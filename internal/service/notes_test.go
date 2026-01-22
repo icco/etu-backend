@@ -11,19 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// mockDB implements a mock database for testing
-type mockDB struct {
-	notes map[string]*db.Note
-	tags  map[string]*db.Tag
-}
-
-func newMockDB() *mockDB {
-	return &mockDB{
-		notes: make(map[string]*db.Note),
-		tags:  make(map[string]*db.Tag),
-	}
-}
-
 // mockNotesService wraps NotesService for testing
 type mockNotesService struct {
 	pb.UnimplementedNotesServiceServer
@@ -266,11 +253,11 @@ func TestListNotes(t *testing.T) {
 	ctx := context.Background()
 
 	// Create some notes
-	svc.CreateNote(ctx, &pb.CreateNoteRequest{
+	_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
 		UserId:  "user-123",
 		Content: "Note 1",
 	})
-	svc.CreateNote(ctx, &pb.CreateNoteRequest{
+	_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
 		UserId:  "user-123",
 		Content: "Note 2",
 	})
