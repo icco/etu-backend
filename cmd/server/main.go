@@ -1,0 +1,131 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/icco/etu-backend/internal/auth"
+	"github.com/icco/etu-backend/internal/db"
+	"github.com/icco/etu-backend/internal/service"
+	pb "github.com/icco/etu-backend/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
+)
+
+var (
+	CommitSHA = "unknown"
+)
+
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "50051"
+	}
+
+	log.Printf("Starting etu-backend gRPC server (commit: %s)", CommitSHA)
+
+	// Initialize database
+	database, err := db.New()
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer database.Close()
+	log.Println("Connected to database")
+
+	// Initialize authenticator
+	authenticator, err := auth.New()
+	if err != nil {
+		log.Fatalf("Failed to initialize authenticator: %v", err)
+	}
+	defer authenticator.Close()
+	log.Println("Authenticator initialized")
+
+	// Create gRPC server with authentication interceptor
+	server := grpc.NewServer(
+		grpc.UnaryInterceptor(authInterceptor(authenticator)),
+	)
+
+	// Register services
+	notesService := service.NewNotesService(database)
+	tagsService := service.NewTagsService(database)
+
+	pb.RegisterNotesServiceServer(server, notesService)
+	pb.RegisterTagsServiceServer(server, tagsService)
+
+	// Enable reflection for development/debugging
+	reflection.Register(server)
+
+	// Start listening
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatalf("Failed to listen on port %s: %v", port, err)
+	}
+
+	// Handle graceful shutdown
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		log.Println("Shutting down gRPC server...")
+		server.GracefulStop()
+	}()
+
+	log.Printf("gRPC server listening on :%s", port)
+	if err := server.Serve(listener); err != nil {
+		log.Fatalf("Failed to serve: %v", err)
+	}
+}
+
+// authInterceptor creates a gRPC interceptor that validates API keys
+func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		// Extract metadata from context
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "missing metadata")
+		}
+
+		// Get authorization header
+		authHeaders := md.Get("authorization")
+		if len(authHeaders) == 0 {
+			return nil, status.Error(codes.Unauthenticated, "missing authorization header")
+		}
+
+		apiKey := authHeaders[0]
+
+		// Verify the API key
+		userID, err := authenticator.VerifyAPIKey(ctx, apiKey)
+		if err != nil {
+			return nil, status.Errorf(codes.Unauthenticated, "invalid API key: %v", err)
+		}
+
+		// Add user ID to context for use by handlers
+		ctx = context.WithValue(ctx, userIDKey, userID)
+
+		// Log the authenticated request
+		log.Printf("Authenticated request: method=%s user=%s", info.FullMethod, userID)
+
+		return handler(ctx, req)
+	}
+}
+
+type contextKey string
+
+const userIDKey contextKey = "userID"
+
+// GetUserID extracts the user ID from context
+func GetUserID(ctx context.Context) (string, error) {
+	userID, ok := ctx.Value(userIDKey).(string)
+	if !ok || userID == "" {
+		return "", fmt.Errorf("user ID not found in context")
+	}
+	return userID, nil
+}

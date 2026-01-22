@@ -1,0 +1,60 @@
+version: '3'
+
+vars:
+  GIT_COMMIT:
+    sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  proto:
+    desc: Generate protobuf files
+    cmds:
+      - protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/etu.proto
+
+  build:
+    desc: Build the server binary
+    cmds:
+      - go build -ldflags "-X main.CommitSHA={{.GIT_COMMIT}}" -o bin/server ./cmd/server
+
+  run:
+    desc: Run the server
+    cmds:
+      - go run ./cmd/server
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test -v -cover ./...
+
+  test-race:
+    desc: Run tests with race detection
+    cmds:
+      - go test -v -race ./...
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf bin/
+
+  deps:
+    desc: Install dependencies
+    cmds:
+      - go mod download
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+      - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+  lint:
+    desc: Run linters
+    cmds:
+      - go vet ./...
+      - staticcheck ./...
+
+  update:
+    desc: Update dependencies
+    cmds:
+      - go get -u ./...
+      - go mod tidy
