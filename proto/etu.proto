@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package etu;
+
+option go_package = "github.com/icco/etu-backend/proto";
+
+// Timestamp message
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}
+
+// Note message
+message Note {
+  string id = 1;
+  string content = 2;
+  repeated string tags = 3;
+  Timestamp created_at = 4;
+  Timestamp updated_at = 5;
+}
+
+// Tag message
+message Tag {
+  string id = 1;
+  string name = 2;
+  int32 count = 3;
+  Timestamp created_at = 4;
+}
+
+// Request/Response messages for Notes
+
+message ListNotesRequest {
+  string user_id = 1;      // Required for auth context
+  string search = 2;
+  repeated string tags = 3;
+  string start_date = 4;   // ISO 8601 format
+  string end_date = 5;     // ISO 8601 format
+  int32 limit = 6;
+  int32 offset = 7;
+}
+
+message ListNotesResponse {
+  repeated Note notes = 1;
+  int32 total = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message CreateNoteRequest {
+  string user_id = 1;      // Required for auth context
+  string content = 2;
+  repeated string tags = 3;
+}
+
+message CreateNoteResponse {
+  Note note = 1;
+}
+
+message GetNoteRequest {
+  string user_id = 1;      // Required for auth context
+  string id = 2;
+}
+
+message GetNoteResponse {
+  Note note = 1;
+}
+
+message UpdateNoteRequest {
+  string user_id = 1;      // Required for auth context
+  string id = 2;
+  optional string content = 3;
+  repeated string tags = 4;
+  bool update_tags = 5;    // Flag to indicate if tags should be updated
+}
+
+message UpdateNoteResponse {
+  Note note = 1;
+}
+
+message DeleteNoteRequest {
+  string user_id = 1;      // Required for auth context
+  string id = 2;
+}
+
+message DeleteNoteResponse {
+  bool success = 1;
+}
+
+// Request/Response messages for Tags
+
+message ListTagsRequest {
+  string user_id = 1;      // Required for auth context
+}
+
+message ListTagsResponse {
+  repeated Tag tags = 1;
+}
+
+// Service definitions
+
+service NotesService {
+  rpc ListNotes(ListNotesRequest) returns (ListNotesResponse);
+  rpc CreateNote(CreateNoteRequest) returns (CreateNoteResponse);
+  rpc GetNote(GetNoteRequest) returns (GetNoteResponse);
+  rpc UpdateNote(UpdateNoteRequest) returns (UpdateNoteResponse);
+  rpc DeleteNote(DeleteNoteRequest) returns (DeleteNoteResponse);
+}
+
+service TagsService {
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
+}
