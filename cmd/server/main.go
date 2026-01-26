@@ -56,9 +56,13 @@ func main() {
 	// Register services
 	notesService := service.NewNotesService(database)
 	tagsService := service.NewTagsService(database)
+	authService := service.NewAuthService(database)
+	apiKeysService := service.NewApiKeysService(database)
 
 	pb.RegisterNotesServiceServer(server, notesService)
 	pb.RegisterTagsServiceServer(server, tagsService)
+	pb.RegisterAuthServiceServer(server, authService)
+	pb.RegisterApiKeysServiceServer(server, apiKeysService)
 
 	// Enable reflection for development/debugging
 	reflection.Register(server)
@@ -86,7 +90,20 @@ func main() {
 
 // authInterceptor creates a gRPC interceptor that validates API keys
 func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerInterceptor {
+	// Methods that don't require authentication
+	publicMethods := map[string]bool{
+		"/etu.AuthService/Register":      true,
+		"/etu.AuthService/Authenticate":  true,
+		"/etu.ApiKeysService/VerifyApiKey": true,
+	}
+
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		// Skip auth for public methods
+		if publicMethods[info.FullMethod] {
+			log.Printf("Public request: method=%s", info.FullMethod)
+			return handler(ctx, req)
+		}
+
 		// Extract metadata from context
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {

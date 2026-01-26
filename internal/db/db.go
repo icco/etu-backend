@@ -36,6 +36,30 @@ type Tag struct {
 	Count     int
 }
 
+// User represents a user in the database
+type User struct {
+	ID                 string
+	Email              string
+	Name               *string
+	Image              *string
+	PasswordHash       string
+	SubscriptionStatus string
+	SubscriptionEnd    *time.Time
+	CreatedAt          time.Time
+	StripeCustomerID   *string
+}
+
+// ApiKey represents an API key in the database
+type ApiKey struct {
+	ID        string
+	Name      string
+	KeyPrefix string
+	KeyHash   string
+	UserID    string
+	CreatedAt time.Time
+	LastUsed  *time.Time
+}
+
 // New creates a new database connection
 func New() (*DB, error) {
 	connStr := os.Getenv("DATABASE_URL")
@@ -469,4 +493,294 @@ func generateCUID() string {
 	}
 
 	return string(result)
+}
+
+// CreateUser creates a new user with email and password
+func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User, error) {
+	userID := generateCUID()
+	now := time.Now()
+
+	_, err := db.conn.ExecContext(ctx, `
+		INSERT INTO "User" (id, email, "passwordHash", "subscriptionStatus", "createdAt")
+		VALUES ($1, $2, $3, $4, $5)
+	`, userID, email, passwordHash, "free", now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert user: %w", err)
+	}
+
+	return &User{
+		ID:                 userID,
+		Email:              email,
+		PasswordHash:       passwordHash,
+		SubscriptionStatus: "free",
+		CreatedAt:          now,
+	}, nil
+}
+
+// GetUserByEmail retrieves a user by email address
+func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	query := `
+		SELECT id, email, name, image, "passwordHash", "subscriptionStatus", "subscriptionEnd", "createdAt", "stripeCustomerId"
+		FROM "User"
+		WHERE email = $1
+	`
+
+	var u User
+	var subscriptionEnd sql.NullTime
+	var stripeCustomerID sql.NullString
+	var name, image sql.NullString
+
+	err := db.conn.QueryRowContext(ctx, query, email).Scan(
+		&u.ID, &u.Email, &name, &image, &u.PasswordHash,
+		&u.SubscriptionStatus, &subscriptionEnd, &u.CreatedAt, &stripeCustomerID,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if name.Valid {
+		u.Name = &name.String
+	}
+	if image.Valid {
+		u.Image = &image.String
+	}
+	if subscriptionEnd.Valid {
+		u.SubscriptionEnd = &subscriptionEnd.Time
+	}
+	if stripeCustomerID.Valid {
+		u.StripeCustomerID = &stripeCustomerID.String
+	}
+
+	return &u, nil
+}
+
+// GetUser retrieves a user by ID
+func (db *DB) GetUser(ctx context.Context, userID string) (*User, error) {
+	query := `
+		SELECT id, email, name, image, "passwordHash", "subscriptionStatus", "subscriptionEnd", "createdAt", "stripeCustomerId"
+		FROM "User"
+		WHERE id = $1
+	`
+
+	var u User
+	var subscriptionEnd sql.NullTime
+	var stripeCustomerID sql.NullString
+	var name, image sql.NullString
+
+	err := db.conn.QueryRowContext(ctx, query, userID).Scan(
+		&u.ID, &u.Email, &name, &image, &u.PasswordHash,
+		&u.SubscriptionStatus, &subscriptionEnd, &u.CreatedAt, &stripeCustomerID,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if name.Valid {
+		u.Name = &name.String
+	}
+	if image.Valid {
+		u.Image = &image.String
+	}
+	if subscriptionEnd.Valid {
+		u.SubscriptionEnd = &subscriptionEnd.Time
+	}
+	if stripeCustomerID.Valid {
+		u.StripeCustomerID = &stripeCustomerID.String
+	}
+
+	return &u, nil
+}
+
+// GetUserByStripeCustomerID retrieves a user by Stripe customer ID
+func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*User, error) {
+	query := `
+		SELECT id, email, name, image, "passwordHash", "subscriptionStatus", "subscriptionEnd", "createdAt", "stripeCustomerId"
+		FROM "User"
+		WHERE "stripeCustomerId" = $1
+	`
+
+	var u User
+	var subscriptionEnd sql.NullTime
+	var stripeID sql.NullString
+	var name, image sql.NullString
+
+	err := db.conn.QueryRowContext(ctx, query, stripeCustomerID).Scan(
+		&u.ID, &u.Email, &name, &image, &u.PasswordHash,
+		&u.SubscriptionStatus, &subscriptionEnd, &u.CreatedAt, &stripeID,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if name.Valid {
+		u.Name = &name.String
+	}
+	if image.Valid {
+		u.Image = &image.String
+	}
+	if subscriptionEnd.Valid {
+		u.SubscriptionEnd = &subscriptionEnd.Time
+	}
+	if stripeID.Valid {
+		u.StripeCustomerID = &stripeID.String
+	}
+
+	return &u, nil
+}
+
+// UpdateUserSubscription updates a user's subscription information
+func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionStatus string, stripeCustomerID *string, subscriptionEnd *time.Time) (*User, error) {
+	// Build dynamic update query
+	query := `UPDATE "User" SET "subscriptionStatus" = $1`
+	args := []interface{}{subscriptionStatus}
+	argNum := 2
+
+	if stripeCustomerID != nil {
+		query += fmt.Sprintf(`, "stripeCustomerId" = $%d`, argNum)
+		args = append(args, *stripeCustomerID)
+		argNum++
+	}
+
+	if subscriptionEnd != nil {
+		query += fmt.Sprintf(`, "subscriptionEnd" = $%d`, argNum)
+		args = append(args, *subscriptionEnd)
+		argNum++
+	}
+
+	query += fmt.Sprintf(` WHERE id = $%d`, argNum)
+	args = append(args, userID)
+
+	result, err := db.conn.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user subscription: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return nil, nil
+	}
+
+	return db.GetUser(ctx, userID)
+}
+
+// CreateApiKey creates a new API key for a user
+func (db *DB) CreateApiKey(ctx context.Context, userID, name, keyPrefix, keyHash string) (*ApiKey, error) {
+	keyID := generateCUID()
+	now := time.Now()
+
+	_, err := db.conn.ExecContext(ctx, `
+		INSERT INTO "ApiKey" (id, name, "keyPrefix", "keyHash", "userId", "createdAt")
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, keyID, name, keyPrefix, keyHash, userID, now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert API key: %w", err)
+	}
+
+	return &ApiKey{
+		ID:        keyID,
+		Name:      name,
+		KeyPrefix: keyPrefix,
+		KeyHash:   keyHash,
+		UserID:    userID,
+		CreatedAt: now,
+	}, nil
+}
+
+// ListApiKeys retrieves all API keys for a user (without the hash)
+func (db *DB) ListApiKeys(ctx context.Context, userID string) ([]ApiKey, error) {
+	query := `
+		SELECT id, name, "keyPrefix", "createdAt", "lastUsed"
+		FROM "ApiKey"
+		WHERE "userId" = $1
+		ORDER BY "createdAt" DESC
+	`
+
+	rows, err := db.conn.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query API keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []ApiKey
+	for rows.Next() {
+		var k ApiKey
+		var lastUsed sql.NullTime
+		if err := rows.Scan(&k.ID, &k.Name, &k.KeyPrefix, &k.CreatedAt, &lastUsed); err != nil {
+			return nil, fmt.Errorf("failed to scan API key: %w", err)
+		}
+		if lastUsed.Valid {
+			k.LastUsed = &lastUsed.Time
+		}
+		k.UserID = userID
+		keys = append(keys, k)
+	}
+
+	return keys, rows.Err()
+}
+
+// DeleteApiKey deletes an API key for a user
+func (db *DB) DeleteApiKey(ctx context.Context, userID, keyID string) (bool, error) {
+	result, err := db.conn.ExecContext(ctx, `
+		DELETE FROM "ApiKey" WHERE id = $1 AND "userId" = $2
+	`, keyID, userID)
+	if err != nil {
+		return false, fmt.Errorf("failed to delete API key: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	return rowsAffected > 0, nil
+}
+
+// GetApiKeysByPrefix retrieves API keys by prefix for verification
+func (db *DB) GetApiKeysByPrefix(ctx context.Context, keyPrefix string) ([]ApiKey, error) {
+	query := `
+		SELECT id, name, "keyPrefix", "keyHash", "userId", "createdAt", "lastUsed"
+		FROM "ApiKey"
+		WHERE "keyPrefix" = $1
+	`
+
+	rows, err := db.conn.QueryContext(ctx, query, keyPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query API keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []ApiKey
+	for rows.Next() {
+		var k ApiKey
+		var lastUsed sql.NullTime
+		if err := rows.Scan(&k.ID, &k.Name, &k.KeyPrefix, &k.KeyHash, &k.UserID, &k.CreatedAt, &lastUsed); err != nil {
+			return nil, fmt.Errorf("failed to scan API key: %w", err)
+		}
+		if lastUsed.Valid {
+			k.LastUsed = &lastUsed.Time
+		}
+		keys = append(keys, k)
+	}
+
+	return keys, rows.Err()
+}
+
+// UpdateApiKeyLastUsed updates the lastUsed timestamp for an API key
+func (db *DB) UpdateApiKeyLastUsed(ctx context.Context, keyID string) error {
+	_, err := db.conn.ExecContext(ctx, `
+		UPDATE "ApiKey" SET "lastUsed" = $1 WHERE id = $2
+	`, time.Now(), keyID)
+	return err
 }
