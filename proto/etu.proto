@@ -27,6 +27,27 @@ message Tag {
   Timestamp created_at = 4;
 }
 
+// User message
+message User {
+  string id = 1;
+  string email = 2;
+  optional string name = 3;
+  optional string image = 4;
+  string subscription_status = 5;
+  optional Timestamp subscription_end = 6;
+  Timestamp created_at = 7;
+  optional string stripe_customer_id = 8;
+}
+
+// API Key message
+message ApiKey {
+  string id = 1;
+  string name = 2;
+  string key_prefix = 3;
+  Timestamp created_at = 4;
+  optional Timestamp last_used = 5;
+}
+
 // Request/Response messages for Notes
 
 message ListNotesRequest {
@@ -96,6 +117,92 @@ message ListTagsResponse {
   repeated Tag tags = 1;
 }
 
+// Auth request/response messages
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  User user = 1;
+}
+
+message AuthenticateRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthenticateResponse {
+  bool success = 1;
+  optional User user = 2;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message GetUserByStripeCustomerIdRequest {
+  string stripe_customer_id = 1;
+}
+
+message GetUserByStripeCustomerIdResponse {
+  optional User user = 1;
+}
+
+message UpdateUserSubscriptionRequest {
+  string user_id = 1;
+  string subscription_status = 2;
+  optional string stripe_customer_id = 3;
+  optional Timestamp subscription_end = 4;
+}
+
+message UpdateUserSubscriptionResponse {
+  User user = 1;
+}
+
+// API Keys request/response messages
+
+message CreateApiKeyRequest {
+  string user_id = 1;
+  string name = 2;
+}
+
+message CreateApiKeyResponse {
+  ApiKey api_key = 1;
+  string raw_key = 2;
+}
+
+message ListApiKeysRequest {
+  string user_id = 1;
+}
+
+message ListApiKeysResponse {
+  repeated ApiKey api_keys = 1;
+}
+
+message DeleteApiKeyRequest {
+  string user_id = 1;
+  string key_id = 2;
+}
+
+message DeleteApiKeyResponse {
+  bool success = 1;
+}
+
+message VerifyApiKeyRequest {
+  string raw_key = 1;
+}
+
+message VerifyApiKeyResponse {
+  bool valid = 1;
+  optional string user_id = 2;
+}
+
 // Service definitions
 
 service NotesService {
@@ -108,4 +215,19 @@ service NotesService {
 
 service TagsService {
   rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
+}
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetUserByStripeCustomerId(GetUserByStripeCustomerIdRequest) returns (GetUserByStripeCustomerIdResponse);
+  rpc UpdateUserSubscription(UpdateUserSubscriptionRequest) returns (UpdateUserSubscriptionResponse);
+}
+
+service ApiKeysService {
+  rpc CreateApiKey(CreateApiKeyRequest) returns (CreateApiKeyResponse);
+  rpc ListApiKeys(ListApiKeysRequest) returns (ListApiKeysResponse);
+  rpc DeleteApiKey(DeleteApiKeyRequest) returns (DeleteApiKeyResponse);
+  rpc VerifyApiKey(VerifyApiKeyRequest) returns (VerifyApiKeyResponse);
 }
