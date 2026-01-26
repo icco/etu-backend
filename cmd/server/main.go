@@ -88,13 +88,19 @@ func main() {
 	}
 }
 
-// authInterceptor creates a gRPC interceptor that validates API keys
+// authInterceptor creates a gRPC interceptor that validates API keys and M2M tokens
 func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerInterceptor {
 	// Methods that don't require authentication
 	publicMethods := map[string]bool{
-		"/etu.AuthService/Register":      true,
-		"/etu.AuthService/Authenticate":  true,
+		"/etu.AuthService/Register":        true,
+		"/etu.AuthService/Authenticate":    true,
 		"/etu.ApiKeysService/VerifyApiKey": true,
+	}
+
+	// Load M2M token from environment
+	m2mToken := os.Getenv("M2M_TOKEN")
+	if m2mToken != "" {
+		log.Println("M2M token authentication enabled")
 	}
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
@@ -116,16 +122,26 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 			return nil, status.Error(codes.Unauthenticated, "missing authorization header")
 		}
 
-		apiKey := authHeaders[0]
+		token := authHeaders[0]
 
-		// Verify the API key
-		userID, err := authenticator.VerifyAPIKey(ctx, apiKey)
+		// Check for M2M token first
+		if m2mToken != "" && token == m2mToken {
+			// M2M authentication successful - no user context
+			ctx = context.WithValue(ctx, userIDKey, "m2m")
+			ctx = context.WithValue(ctx, authTypeKey, "m2m")
+			log.Printf("M2M authenticated request: method=%s", info.FullMethod)
+			return handler(ctx, req)
+		}
+
+		// Fall back to API key verification
+		userID, err := authenticator.VerifyAPIKey(ctx, token)
 		if err != nil {
 			return nil, status.Errorf(codes.Unauthenticated, "invalid API key: %v", err)
 		}
 
 		// Add user ID to context for use by handlers
 		ctx = context.WithValue(ctx, userIDKey, userID)
+		ctx = context.WithValue(ctx, authTypeKey, "apikey")
 
 		// Log the authenticated request
 		log.Printf("Authenticated request: method=%s user=%s", info.FullMethod, userID)
@@ -136,7 +152,10 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 
 type contextKey string
 
-const userIDKey contextKey = "userID"
+const (
+	userIDKey   contextKey = "userID"
+	authTypeKey contextKey = "authType"
+)
 
 // GetUserID extracts the user ID from context
 func GetUserID(ctx context.Context) (string, error) {
@@ -145,4 +164,18 @@ func GetUserID(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("user ID not found in context")
 	}
 	return userID, nil
+}
+
+// GetAuthType extracts the authentication type from context ("m2m" or "apikey")
+func GetAuthType(ctx context.Context) string {
+	authType, ok := ctx.Value(authTypeKey).(string)
+	if !ok {
+		return ""
+	}
+	return authType
+}
+
+// IsM2MAuth returns true if the request was authenticated via M2M token
+func IsM2MAuth(ctx context.Context) bool {
+	return GetAuthType(ctx) == "m2m"
 }
