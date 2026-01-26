@@ -97,10 +97,10 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 		"/etu.ApiKeysService/VerifyApiKey": true,
 	}
 
-	// Load M2M token from environment
-	m2mToken := os.Getenv("M2M_TOKEN")
-	if m2mToken != "" {
-		log.Println("M2M token authentication enabled")
+	// Load GRPC API key from environment for server-to-server auth
+	grpcApiKey := os.Getenv("GRPC_API_KEY")
+	if grpcApiKey != "" {
+		log.Println("GRPC API key authentication enabled")
 	}
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
@@ -124,12 +124,12 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 
 		token := authHeaders[0]
 
-		// Check for M2M token first
-		if m2mToken != "" && token == m2mToken {
-			// M2M authentication successful - no user context
+		// Check for GRPC API key (server-to-server auth)
+		if grpcApiKey != "" && token == grpcApiKey {
+			// GRPC API key authentication successful - no user context
 			ctx = context.WithValue(ctx, userIDKey, "m2m")
 			ctx = context.WithValue(ctx, authTypeKey, "m2m")
-			log.Printf("M2M authenticated request: method=%s", info.FullMethod)
+			log.Printf("GRPC API key authenticated request: method=%s", info.FullMethod)
 			return handler(ctx, req)
 		}
 
