@@ -1,0 +1,70 @@
+{
+  "name": "@icco/etu-proto",
+  "version": "0.0.0",
+  "description": "Generated TypeScript protobuf types for the etu API",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./etu_pb": {
+      "import": "./dist/etu_pb.js",
+      "types": "./dist/etu_pb.d.ts"
+    },
+    "./etu_connect": {
+      "import": "./dist/etu_connect.js",
+      "types": "./dist/etu_connect.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist gen",
+    "generate": "buf generate && echo \"export * from './etu_pb.js';\" > gen/index.ts",
+    "build": "npm run generate && tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/icco/etu-backend.git",
+    "directory": "packages/etu-proto"
+  },
+  "keywords": [
+    "protobuf",
+    "grpc",
+    "etu",
+    "notes",
+    "tags"
+  ],
+  "author": "Nat Welch",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/icco/etu-backend/issues"
+  },
+  "homepage": "https://github.com/icco/etu-backend#readme",
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.0.0"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "^1.47.0",
+    "@bufbuild/protoc-gen-es": "^2.0.0",
+    "typescript": "^5.7.0"
+  },
+  "peerDependencies": {
+    "@connectrpc/connect": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@connectrpc/connect": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
