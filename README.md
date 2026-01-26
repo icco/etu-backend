@@ -24,11 +24,17 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 
 ```
 etu-backend/
-├── cmd/server/          # Application entry point
+├── cmd/
+│   ├── server/          # gRPC API server entry point
+│   └── sync/            # Notion sync job entry point
 ├── internal/
 │   ├── auth/            # API key authentication
 │   ├── db/              # Database layer (PostgreSQL)
-│   └── service/         # gRPC service implementations
+│   ├── notion/          # Notion API client
+│   ├── service/         # gRPC service implementations
+│   ├── sync/            # Notion-to-PostgreSQL sync logic
+│   └── syncdb/          # GORM database layer for sync
+├── migrations/          # SQL migration files
 ├── proto/               # Protocol buffer definitions
 ├── .github/workflows/   # CI/CD pipelines
 ├── Dockerfile
@@ -49,6 +55,7 @@ etu-backend/
 |----------|-------------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `PORT` | Server port (default: 50051) | No |
+| `NOTION_KEY` | Notion API key (for sync job) | Sync only |
 
 ## Getting Started
 
@@ -145,3 +152,68 @@ task lint
 ```bash
 task --list      # List all available tasks
 ```
+
+## Notion Sync Job
+
+The sync job fetches journal entries from a Notion database and syncs them to PostgreSQL. It's designed to run as a cron job or continuously with an interval.
+
+### Prerequisites
+
+1. A Notion integration with access to your "Journal" database
+2. Set the `NOTION_KEY` environment variable with your Notion API key
+3. Run the database migration before first sync
+
+### Database Migration
+
+Before running the sync job for the first time, apply the migration:
+
+```bash
+psql $DATABASE_URL < migrations/001_add_notion_sync.sql
+```
+
+### Running the Sync Job
+
+**One-time sync:**
+```bash
+./bin/sync -user <USER_ID> -full
+```
+
+**Incremental sync (only changes since last sync):**
+```bash
+./bin/sync -user <USER_ID>
+```
+
+**Continuous sync (every hour):**
+```bash
+./bin/sync -user <USER_ID> -interval 1h
+```
+
+### Command Line Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-user` | User ID to sync notes for (required) | - |
+| `-full` | Perform a full sync instead of incremental | false |
+| `-interval` | Run continuously with this interval (e.g., `1h`, `30m`) | - |
+| `-migrate` | Run GORM auto-migrations before syncing | false |
+
+### Example Cron Entry
+
+To sync every hour:
+
+```cron
+0 * * * * DATABASE_URL="..." NOTION_KEY="..." /path/to/sync -user <USER_ID> >> /var/log/etu-sync.log 2>&1
+```
+
+### Data Mapping
+
+The sync job maps Notion data to PostgreSQL as follows:
+
+| Notion Field | PostgreSQL Column | Description |
+|--------------|-------------------|-------------|
+| Page ID | `externalId` | Notion's page identifier |
+| ID property | `notionUuid` | UUID stored in the "ID" title property |
+| Page content | `content` | Paragraph blocks as text |
+| Tags property | Tags via `NoteTag` | Multi-select tags |
+| Created time | `createdAt` | Page creation timestamp |
+| Last edited | `updatedAt` | Page modification timestamp |
