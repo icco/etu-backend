@@ -4,6 +4,14 @@ Generated TypeScript protobuf types for the etu API.
 
 ## Installation
 
+First, configure npm to use GitHub Packages for the `@icco` scope by adding to your `.npmrc`:
+
+```
+@icco:registry=https://npm.pkg.github.com
+```
+
+Then install:
+
 ```bash
 npm install @icco/etu-proto
 ```
