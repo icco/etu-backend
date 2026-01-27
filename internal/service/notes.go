@@ -151,10 +151,16 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 
 // noteToProto converts a db.Note to a protobuf Note
 func noteToProto(n *db.Note) *pb.Note {
+	// Convert []Tag to []string
+	tagNames := make([]string, len(n.Tags))
+	for i, t := range n.Tags {
+		tagNames[i] = t.Name
+	}
+
 	return &pb.Note{
 		Id:        n.ID,
 		Content:   n.Content,
-		Tags:      n.Tags,
+		Tags:      tagNames,
 		CreatedAt: &pb.Timestamp{Seconds: n.CreatedAt.Unix(), Nanos: int32(n.CreatedAt.Nanosecond())},
 		UpdatedAt: &pb.Timestamp{Seconds: n.UpdatedAt.Unix(), Nanos: int32(n.UpdatedAt.Nanosecond())},
 	}

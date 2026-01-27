@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/icco/etu-backend/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -14,6 +15,13 @@ import (
 type DB struct {
 	conn *gorm.DB
 }
+
+// Re-export models for backwards compatibility
+type Note = models.Note
+type Tag = models.Tag
+type NoteTag = models.NoteTag
+type User = models.User
+type SyncState = models.SyncState
 
 // New creates a new GORM database connection
 func New() (*DB, error) {
@@ -51,9 +59,16 @@ func (db *DB) Close() error {
 	return sqlDB.Close()
 }
 
-// AutoMigrate runs auto migrations for sync-related tables
+// AutoMigrate runs auto migrations for all tables
 func (db *DB) AutoMigrate() error {
-	return db.conn.AutoMigrate(&SyncState{})
+	return db.conn.AutoMigrate(
+		&models.User{},
+		&models.Note{},
+		&models.Tag{},
+		&models.NoteTag{},
+		&models.ApiKey{},
+		&models.SyncState{},
+	)
 }
 
 // GetNoteByNotionPageID finds a note by its Notion page ID (externalId)
@@ -99,7 +114,7 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 			// Create new note
 			isNew = true
 			note = Note{
-				ID:         generateCUID(),
+				ID:         models.GenerateCUID(),
 				Content:    content,
 				CreatedAt:  createdAt,
 				UpdatedAt:  updatedAt,
@@ -140,7 +155,7 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 			if result.Error == gorm.ErrRecordNotFound {
 				// Create new tag
 				tag = Tag{
-					ID:        generateCUID(),
+					ID:        models.GenerateCUID(),
 					Name:      tagName,
 					CreatedAt: time.Now(),
 					UserID:    userID,
@@ -210,23 +225,4 @@ func (db *DB) GetNoteTags(noteID string) ([]string, error) {
 		names[i] = tag.Name
 	}
 	return names, nil
-}
-
-// generateCUID generates a CUID-like identifier
-func generateCUID() string {
-	const chars = "0123456789abcdefghijklmnopqrstuvwxyz"
-	result := make([]byte, 25)
-	result[0] = 'c'
-
-	timestamp := time.Now().UnixMilli()
-	for i := 1; i < 9; i++ {
-		result[i] = chars[timestamp%36]
-		timestamp /= 36
-	}
-
-	for i := 9; i < 25; i++ {
-		result[i] = chars[time.Now().UnixNano()%36]
-	}
-
-	return string(result)
 }

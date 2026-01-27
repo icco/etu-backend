@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/icco/etu-backend/internal/db"
+	"github.com/icco/etu-backend/internal/models"
 	pb "github.com/icco/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,13 +33,20 @@ func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteReq
 	}
 
 	now := time.Now()
+
+	// Convert []string to []Tag
+	tags := make([]models.Tag, len(req.Tags))
+	for i, name := range req.Tags {
+		tags[i] = models.Tag{Name: name}
+	}
+
 	note := &db.Note{
 		ID:        "test-note-id",
 		Content:   req.Content,
 		CreatedAt: now,
 		UpdatedAt: now,
 		UserID:    req.UserId,
-		Tags:      req.Tags,
+		Tags:      tags,
 	}
 	s.notes[note.ID] = note
 
