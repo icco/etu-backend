@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/icco/etu-backend/internal/auth"
 	"github.com/icco/etu-backend/internal/db"
@@ -25,12 +28,17 @@ var (
 )
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "50051"
+	grpcPort := os.Getenv("GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = "50051"
 	}
 
-	log.Printf("Starting etu-backend gRPC server (commit: %s)", CommitSHA)
+	httpPort := os.Getenv("HTTP_PORT")
+	if httpPort == "" {
+		httpPort = "8080"
+	}
+
+	log.Printf("Starting etu-backend server (commit: %s)", CommitSHA)
 
 	// Initialize database
 	database, err := db.New()
@@ -67,25 +75,94 @@ func main() {
 	// Enable reflection for development/debugging
 	reflection.Register(server)
 
-	// Start listening
-	listener, err := net.Listen("tcp", ":"+port)
+	// Start gRPC listener
+	grpcListener, err := net.Listen("tcp", ":"+grpcPort)
 	if err != nil {
-		log.Fatalf("Failed to listen on port %s: %v", port, err)
+		log.Fatalf("Failed to listen on gRPC port %s: %v", grpcPort, err)
 	}
 
-	// Handle graceful shutdown
+	// Create HTTP server for health checks
+	httpServer := &http.Server{
+		Addr:         ":" + httpPort,
+		Handler:      newHealthHandler(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	// Start HTTP server in goroutine
 	go func() {
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-		<-sigCh
-		log.Println("Shutting down gRPC server...")
-		server.GracefulStop()
+		log.Printf("HTTP health server listening on :%s", httpPort)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to serve HTTP: %v", err)
+		}
 	}()
 
-	log.Printf("gRPC server listening on :%s", port)
-	if err := server.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+	// Start gRPC server in goroutine
+	go func() {
+		log.Printf("gRPC server listening on :%s", grpcPort)
+		if err := server.Serve(grpcListener); err != nil {
+			log.Fatalf("Failed to serve gRPC: %v", err)
+		}
+	}()
+
+	// Handle graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	log.Println("Shutting down servers...")
+
+	// Shutdown HTTP server with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(ctx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
 	}
+
+	// Gracefully stop gRPC server
+	server.GracefulStop()
+
+	log.Println("Servers stopped")
+}
+
+// newHealthHandler creates an HTTP handler for health check endpoints
+func newHealthHandler() http.Handler {
+	mux := http.NewServeMux()
+
+	// Root health check
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "ok",
+			"commit": CommitSHA,
+		})
+	})
+
+	// Explicit health endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "ok",
+			"commit": CommitSHA,
+		})
+	})
+
+	// Readiness check (could add DB checks here if needed)
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "ready",
+		})
+	})
+
+	return mux
 }
 
 // authInterceptor creates a gRPC interceptor that validates API keys and M2M tokens
