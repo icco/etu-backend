@@ -19,7 +19,6 @@ func main() {
 	userID := flag.String("user", "", "User ID to sync (required)")
 	fullSync := flag.Bool("full", false, "Perform a full sync instead of incremental")
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
-	migrate := flag.Bool("migrate", false, "Run database migrations before syncing")
 	flag.Parse()
 
 	if *userID == "" {
@@ -41,13 +40,9 @@ func main() {
 	defer database.Close()
 	log.Println("Connected to database")
 
-	// Run migrations if requested
-	if *migrate {
-		log.Println("Running database migrations...")
-		if err := database.AutoMigrate(); err != nil {
-			log.Fatalf("Failed to run migrations: %v", err)
-		}
-		log.Println("Migrations completed")
+	// Run auto-migrations to ensure all tables exist
+	if err := database.AutoMigrate(); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
 	// Initialize Notion client

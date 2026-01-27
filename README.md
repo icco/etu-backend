@@ -34,7 +34,6 @@ etu-backend/
 │   ├── service/         # gRPC service implementations
 │   ├── sync/            # Notion-to-PostgreSQL sync logic
 │   └── syncdb/          # GORM database layer for sync
-├── migrations/          # SQL migration files
 ├── proto/               # Protocol buffer definitions
 ├── .github/workflows/   # CI/CD pipelines
 ├── Dockerfile
@@ -155,21 +154,12 @@ task --list      # List all available tasks
 
 ## Notion Sync Job
 
-The sync job fetches journal entries from a Notion database and syncs them to PostgreSQL. It's designed to run as a cron job or continuously with an interval.
+The sync job fetches journal entries from a Notion database and syncs them to PostgreSQL. It's designed to run as a cron job or continuously with an interval. Database tables are managed automatically by GORM on startup.
 
 ### Prerequisites
 
 1. A Notion integration with access to your "Journal" database
 2. Set the `NOTION_KEY` environment variable with your Notion API key
-3. Run the database migration before first sync
-
-### Database Migration
-
-Before running the sync job for the first time, apply the migration:
-
-```bash
-psql $DATABASE_URL < migrations/001_add_notion_sync.sql
-```
 
 ### Running the Sync Job
 
@@ -195,7 +185,6 @@ psql $DATABASE_URL < migrations/001_add_notion_sync.sql
 | `-user` | User ID to sync notes for (required) | - |
 | `-full` | Perform a full sync instead of incremental | false |
 | `-interval` | Run continuously with this interval (e.g., `1h`, `30m`) | - |
-| `-migrate` | Run GORM auto-migrations before syncing | false |
 
 ### Example Cron Entry
 
