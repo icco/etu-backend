@@ -8,14 +8,15 @@ import (
 
 // Note represents a note in the database
 type Note struct {
-	ID         string    `gorm:"column:id;primaryKey"`
-	Content    string    `gorm:"column:content;type:text"`
-	CreatedAt  time.Time `gorm:"column:createdAt"`
-	UpdatedAt  time.Time `gorm:"column:updatedAt"`
-	UserID     string    `gorm:"column:userId;index"`
-	ExternalID *string   `gorm:"column:externalId;index"` // Notion page ID
-	NotionUUID *string   `gorm:"column:notionUuid;index"` // Notion post UUID (stored in ID property)
-	Tags       []Tag     `gorm:"many2many:NoteTag;foreignKey:ID;joinForeignKey:noteId;References:ID;joinReferences:tagId"`
+	ID               string     `gorm:"column:id;primaryKey"`
+	Content          string     `gorm:"column:content;type:text"`
+	CreatedAt        time.Time  `gorm:"column:createdAt"`
+	UpdatedAt        time.Time  `gorm:"column:updatedAt"`
+	UserID           string     `gorm:"column:userId;index"`
+	ExternalID       *string    `gorm:"column:externalId;index"`       // Notion page ID
+	NotionUUID       *string    `gorm:"column:notionUuid;index"`       // Notion post UUID (stored in ID property)
+	LastSyncedToNotion *time.Time `gorm:"column:lastSyncedToNotion"`  // When this note was last pushed to Notion
+	Tags             []Tag      `gorm:"many2many:NoteTag;foreignKey:ID;joinForeignKey:noteId;References:ID;joinReferences:tagId"`
 }
 
 // TableName specifies the table name for Note

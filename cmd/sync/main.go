@@ -18,6 +18,8 @@ func main() {
 	// Parse command line flags
 	userID := flag.String("user", "", "User ID to sync (required)")
 	fullSync := flag.Bool("full", false, "Perform a full sync instead of incremental")
+	bidirectional := flag.Bool("bidirectional", false, "Sync both from and to Notion (default: only from Notion)")
+	toNotion := flag.Bool("to-notion", false, "Only sync local changes to Notion (skip syncing from Notion)")
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
 	flag.Parse()
 
@@ -28,6 +30,8 @@ func main() {
 	log.Printf("Starting Notion sync job")
 	log.Printf("  User ID: %s", *userID)
 	log.Printf("  Full sync: %v", *fullSync)
+	log.Printf("  Bidirectional: %v", *bidirectional)
+	log.Printf("  To Notion only: %v", *toNotion)
 	if *interval > 0 {
 		log.Printf("  Interval: %s", *interval)
 	}
@@ -68,31 +72,69 @@ func main() {
 		cancel()
 	}()
 
+	// Determine sync mode
+	syncMode := "from-notion"
+	if *bidirectional {
+		syncMode = "bidirectional"
+	} else if *toNotion {
+		syncMode = "to-notion"
+	}
+
 	if *interval > 0 {
 		// Run continuously
-		runContinuously(ctx, syncer, *userID, *fullSync, *interval)
+		runContinuously(ctx, syncer, *userID, *fullSync, syncMode, *interval)
 	} else {
 		// Run once
-		runOnce(ctx, syncer, *userID, *fullSync)
+		runOnce(ctx, syncer, *userID, *fullSync, syncMode)
 	}
 }
 
-func runOnce(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool) {
-	result, err := syncer.SyncUser(ctx, userID, fullSync)
-	if err != nil {
-		log.Fatalf("Sync failed: %v", err)
-	}
+func runOnce(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) {
+	switch syncMode {
+	case "to-notion":
+		result, err := syncer.SyncUserToNotion(ctx, userID)
+		if err != nil {
+			log.Fatalf("Sync to Notion failed: %v", err)
+		}
+		log.Printf("Sync to Notion completed in %s", result.Duration)
+		log.Printf("  Created: %d", result.Created)
+		log.Printf("  Updated: %d", result.Updated)
+		log.Printf("  Archived: %d", result.Archived)
+		log.Printf("  Errors: %d", result.Errors)
 
-	log.Printf("Sync completed in %s", result.Duration)
-	log.Printf("  Created: %d", result.Created)
-	log.Printf("  Updated: %d", result.Updated)
-	log.Printf("  Unchanged: %d", result.Unchanged)
-	log.Printf("  Errors: %d", result.Errors)
+	case "bidirectional":
+		fromResult, toResult, err := syncer.SyncUserBidirectional(ctx, userID, fullSync)
+		if err != nil {
+			log.Fatalf("Bidirectional sync failed: %v", err)
+		}
+		log.Printf("Bidirectional sync completed")
+		log.Printf("From Notion (in %s):", fromResult.Duration)
+		log.Printf("  Created: %d", fromResult.Created)
+		log.Printf("  Updated: %d", fromResult.Updated)
+		log.Printf("  Unchanged: %d", fromResult.Unchanged)
+		log.Printf("  Errors: %d", fromResult.Errors)
+		log.Printf("To Notion (in %s):", toResult.Duration)
+		log.Printf("  Created: %d", toResult.Created)
+		log.Printf("  Updated: %d", toResult.Updated)
+		log.Printf("  Archived: %d", toResult.Archived)
+		log.Printf("  Errors: %d", toResult.Errors)
+
+	default: // from-notion
+		result, err := syncer.SyncUser(ctx, userID, fullSync)
+		if err != nil {
+			log.Fatalf("Sync failed: %v", err)
+		}
+		log.Printf("Sync completed in %s", result.Duration)
+		log.Printf("  Created: %d", result.Created)
+		log.Printf("  Updated: %d", result.Updated)
+		log.Printf("  Unchanged: %d", result.Unchanged)
+		log.Printf("  Errors: %d", result.Errors)
+	}
 }
 
-func runContinuously(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, interval time.Duration) {
+func runContinuously(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string, interval time.Duration) {
 	// Run immediately on start
-	performSync(ctx, syncer, userID, fullSync)
+	performSync(ctx, syncer, userID, fullSync, syncMode)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -104,20 +146,42 @@ func runContinuously(ctx context.Context, syncer *sync.Syncer, userID string, fu
 			return
 		case <-ticker.C:
 			// After the first run, always do incremental syncs unless --full was specified
-			performSync(ctx, syncer, userID, fullSync)
+			performSync(ctx, syncer, userID, fullSync, syncMode)
 		}
 	}
 }
 
-func performSync(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool) {
+func performSync(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) {
 	log.Printf("Starting sync at %s", time.Now().Format(time.RFC3339))
 
-	result, err := syncer.SyncUser(ctx, userID, fullSync)
-	if err != nil {
-		log.Printf("Sync failed: %v", err)
-		return
-	}
+	switch syncMode {
+	case "to-notion":
+		result, err := syncer.SyncUserToNotion(ctx, userID)
+		if err != nil {
+			log.Printf("Sync to Notion failed: %v", err)
+			return
+		}
+		log.Printf("Sync to Notion completed in %s: created=%d updated=%d archived=%d errors=%d",
+			result.Duration, result.Created, result.Updated, result.Archived, result.Errors)
 
-	log.Printf("Sync completed in %s: created=%d updated=%d unchanged=%d errors=%d",
-		result.Duration, result.Created, result.Updated, result.Unchanged, result.Errors)
+	case "bidirectional":
+		fromResult, toResult, err := syncer.SyncUserBidirectional(ctx, userID, fullSync)
+		if err != nil {
+			log.Printf("Bidirectional sync failed: %v", err)
+			return
+		}
+		log.Printf("From Notion in %s: created=%d updated=%d unchanged=%d errors=%d",
+			fromResult.Duration, fromResult.Created, fromResult.Updated, fromResult.Unchanged, fromResult.Errors)
+		log.Printf("To Notion in %s: created=%d updated=%d archived=%d errors=%d",
+			toResult.Duration, toResult.Created, toResult.Updated, toResult.Archived, toResult.Errors)
+
+	default: // from-notion
+		result, err := syncer.SyncUser(ctx, userID, fullSync)
+		if err != nil {
+			log.Printf("Sync failed: %v", err)
+			return
+		}
+		log.Printf("Sync completed in %s: created=%d updated=%d unchanged=%d errors=%d",
+			result.Duration, result.Created, result.Updated, result.Unchanged, result.Errors)
+	}
 }

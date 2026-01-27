@@ -298,3 +298,179 @@ func (c *Client) getDatabaseID(ctx context.Context) (notionapi.DatabaseID, error
 	c.cachedDbID = notionapi.DatabaseID(db.ID.String())
 	return c.cachedDbID, nil
 }
+
+// CreatePost creates a new page in the Notion database.
+// Returns the Notion page ID and UUID on success.
+func (c *Client) CreatePost(ctx context.Context, id, content string, tags []string) (pageID string, err error) {
+	dbID, err := c.getDatabaseID(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get database ID: %w", err)
+	}
+
+	client := c.getClient()
+
+	// Build multi-select options for tags
+	multiSelectTags := make([]notionapi.Option, len(tags))
+	for i, tag := range tags {
+		multiSelectTags[i] = notionapi.Option{Name: tag}
+	}
+
+	// Create the page with properties
+	createReq := &notionapi.PageCreateRequest{
+		Parent: notionapi.Parent{
+			Type:       notionapi.ParentTypeDatabaseID,
+			DatabaseID: dbID,
+		},
+		Properties: notionapi.Properties{
+			"ID": notionapi.TitleProperty{
+				Type: notionapi.PropertyTypeTitle,
+				Title: []notionapi.RichText{
+					{
+						Type: notionapi.ObjectTypeText,
+						Text: &notionapi.Text{Content: id},
+					},
+				},
+			},
+			"Tags": notionapi.MultiSelectProperty{
+				Type:        notionapi.PropertyTypeMultiSelect,
+				MultiSelect: multiSelectTags,
+			},
+		},
+		Children: c.contentToBlocks(content),
+	}
+
+	page, err := client.Page.Create(ctx, createReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to create page: %w", err)
+	}
+
+	return page.ID.String(), nil
+}
+
+// UpdatePost updates an existing Notion page's content and tags.
+func (c *Client) UpdatePost(ctx context.Context, pageID, content string, tags []string) error {
+	client := c.getClient()
+
+	// Build multi-select options for tags
+	multiSelectTags := make([]notionapi.Option, len(tags))
+	for i, tag := range tags {
+		multiSelectTags[i] = notionapi.Option{Name: tag}
+	}
+
+	// Update page properties (tags)
+	updateReq := &notionapi.PageUpdateRequest{
+		Properties: notionapi.Properties{
+			"Tags": notionapi.MultiSelectProperty{
+				Type:        notionapi.PropertyTypeMultiSelect,
+				MultiSelect: multiSelectTags,
+			},
+		},
+	}
+
+	_, err := client.Page.Update(ctx, notionapi.PageID(pageID), updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to update page properties: %w", err)
+	}
+
+	// Update content: first delete existing blocks, then add new ones
+	if err := c.replacePageContent(ctx, client, pageID, content); err != nil {
+		return fmt.Errorf("failed to update page content: %w", err)
+	}
+
+	return nil
+}
+
+// ArchivePost archives (soft-deletes) a Notion page.
+func (c *Client) ArchivePost(ctx context.Context, pageID string) error {
+	client := c.getClient()
+
+	updateReq := &notionapi.PageUpdateRequest{
+		Archived: true,
+	}
+
+	_, err := client.Page.Update(ctx, notionapi.PageID(pageID), updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to archive page: %w", err)
+	}
+
+	return nil
+}
+
+// replacePageContent deletes all existing blocks and adds new content.
+func (c *Client) replacePageContent(ctx context.Context, client *notionapi.Client, pageID, content string) error {
+	// First, get all existing blocks
+	var cursor string
+	var blockIDs []notionapi.BlockID
+
+	for {
+		pagination := &notionapi.Pagination{PageSize: 100}
+		if cursor != "" {
+			pagination.StartCursor = notionapi.Cursor(cursor)
+		}
+
+		blockResp, err := client.Block.GetChildren(ctx, notionapi.BlockID(pageID), pagination)
+		if err != nil {
+			return fmt.Errorf("failed to get existing blocks: %w", err)
+		}
+
+		for _, block := range blockResp.Results {
+			blockIDs = append(blockIDs, notionapi.BlockID(block.GetID()))
+		}
+
+		if !blockResp.HasMore {
+			break
+		}
+		cursor = blockResp.NextCursor
+	}
+
+	// Delete all existing blocks
+	for _, blockID := range blockIDs {
+		_, err := client.Block.Delete(ctx, blockID)
+		if err != nil {
+			return fmt.Errorf("failed to delete block %s: %w", blockID, err)
+		}
+	}
+
+	// Add new content blocks
+	newBlocks := c.contentToBlocks(content)
+	if len(newBlocks) > 0 {
+		_, err := client.Block.AppendChildren(ctx, notionapi.BlockID(pageID), &notionapi.AppendBlockChildrenRequest{
+			Children: newBlocks,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to append new blocks: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// contentToBlocks converts text content to Notion paragraph blocks.
+func (c *Client) contentToBlocks(content string) []notionapi.Block {
+	if content == "" {
+		return nil
+	}
+
+	// Split content by newlines and create paragraph blocks
+	lines := strings.Split(content, "\n")
+	blocks := make([]notionapi.Block, 0, len(lines))
+
+	for _, line := range lines {
+		blocks = append(blocks, &notionapi.ParagraphBlock{
+			BasicBlock: notionapi.BasicBlock{
+				Type:   notionapi.BlockTypeParagraph,
+				Object: notionapi.ObjectTypeBlock,
+			},
+			Paragraph: notionapi.Paragraph{
+				RichText: []notionapi.RichText{
+					{
+						Type: notionapi.ObjectTypeText,
+						Text: &notionapi.Text{Content: line},
+					},
+				},
+			},
+		})
+	}
+
+	return blocks
+}

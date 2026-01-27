@@ -226,3 +226,61 @@ func (db *DB) GetNoteTags(noteID string) ([]string, error) {
 	}
 	return names, nil
 }
+
+// GetNotesNeedingSyncToNotion returns notes that have been modified locally
+// and need to be synced back to Notion.
+// This includes:
+// - Notes without an ExternalID (never synced to Notion)
+// - Notes where UpdatedAt > LastSyncedToNotion (modified since last sync)
+func (db *DB) GetNotesNeedingSyncToNotion(userID string) ([]Note, error) {
+	var notes []Note
+	err := db.conn.
+		Where(`"userId" = ? AND ("externalId" IS NULL OR "lastSyncedToNotion" IS NULL OR "updatedAt" > "lastSyncedToNotion")`, userID).
+		Find(&notes).Error
+	if err != nil {
+		return nil, err
+	}
+	return notes, nil
+}
+
+// GetNoteWithTags returns a note with its tags loaded
+func (db *DB) GetNoteWithTags(noteID string) (*Note, error) {
+	var note Note
+	err := db.conn.
+		Preload("Tags").
+		Where(`id = ?`, noteID).
+		First(&note).Error
+	if err != nil {
+		return nil, err
+	}
+	return &note, nil
+}
+
+// MarkNoteSyncedToNotion updates the note's Notion sync status
+func (db *DB) MarkNoteSyncedToNotion(noteID, pageID, notionUUID string) error {
+	now := time.Now()
+	return db.conn.Model(&Note{}).
+		Where(`id = ?`, noteID).
+		Updates(map[string]interface{}{
+			"externalId":         pageID,
+			"notionUuid":         notionUUID,
+			"lastSyncedToNotion": now,
+		}).Error
+}
+
+// UpdateNoteNotionSyncTime updates just the lastSyncedToNotion timestamp
+func (db *DB) UpdateNoteNotionSyncTime(noteID string) error {
+	now := time.Now()
+	return db.conn.Model(&Note{}).
+		Where(`id = ?`, noteID).
+		Update("lastSyncedToNotion", now).Error
+}
+
+// GetDeletedNotesWithNotionID returns notes that have been soft-deleted
+// but still have a Notion page ID (for archiving in Notion).
+// Note: This assumes you have a soft-delete mechanism. If not, this is a placeholder.
+func (db *DB) GetArchivedNotePageIDs(userID string) ([]string, error) {
+	// Placeholder: This would query for soft-deleted notes
+	// For now, return empty since we don't have soft-delete implemented
+	return []string{}, nil
+}
