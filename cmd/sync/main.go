@@ -18,8 +18,7 @@ func main() {
 	// Parse command line flags
 	userID := flag.String("user", "", "User ID to sync (required)")
 	fullSync := flag.Bool("full", false, "Perform a full sync instead of incremental")
-	bidirectional := flag.Bool("bidirectional", false, "Sync both from and to Notion (default: only from Notion)")
-	toNotion := flag.Bool("to-notion", false, "Only sync local changes to Notion (skip syncing from Notion)")
+	direction := flag.String("direction", "from-notion", "Sync direction: from-notion, to-notion, or bidirectional")
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
 	flag.Parse()
 
@@ -27,11 +26,20 @@ func main() {
 		log.Fatal("Error: -user flag is required")
 	}
 
+	// Validate direction flag
+	validDirections := map[string]bool{
+		"from-notion":   true,
+		"to-notion":     true,
+		"bidirectional": true,
+	}
+	if !validDirections[*direction] {
+		log.Fatalf("Error: invalid -direction value %q. Must be one of: from-notion, to-notion, bidirectional", *direction)
+	}
+
 	log.Printf("Starting Notion sync job")
 	log.Printf("  User ID: %s", *userID)
+	log.Printf("  Direction: %s", *direction)
 	log.Printf("  Full sync: %v", *fullSync)
-	log.Printf("  Bidirectional: %v", *bidirectional)
-	log.Printf("  To Notion only: %v", *toNotion)
 	if *interval > 0 {
 		log.Printf("  Interval: %s", *interval)
 	}
@@ -72,20 +80,12 @@ func main() {
 		cancel()
 	}()
 
-	// Determine sync mode
-	syncMode := "from-notion"
-	if *bidirectional {
-		syncMode = "bidirectional"
-	} else if *toNotion {
-		syncMode = "to-notion"
-	}
-
 	if *interval > 0 {
 		// Run continuously
-		runContinuously(ctx, syncer, *userID, *fullSync, syncMode, *interval)
+		runContinuously(ctx, syncer, *userID, *fullSync, *direction, *interval)
 	} else {
 		// Run once
-		runOnce(ctx, syncer, *userID, *fullSync, syncMode)
+		runOnce(ctx, syncer, *userID, *fullSync, *direction)
 	}
 }
 
