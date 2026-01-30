@@ -458,3 +458,98 @@ func (db *DB) GetApiKeysByPrefix(ctx context.Context, keyPrefix string) ([]ApiKe
 func (db *DB) UpdateApiKeyLastUsed(ctx context.Context, keyID string) error {
 	return db.conn.WithContext(ctx).Model(&ApiKey{}).Where("id = ?", keyID).Update("lastUsed", time.Now()).Error
 }
+
+// GetNotesWithFewTags retrieves notes for a user that have fewer than maxTags tags
+func (db *DB) GetNotesWithFewTags(ctx context.Context, userID string, maxTags int) ([]Note, error) {
+	var notes []Note
+
+	// Query to find notes with tag count less than maxTags
+	err := db.conn.WithContext(ctx).
+		Select(`"Note".*`).
+		Joins(`LEFT JOIN "NoteTag" ON "Note".id = "NoteTag"."noteId"`).
+		Where(`"Note"."userId" = ?`, userID).
+		Group(`"Note".id`).
+		Having("COUNT(\"NoteTag\".\"tagId\") < ?", maxTags).
+		Order(`"Note"."createdAt" DESC`).
+		Find(&notes).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to query notes with few tags: %w", err)
+	}
+
+	// Fetch tags for each note
+	for i := range notes {
+		tags, err := db.getNoteTags(ctx, notes[i].ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get tags for note %s: %w", notes[i].ID, err)
+		}
+		notes[i].Tags = tags
+	}
+
+	return notes, nil
+}
+
+// AddTagsToNote adds tags to a note without removing existing tags
+func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames []string) error {
+	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Verify note ownership
+		var note Note
+		result := tx.Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
+		if result.Error == gorm.ErrRecordNotFound {
+			return fmt.Errorf("note not found")
+		}
+		if result.Error != nil {
+			return fmt.Errorf("failed to verify note ownership: %w", result.Error)
+		}
+
+		now := time.Now()
+		tagsAdded := false
+
+		// Add new tags
+		for _, tagName := range tagNames {
+			if tagName == "" {
+				continue
+			}
+
+			// Find or create the tag
+			var tag models.Tag
+			result := tx.Where(`"userId" = ? AND name = ?`, userID, tagName).First(&tag)
+			if result.Error == gorm.ErrRecordNotFound {
+				tag = models.Tag{
+					ID:        models.GenerateCUID(),
+					Name:      tagName,
+					CreatedAt: now,
+					UserID:    userID,
+				}
+				if err := tx.Create(&tag).Error; err != nil {
+					return fmt.Errorf("failed to create tag: %w", err)
+				}
+			} else if result.Error != nil {
+				return result.Error
+			}
+
+			// Check if the tag is already linked to the note
+			var noteTag models.NoteTag
+			result = tx.Where(`"noteId" = ? AND "tagId" = ?`, noteID, tag.ID).First(&noteTag)
+			if result.Error == gorm.ErrRecordNotFound {
+				// Link note to tag if not already linked
+				noteTag = models.NoteTag{NoteID: noteID, TagID: tag.ID}
+				if err := tx.Create(&noteTag).Error; err != nil {
+					return fmt.Errorf("failed to link note to tag: %w", err)
+				}
+				tagsAdded = true
+			} else if result.Error != nil {
+				return result.Error
+			}
+		}
+
+		// Update the note's updatedAt timestamp if tags were added
+		if tagsAdded {
+			if err := tx.Model(&note).Update("updatedAt", now).Error; err != nil {
+				return fmt.Errorf("failed to update note timestamp: %w", err)
+			}
+		}
+
+		return nil
+	})
+}

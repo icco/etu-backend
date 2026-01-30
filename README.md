@@ -55,6 +55,7 @@ etu-backend/
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `PORT` | Server port (default: 50051) | No |
 | `NOTION_KEY` | Notion API key (for sync job) | Sync only |
+| `GEMINI_API_KEY` | Gemini API key (for tag generation) | Taggen only |
 
 ## Getting Started
 
@@ -206,3 +207,66 @@ The sync job maps Notion data to PostgreSQL as follows:
 | Tags property | Tags via `NoteTag` | Multi-select tags |
 | Created time | `createdAt` | Page creation timestamp |
 | Last edited | `updatedAt` | Page modification timestamp |
+
+## Gemini Tag Generation Job
+
+The tag generation job uses Google's Gemini AI to automatically generate tags for notes that have fewer than 3 tags. It's designed to run as a cron job or continuously with an interval.
+
+### Features
+
+- Generates up to 3 tags per note using Gemini 1.5 Flash (cost-effective)
+- Only processes notes with fewer than 3 tags
+- Prefers reusing existing tags over creating new ones
+- All tags are lowercase and single words (no spaces or hyphens)
+- Never modifies or deletes existing tags
+
+### Prerequisites
+
+1. Set the `GEMINI_API_KEY` environment variable with your Google AI API key
+2. Get your API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+
+### Running the Tag Generation Job
+
+**One-time generation:**
+```bash
+./bin/taggen -user <USER_ID>
+```
+
+**Dry run (test without adding tags):**
+```bash
+./bin/taggen -user <USER_ID> -dry-run
+```
+
+**Continuous generation (every 6 hours):**
+```bash
+./bin/taggen -user <USER_ID> -interval 6h
+```
+
+### Command Line Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `-user` | User ID to generate tags for (required) | - |
+| `-dry-run` | Run without actually adding tags (for testing) | false |
+| `-delay` | Delay between processing notes to avoid rate limiting (e.g., `2s`, `5s`) | 2s |
+| `-interval` | Run continuously with this interval (e.g., `6h`, `1h`) | - |
+
+### Example Cron Entry
+
+To generate tags every 6 hours:
+
+```cron
+0 */6 * * * DATABASE_URL="..." GEMINI_API_KEY="..." /path/to/taggen -user <USER_ID> >> /var/log/etu-taggen.log 2>&1
+```
+
+### How It Works
+
+1. Fetches all notes for the user that have fewer than 3 tags
+2. For each note:
+   - Sends the note content to Gemini 1.5 Flash
+   - Receives up to 3 tag suggestions
+   - Validates tags (lowercase, single word, alphanumeric only)
+   - Prefers existing tags to maintain consistency
+   - Adds only the number of tags needed to reach 3 total
+   - Updates the note's `updatedAt` timestamp
+3. Waits for the configured delay (default 2s) between requests to avoid rate limiting
