@@ -60,6 +60,9 @@ type User struct {
 	SubscriptionEnd    *time.Time `gorm:"column:subscriptionEnd"`
 	CreatedAt          time.Time  `gorm:"column:createdAt"`
 	StripeCustomerID   *string    `gorm:"column:stripeCustomerId"`
+	NotionKey          *string    `gorm:"column:notionKey"` // Notion API key for syncing. TODO: Consider encrypting this field at rest for better security.
+	Username           *string    `gorm:"column:username"`  // Optional username
+	UpdatedAt          time.Time  `gorm:"column:updatedAt"`
 }
 
 // TableName specifies the table name for User
@@ -92,20 +95,6 @@ type SyncState struct {
 // TableName specifies the table name for SyncState
 func (SyncState) TableName() string {
 	return "SyncState"
-}
-
-// UserSettings stores per-user configuration
-type UserSettings struct {
-	UserID    string     `gorm:"column:userId;primaryKey"`
-	NotionKey *string    `gorm:"column:notionKey"` // Notion API key for syncing. TODO: Consider encrypting this field at rest for better security.
-	Username  *string    `gorm:"column:username"`  // Optional username
-	CreatedAt time.Time  `gorm:"column:createdAt"`
-	UpdatedAt time.Time  `gorm:"column:updatedAt"`
-}
-
-// TableName specifies the table name for UserSettings
-func (UserSettings) TableName() string {
-	return "UserSettings"
 }
 
 // BeforeCreate hook to generate CUID-like ID for notes

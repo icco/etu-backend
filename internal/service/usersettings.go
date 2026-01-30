@@ -32,23 +32,27 @@ func (s *UserSettingsService) GetUserSettings(ctx context.Context, req *pb.GetUs
 	// This should be done via middleware or by extracting user ID from context
 	// For now, assuming authentication is handled by the gRPC interceptor
 
-	settings, err := s.db.GetUserSettings(ctx, req.UserId)
+	user, err := s.db.GetUserSettings(ctx, req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get user settings: %v", err)
+	}
+	
+	if user == nil {
+		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
 	return &pb.GetUserSettingsResponse{
 		Settings: &pb.UserSettings{
-			UserId:    settings.UserID,
-			NotionKey: settings.NotionKey,
-			Username:  settings.Username,
+			UserId:    user.ID,
+			NotionKey: user.NotionKey,
+			Username:  user.Username,
 			CreatedAt: &pb.Timestamp{
-				Seconds: settings.CreatedAt.Unix(),
-				Nanos:   int32(settings.CreatedAt.Nanosecond()),
+				Seconds: user.CreatedAt.Unix(),
+				Nanos:   int32(user.CreatedAt.Nanosecond()),
 			},
 			UpdatedAt: &pb.Timestamp{
-				Seconds: settings.UpdatedAt.Unix(),
-				Nanos:   int32(settings.UpdatedAt.Nanosecond()),
+				Seconds: user.UpdatedAt.Unix(),
+				Nanos:   int32(user.UpdatedAt.Nanosecond()),
 			},
 		},
 	}, nil
@@ -64,23 +68,23 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 	// This should be done via middleware or by extracting user ID from context
 	// For now, assuming authentication is handled by the gRPC interceptor
 
-	settings, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Username)
+	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Username)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
 	}
 
 	return &pb.UpdateUserSettingsResponse{
 		Settings: &pb.UserSettings{
-			UserId:    settings.UserID,
-			NotionKey: settings.NotionKey,
-			Username:  settings.Username,
+			UserId:    user.ID,
+			NotionKey: user.NotionKey,
+			Username:  user.Username,
 			CreatedAt: &pb.Timestamp{
-				Seconds: settings.CreatedAt.Unix(),
-				Nanos:   int32(settings.CreatedAt.Nanosecond()),
+				Seconds: user.CreatedAt.Unix(),
+				Nanos:   int32(user.CreatedAt.Nanosecond()),
 			},
 			UpdatedAt: &pb.Timestamp{
-				Seconds: settings.UpdatedAt.Unix(),
-				Nanos:   int32(settings.UpdatedAt.Nanosecond()),
+				Seconds: user.UpdatedAt.Unix(),
+				Nanos:   int32(user.UpdatedAt.Nanosecond()),
 			},
 		},
 	}, nil

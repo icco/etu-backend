@@ -23,7 +23,6 @@ type Tag = models.Tag
 type NoteTag = models.NoteTag
 type User = models.User
 type SyncState = models.SyncState
-type UserSettings = models.UserSettings
 
 // New creates a new GORM database connection
 func New() (*DB, error) {
@@ -75,7 +74,6 @@ func (db *DB) AutoMigrate() error {
 		&models.NoteTag{},
 		&models.ApiKey{},
 		&models.SyncState{},
-		&models.UserSettings{},
 	)
 }
 
@@ -294,26 +292,26 @@ func (db *DB) GetArchivedNotePageIDs(userID string) ([]string, error) {
 }
 
 // GetUsersWithNotionKeys retrieves all users who have a Notion API key configured
-func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]UserSettings, error) {
-	var settings []UserSettings
+func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
+	var users []User
 	err := db.conn.WithContext(ctx).
 		Where(`"notionKey" IS NOT NULL AND "notionKey" != ''`).
-		Find(&settings).Error
+		Find(&users).Error
 	if err != nil {
 		return nil, err
 	}
-	return settings, nil
+	return users, nil
 }
 
 // GetUserSettings retrieves user settings for a user
-func (db *DB) GetUserSettings(ctx context.Context, userID string) (*UserSettings, error) {
-	var settings UserSettings
-	result := db.conn.WithContext(ctx).Where(`"userId" = ?`, userID).First(&settings)
+func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error) {
+	var user User
+	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
 	if result.Error == gorm.ErrRecordNotFound {
 		return nil, nil
 	}
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return &settings, nil
+	return &user, nil
 }
