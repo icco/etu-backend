@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/jomei/notionapi v1.13.3
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.11.1
 	golang.org/x/crypto v0.47.0
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
@@ -23,5 +23,5 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260126211449-d11affda4bed // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect
 )
