@@ -2,15 +2,17 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"google.golang.org/genai"
 )
 
 // GenerateTags generates a list of lowercase, single-word tags for a given text using Gemini.
-// It returns up to 3 tags.
-func GenerateTags(ctx context.Context, text string, apiKey string) ([]string, error) {
+// It returns up to 3 tags. existingTags is a list of tags the user has previously used.
+func GenerateTags(ctx context.Context, text string, existingTags []string, apiKey string) ([]string, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("no Gemini API key configured")
 	}
@@ -22,21 +24,28 @@ func GenerateTags(ctx context.Context, text string, apiKey string) ([]string, er
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
+	// Build the existing tags list for the prompt
+	existingTagsStr := ""
+	if len(existingTags) > 0 {
+		existingTagsStr = fmt.Sprintf("\n\nThe user has previously used these tags (prefer reusing these if relevant): %s", strings.Join(existingTags, ", "))
+	}
+
 	// Use Gemini Flash for cost-effectiveness
 	prompt := fmt.Sprintf(`Given the journal entry below, generate up to 3 single-word tags to summarize the content. Each tag should be:
-- A single word (no spaces, no hyphens)
+- A single word (no spaces, no hyphens, only alphanumeric characters)
 - Lowercase
-- Relevant to the content
+- Relevant to the content%s
 
-Output should be a comma-separated list of tags only, no other text.
+Return ONLY a JSON array of strings, nothing else. Example: ["tag1", "tag2", "tag3"]
 
 Journal entry:
-%s`, text)
+%s`, existingTagsStr, text)
 
 	resp, err := client.Models.GenerateContent(ctx, "gemini-1.5-flash-8b", []*genai.Content{
 		genai.NewContentFromText(prompt, genai.RoleUser),
 	}, &genai.GenerateContentConfig{
-		Temperature: genai.Ptr(float32(0.3)), // Lower temperature for more consistent results
+		Temperature:      genai.Ptr(float32(0.3)), // Lower temperature for more consistent results
+		ResponseMIMEType: "application/json",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tags: %w", err)
@@ -50,15 +59,31 @@ Journal entry:
 	var tags []string
 	for _, part := range resp.Candidates[0].Content.Parts {
 		if part.Text != "" {
-			outText := part.Text
-			// Split by comma and clean up
-			rawTags := strings.Split(outText, ",")
-			for _, tag := range rawTags {
-				tag = strings.TrimSpace(tag)
-				tag = strings.ToLower(tag)
-				// Only accept single words (no spaces, no hyphens, no special chars)
-				if tag != "" && !strings.ContainsAny(tag, " -_") && isAlphanumeric(tag) {
-					tags = append(tags, tag)
+			// Try to parse as JSON array
+			var jsonTags []string
+			if err := json.Unmarshal([]byte(part.Text), &jsonTags); err == nil {
+				// Successfully parsed JSON
+				for _, tag := range jsonTags {
+					tag = strings.TrimSpace(tag)
+					tag = strings.ToLower(tag)
+					// Only accept single words (alphanumeric only)
+					if tag != "" && isValidTag(tag) {
+						tags = append(tags, tag)
+					}
+				}
+			} else {
+				// Fallback to comma-separated parsing if JSON parsing fails
+				rawTags := strings.Split(part.Text, ",")
+				for _, tag := range rawTags {
+					tag = strings.TrimSpace(tag)
+					tag = strings.ToLower(tag)
+					// Remove any quotes or brackets
+					tag = strings.Trim(tag, "\"'[]")
+					tag = strings.TrimSpace(tag)
+					// Only accept single words (alphanumeric only)
+					if tag != "" && isValidTag(tag) {
+						tags = append(tags, tag)
+					}
 				}
 			}
 		}
@@ -72,12 +97,9 @@ Journal entry:
 	return tags, nil
 }
 
-// isAlphanumeric checks if a string contains only alphanumeric characters
-func isAlphanumeric(s string) bool {
-	for _, r := range s {
-		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
-			return false
-		}
-	}
-	return true
+var tagRegex = regexp.MustCompile(`^[a-z0-9]+$`)
+
+// isValidTag checks if a tag is valid (alphanumeric lowercase only)
+func isValidTag(s string) bool {
+	return tagRegex.MatchString(s)
 }

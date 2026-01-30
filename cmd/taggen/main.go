@@ -132,8 +132,11 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey
 
 	// Create a map of existing tag names (lowercase) for easy lookup
 	existingTagNames := make(map[string]bool)
+	existingTagList := make([]string, 0, len(existingTags))
 	for _, tag := range existingTags {
-		existingTagNames[strings.ToLower(tag.Name)] = true
+		lowerName := strings.ToLower(tag.Name)
+		existingTagNames[lowerName] = true
+		existingTagList = append(existingTagList, lowerName)
 	}
 
 	// Fetch notes with less than 3 tags
@@ -157,8 +160,8 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey
 
 		log.Printf("Processing note %s (current tags: %d)", note.ID, currentTagCount)
 
-		// Generate tags using Gemini
-		generatedTags, err := ai.GenerateTags(ctx, note.Content, geminiKey)
+		// Generate tags using Gemini, passing existing tags
+		generatedTags, err := ai.GenerateTags(ctx, note.Content, existingTagList, geminiKey)
 		if err != nil {
 			log.Printf("Failed to generate tags for note %s: %v", note.ID, err)
 			result.Errors++
