@@ -56,8 +56,8 @@ Journal entry:
 			for _, tag := range rawTags {
 				tag = strings.TrimSpace(tag)
 				tag = strings.ToLower(tag)
-				// Only accept single words (no spaces)
-				if tag != "" && !strings.Contains(tag, " ") {
+				// Only accept single words (no spaces, no hyphens, no special chars)
+				if tag != "" && !strings.ContainsAny(tag, " -_") && isAlphanumeric(tag) {
 					tags = append(tags, tag)
 				}
 			}
@@ -70,4 +70,14 @@ Journal entry:
 	}
 
 	return tags, nil
+}
+
+// isAlphanumeric checks if a string contains only alphanumeric characters
+func isAlphanumeric(s string) bool {
+	for _, r := range s {
+		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9')) {
+			return false
+		}
+	}
+	return true
 }

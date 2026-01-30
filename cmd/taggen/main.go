@@ -19,6 +19,7 @@ func main() {
 	userID := flag.String("user", "", "User ID to generate tags for (required)")
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
 	dryRun := flag.Bool("dry-run", false, "Run without actually adding tags (for testing)")
+	delay := flag.Duration("delay", 2*time.Second, "Delay between processing notes to avoid rate limiting (e.g., 2s)")
 	flag.Parse()
 
 	if *userID == "" {
@@ -33,6 +34,7 @@ func main() {
 	log.Printf("Starting Gemini tag generation job")
 	log.Printf("  User ID: %s", *userID)
 	log.Printf("  Dry run: %v", *dryRun)
+	log.Printf("  Delay: %s", *delay)
 	if *interval > 0 {
 		log.Printf("  Interval: %s", *interval)
 	}
@@ -60,15 +62,15 @@ func main() {
 
 	if *interval > 0 {
 		// Run continuously
-		runContinuously(ctx, database, *userID, geminiKey, *dryRun, *interval)
+		runContinuously(ctx, database, *userID, geminiKey, *dryRun, *delay, *interval)
 	} else {
 		// Run once
-		runOnce(ctx, database, *userID, geminiKey, *dryRun)
+		runOnce(ctx, database, *userID, geminiKey, *dryRun, *delay)
 	}
 }
 
-func runOnce(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool) {
-	result, err := generateTagsForUser(ctx, database, userID, geminiKey, dryRun)
+func runOnce(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool, delay time.Duration) {
+	result, err := generateTagsForUser(ctx, database, userID, geminiKey, dryRun, delay)
 	if err != nil {
 		log.Fatalf("Tag generation failed: %v", err)
 	}
@@ -79,9 +81,9 @@ func runOnce(ctx context.Context, database *db.DB, userID, geminiKey string, dry
 	log.Printf("  Errors: %d", result.Errors)
 }
 
-func runContinuously(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool, interval time.Duration) {
+func runContinuously(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool, delay time.Duration, interval time.Duration) {
 	// Run immediately on start
-	performTagGeneration(ctx, database, userID, geminiKey, dryRun)
+	performTagGeneration(ctx, database, userID, geminiKey, dryRun, delay)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -92,15 +94,15 @@ func runContinuously(ctx context.Context, database *db.DB, userID, geminiKey str
 			log.Println("Shutting down tag generation job")
 			return
 		case <-ticker.C:
-			performTagGeneration(ctx, database, userID, geminiKey, dryRun)
+			performTagGeneration(ctx, database, userID, geminiKey, dryRun, delay)
 		}
 	}
 }
 
-func performTagGeneration(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool) {
+func performTagGeneration(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool, delay time.Duration) {
 	log.Printf("Starting tag generation at %s", time.Now().Format(time.RFC3339))
 
-	result, err := generateTagsForUser(ctx, database, userID, geminiKey, dryRun)
+	result, err := generateTagsForUser(ctx, database, userID, geminiKey, dryRun, delay)
 	if err != nil {
 		log.Printf("Tag generation failed: %v", err)
 		return
@@ -118,7 +120,7 @@ type TagGenResult struct {
 	Duration       time.Duration
 }
 
-func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool) (*TagGenResult, error) {
+func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool, delay time.Duration) (*TagGenResult, error) {
 	start := time.Now()
 	result := &TagGenResult{}
 
@@ -214,8 +216,10 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey
 
 		result.TagsAdded += len(newTags)
 
-		// Add a small delay to avoid rate limiting
-		time.Sleep(time.Second)
+		// Add a delay to avoid rate limiting
+		if delay > 0 {
+			time.Sleep(delay)
+		}
 	}
 
 	result.Duration = time.Since(start)

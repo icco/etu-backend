@@ -248,6 +248,7 @@ The tag generation job uses Google's Gemini AI to automatically generate tags fo
 |------|-------------|---------|
 | `-user` | User ID to generate tags for (required) | - |
 | `-dry-run` | Run without actually adding tags (for testing) | false |
+| `-delay` | Delay between processing notes to avoid rate limiting (e.g., `2s`, `5s`) | 2s |
 | `-interval` | Run continuously with this interval (e.g., `6h`, `1h`) | - |
 
 ### Example Cron Entry
@@ -264,7 +265,8 @@ To generate tags every 6 hours:
 2. For each note:
    - Sends the note content to Gemini 1.5 Flash
    - Receives up to 3 tag suggestions
-   - Validates tags (lowercase, single word)
+   - Validates tags (lowercase, single word, alphanumeric only)
    - Prefers existing tags to maintain consistency
    - Adds only the number of tags needed to reach 3 total
-3. Waits 1 second between requests to avoid rate limiting
+   - Updates the note's `updatedAt` timestamp
+3. Waits for the configured delay (default 2s) between requests to avoid rate limiting

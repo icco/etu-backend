@@ -503,6 +503,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 		}
 
 		now := time.Now()
+		tagsAdded := false
 
 		// Add new tags
 		for _, tagName := range tagNames {
@@ -536,8 +537,16 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 				if err := tx.Create(&noteTag).Error; err != nil {
 					return fmt.Errorf("failed to link note to tag: %w", err)
 				}
+				tagsAdded = true
 			} else if result.Error != nil {
 				return result.Error
+			}
+		}
+
+		// Update the note's updatedAt timestamp if tags were added
+		if tagsAdded {
+			if err := tx.Model(&note).Update("updatedAt", now).Error; err != nil {
+				return fmt.Errorf("failed to update note timestamp: %w", err)
 			}
 		}
 
