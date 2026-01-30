@@ -22,6 +22,7 @@ type Tag = models.Tag
 type NoteTag = models.NoteTag
 type User = models.User
 type SyncState = models.SyncState
+type UserSettings = models.UserSettings
 
 // New creates a new GORM database connection
 func New() (*DB, error) {
@@ -59,6 +60,11 @@ func (db *DB) Close() error {
 	return sqlDB.Close()
 }
 
+// GetDB returns the underlying GORM connection
+func (db *DB) GetDB() *gorm.DB {
+	return db.conn
+}
+
 // AutoMigrate runs auto migrations for all tables
 func (db *DB) AutoMigrate() error {
 	return db.conn.AutoMigrate(
@@ -68,6 +74,7 @@ func (db *DB) AutoMigrate() error {
 		&models.NoteTag{},
 		&models.ApiKey{},
 		&models.SyncState{},
+		&models.UserSettings{},
 	)
 }
 
@@ -283,4 +290,16 @@ func (db *DB) GetArchivedNotePageIDs(userID string) ([]string, error) {
 	// Placeholder: This would query for soft-deleted notes
 	// For now, return empty since we don't have soft-delete implemented
 	return []string{}, nil
+}
+
+// GetUsersWithNotionKeys retrieves all users who have a Notion API key configured
+func (db *DB) GetUsersWithNotionKeys() ([]UserSettings, error) {
+	var settings []UserSettings
+	err := db.conn.
+		Where(`"notionKey" IS NOT NULL AND "notionKey" != ''`).
+		Find(&settings).Error
+	if err != nil {
+		return nil, err
+	}
+	return settings, nil
 }

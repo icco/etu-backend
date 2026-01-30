@@ -94,6 +94,20 @@ func (SyncState) TableName() string {
 	return "SyncState"
 }
 
+// UserSettings stores per-user configuration
+type UserSettings struct {
+	UserID    string     `gorm:"column:userId;primaryKey"`
+	NotionKey *string    `gorm:"column:notionKey"` // Notion API key for syncing
+	Username  *string    `gorm:"column:username"`  // Optional username
+	CreatedAt time.Time  `gorm:"column:createdAt"`
+	UpdatedAt time.Time  `gorm:"column:updatedAt"`
+}
+
+// TableName specifies the table name for UserSettings
+func (UserSettings) TableName() string {
+	return "UserSettings"
+}
+
 // BeforeCreate hook to generate CUID-like ID for notes
 func (n *Note) BeforeCreate(tx *gorm.DB) error {
 	if n.ID == "" {

@@ -22,6 +22,7 @@ type Note = models.Note
 type Tag = models.Tag
 type User = models.User
 type ApiKey = models.ApiKey
+type UserSettings = models.UserSettings
 
 // New creates a new GORM database connection
 func New() (*DB, error) {
@@ -68,6 +69,7 @@ func (db *DB) AutoMigrate() error {
 		&models.NoteTag{},
 		&models.ApiKey{},
 		&models.SyncState{},
+		&models.UserSettings{},
 	)
 }
 
@@ -552,4 +554,80 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 
 		return nil
 	})
+}
+
+// GetUserSettings retrieves user settings for a user
+func (db *DB) GetUserSettings(ctx context.Context, userID string) (*UserSettings, error) {
+	var settings UserSettings
+	result := db.conn.WithContext(ctx).Where(`"userId" = ?`, userID).First(&settings)
+	if result.Error == gorm.ErrRecordNotFound {
+		// Return empty settings if not found
+		return &UserSettings{
+			UserID:    userID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}, nil
+	}
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get user settings: %w", result.Error)
+	}
+	return &settings, nil
+}
+
+// UpdateUserSettings updates or creates user settings
+func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, username *string) (*UserSettings, error) {
+	now := time.Now()
+	
+	var settings UserSettings
+	result := db.conn.WithContext(ctx).Where(`"userId" = ?`, userID).First(&settings)
+	
+	if result.Error == gorm.ErrRecordNotFound {
+		// Create new settings
+		settings = UserSettings{
+			UserID:    userID,
+			NotionKey: notionKey,
+			Username:  username,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
+		if err := db.conn.WithContext(ctx).Create(&settings).Error; err != nil {
+			return nil, fmt.Errorf("failed to create user settings: %w", err)
+		}
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to get user settings: %w", result.Error)
+	} else {
+		// Update existing settings
+		updates := map[string]interface{}{
+			"updatedAt": now,
+		}
+		if notionKey != nil {
+			updates["notionKey"] = *notionKey
+		}
+		if username != nil {
+			updates["username"] = *username
+		}
+		
+		if err := db.conn.WithContext(ctx).Model(&settings).Updates(updates).Error; err != nil {
+			return nil, fmt.Errorf("failed to update user settings: %w", err)
+		}
+		
+		// Reload to get updated values
+		if err := db.conn.WithContext(ctx).Where(`"userId" = ?`, userID).First(&settings).Error; err != nil {
+			return nil, fmt.Errorf("failed to reload user settings: %w", err)
+		}
+	}
+	
+	return &settings, nil
+}
+
+// GetUsersWithNotionKeys retrieves all users who have a Notion API key configured
+func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]UserSettings, error) {
+	var settings []UserSettings
+	err := db.conn.WithContext(ctx).
+		Where(`"notionKey" IS NOT NULL AND "notionKey" != ''`).
+		Find(&settings).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users with Notion keys: %w", err)
+	}
+	return settings, nil
 }

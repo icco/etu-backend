@@ -37,10 +37,15 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("NOTION_KEY environment variable is required")
 	}
 
+	return NewClientWithKey(notionKey), nil
+}
+
+// NewClientWithKey creates a new Notion client with a specific API key.
+func NewClientWithKey(notionKey string) *Client {
 	return &Client{
 		notionKey: notionKey,
 		rootPage:  "Journal",
-	}, nil
+	}
 }
 
 // getClient returns a cached Notion client.
