@@ -97,7 +97,7 @@ func (SyncState) TableName() string {
 // UserSettings stores per-user configuration
 type UserSettings struct {
 	UserID    string     `gorm:"column:userId;primaryKey"`
-	NotionKey *string    `gorm:"column:notionKey"` // Notion API key for syncing
+	NotionKey *string    `gorm:"column:notionKey"` // Notion API key for syncing. TODO: Consider encrypting this field at rest for better security.
 	Username  *string    `gorm:"column:username"`  // Optional username
 	CreatedAt time.Time  `gorm:"column:createdAt"`
 	UpdatedAt time.Time  `gorm:"column:updatedAt"`

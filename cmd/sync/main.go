@@ -120,14 +120,13 @@ func syncSingleUser(ctx context.Context, database *syncdb.DB, userID string, ful
 	log.Printf("Starting sync for user %s at %s", userID, time.Now().Format(time.RFC3339))
 
 	// Get user settings to retrieve Notion API key
-	var settings syncdb.UserSettings
-	result := database.GetDB().Where(`"userId" = ?`, userID).First(&settings)
-	if result.Error != nil {
-		log.Printf("Error: Failed to get user settings for user %s: %v", userID, result.Error)
+	settings, err := database.GetUserSettings(ctx, userID)
+	if err != nil {
+		log.Printf("Error: Failed to get user settings for user %s: %v", userID, err)
 		return
 	}
 
-	if settings.NotionKey == nil || *settings.NotionKey == "" {
+	if settings == nil || settings.NotionKey == nil || *settings.NotionKey == "" {
 		log.Printf("Error: No Notion API key configured for user %s", userID)
 		return
 	}
@@ -143,7 +142,7 @@ func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncM
 	log.Printf("Starting sync for all users at %s", time.Now().Format(time.RFC3339))
 
 	// Get all users with Notion keys
-	usersWithKeys, err := database.GetUsersWithNotionKeys()
+	usersWithKeys, err := database.GetUsersWithNotionKeys(ctx)
 	if err != nil {
 		log.Printf("Error: Failed to get users with Notion keys: %v", err)
 		return
@@ -156,6 +155,9 @@ func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncM
 
 	log.Printf("Found %d user(s) with Notion keys configured", len(usersWithKeys))
 
+	successCount := 0
+	failureCount := 0
+
 	for _, settings := range usersWithKeys {
 		if settings.NotionKey == nil || *settings.NotionKey == "" {
 			continue
@@ -167,44 +169,57 @@ func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncM
 		notionClient := notion.NewClientWithKey(*settings.NotionKey)
 		syncer := sync.NewSyncer(database, notionClient)
 
-		performSync(ctx, syncer, settings.UserID, fullSync, syncMode)
+		// Try to sync and track success/failure
+		syncResult := performSyncWithResult(ctx, syncer, settings.UserID, fullSync, syncMode)
+		if syncResult {
+			successCount++
+		} else {
+			failureCount++
+		}
 	}
 
-	log.Printf("Completed sync for all users")
+	log.Printf("Completed sync for all users: %d succeeded, %d failed", successCount, failureCount)
 }
 
 func performSync(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) {
+	performSyncWithResult(ctx, syncer, userID, fullSync, syncMode)
+}
+
+func performSyncWithResult(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) bool {
 	switch syncMode {
 	case "to-notion":
 		result, err := syncer.SyncUserToNotion(ctx, userID)
 		if err != nil {
 			log.Printf("Sync to Notion failed for user %s: %v", userID, err)
-			return
+			return false
 		}
 		log.Printf("User %s - Sync to Notion completed in %s", userID, result.Duration)
 		log.Printf("  Created: %d, Updated: %d, Archived: %d, Errors: %d",
 			result.Created, result.Updated, result.Archived, result.Errors)
+		return result.Errors == 0
 
 	case "bidirectional":
 		fromResult, toResult, err := syncer.SyncUserBidirectional(ctx, userID, fullSync)
 		if err != nil {
 			log.Printf("Bidirectional sync failed for user %s: %v", userID, err)
-			return
+			return false
 		}
 		log.Printf("User %s - Bidirectional sync completed", userID)
 		log.Printf("  From Notion (in %s): Created: %d, Updated: %d, Unchanged: %d, Errors: %d",
 			fromResult.Duration, fromResult.Created, fromResult.Updated, fromResult.Unchanged, fromResult.Errors)
 		log.Printf("  To Notion (in %s): Created: %d, Updated: %d, Archived: %d, Errors: %d",
 			toResult.Duration, toResult.Created, toResult.Updated, toResult.Archived, toResult.Errors)
+		return fromResult.Errors == 0 && toResult.Errors == 0
 
 	default: // from-notion
 		result, err := syncer.SyncUser(ctx, userID, fullSync)
 		if err != nil {
 			log.Printf("Sync failed for user %s: %v", userID, err)
-			return
+			return false
 		}
 		log.Printf("User %s - Sync completed in %s", userID, result.Duration)
 		log.Printf("  Created: %d, Updated: %d, Unchanged: %d, Errors: %d",
 			result.Created, result.Updated, result.Unchanged, result.Errors)
+		return result.Errors == 0
 	}
 }

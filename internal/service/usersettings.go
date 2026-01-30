@@ -28,6 +28,10 @@ func (s *UserSettingsService) GetUserSettings(ctx context.Context, req *pb.GetUs
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
+	// TODO: Verify that authenticated user matches req.UserId
+	// This should be done via middleware or by extracting user ID from context
+	// For now, assuming authentication is handled by the gRPC interceptor
+
 	settings, err := s.db.GetUserSettings(ctx, req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get user settings: %v", err)
@@ -56,16 +60,11 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
-	// Extract optional fields
-	var notionKey, username *string
-	if req.NotionKey != nil {
-		notionKey = req.NotionKey
-	}
-	if req.Username != nil {
-		username = req.Username
-	}
+	// TODO: Verify that authenticated user matches req.UserId
+	// This should be done via middleware or by extracting user ID from context
+	// For now, assuming authentication is handled by the gRPC interceptor
 
-	settings, err := s.db.UpdateUserSettings(ctx, req.UserId, notionKey, username)
+	settings, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Username)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
 	}

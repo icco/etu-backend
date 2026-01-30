@@ -1,6 +1,7 @@
 package syncdb
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -293,13 +294,26 @@ func (db *DB) GetArchivedNotePageIDs(userID string) ([]string, error) {
 }
 
 // GetUsersWithNotionKeys retrieves all users who have a Notion API key configured
-func (db *DB) GetUsersWithNotionKeys() ([]UserSettings, error) {
+func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]UserSettings, error) {
 	var settings []UserSettings
-	err := db.conn.
+	err := db.conn.WithContext(ctx).
 		Where(`"notionKey" IS NOT NULL AND "notionKey" != ''`).
 		Find(&settings).Error
 	if err != nil {
 		return nil, err
 	}
 	return settings, nil
+}
+
+// GetUserSettings retrieves user settings for a user
+func (db *DB) GetUserSettings(ctx context.Context, userID string) (*UserSettings, error) {
+	var settings UserSettings
+	result := db.conn.WithContext(ctx).Where(`"userId" = ?`, userID).First(&settings)
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &settings, nil
 }
