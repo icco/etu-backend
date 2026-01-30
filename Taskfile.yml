@@ -27,6 +27,7 @@ tasks:
     cmds:
       - go build -ldflags "-X main.CommitSHA={{.GIT_COMMIT}}" -o bin/server ./cmd/server
       - go build -o bin/sync ./cmd/sync
+      - go build -o bin/taggen ./cmd/taggen
 
   build-server:
     desc: Build the server binary
@@ -37,6 +38,11 @@ tasks:
     desc: Build the sync binary
     cmds:
       - go build -o bin/sync ./cmd/sync
+
+  build-taggen:
+    desc: Build the taggen binary
+    cmds:
+      - go build -o bin/taggen ./cmd/taggen
 
   run:
     desc: Run the server
@@ -55,6 +61,19 @@ tasks:
           ARGS="$ARGS -interval=${INTERVAL}"
         fi
         go run ./cmd/sync $ARGS
+
+  taggen:
+    desc: Run tag generation job (requires USER_ID and GEMINI_API_KEY env vars, optionally DRY_RUN=true and INTERVAL=1h)
+    cmds:
+      - |
+        ARGS="-user=${USER_ID}"
+        if [ "${DRY_RUN}" = "true" ]; then
+          ARGS="$ARGS -dry-run"
+        fi
+        if [ -n "${INTERVAL}" ]; then
+          ARGS="$ARGS -interval=${INTERVAL}"
+        fi
+        go run ./cmd/taggen $ARGS
 
   test:
     desc: Run tests
