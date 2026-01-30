@@ -137,29 +137,35 @@ func newHealthHandler() http.Handler {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 			"commit": CommitSHA,
-		})
+		}); err != nil {
+			log.Printf("Error encoding health response: %v", err)
+		}
 	})
 
 	// Explicit health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 			"commit": CommitSHA,
-		})
+		}); err != nil {
+			log.Printf("Error encoding health response: %v", err)
+		}
 	})
 
 	// Readiness check (could add DB checks here if needed)
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"status": "ready",
-		})
+		}); err != nil {
+			log.Printf("Error encoding ready response: %v", err)
+		}
 	})
 
 	return mux
