@@ -33,6 +33,7 @@ task deps         # Install dependencies
 - Run `task proto` after modifying proto files
 - Use `task lint` before committing code
 - The build generates binaries in `bin/` directory
+- **Build artifacts are excluded from version control** - binaries (`server`, `sync`) and the `bin/` directory are in `.gitignore`
 
 ## Go Coding Conventions
 
@@ -240,6 +241,7 @@ Required for running the application:
 - Don't ignore errors (even in tests)
 - Don't use naked returns in functions with named return values
 - Avoid premature optimization
+- **Never commit binary files or build artifacts** - use .gitignore to exclude them
 
 ### Best Practices
 
