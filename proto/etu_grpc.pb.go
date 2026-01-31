@@ -843,3 +843,143 @@ var ApiKeysService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "proto/etu.proto",
 }
+
+const (
+	UserSettingsService_GetUserSettings_FullMethodName    = "/etu.UserSettingsService/GetUserSettings"
+	UserSettingsService_UpdateUserSettings_FullMethodName = "/etu.UserSettingsService/UpdateUserSettings"
+)
+
+// UserSettingsServiceClient is the client API for UserSettingsService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type UserSettingsServiceClient interface {
+	GetUserSettings(ctx context.Context, in *GetUserSettingsRequest, opts ...grpc.CallOption) (*GetUserSettingsResponse, error)
+	UpdateUserSettings(ctx context.Context, in *UpdateUserSettingsRequest, opts ...grpc.CallOption) (*UpdateUserSettingsResponse, error)
+}
+
+type userSettingsServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewUserSettingsServiceClient(cc grpc.ClientConnInterface) UserSettingsServiceClient {
+	return &userSettingsServiceClient{cc}
+}
+
+func (c *userSettingsServiceClient) GetUserSettings(ctx context.Context, in *GetUserSettingsRequest, opts ...grpc.CallOption) (*GetUserSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserSettingsResponse)
+	err := c.cc.Invoke(ctx, UserSettingsService_GetUserSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userSettingsServiceClient) UpdateUserSettings(ctx context.Context, in *UpdateUserSettingsRequest, opts ...grpc.CallOption) (*UpdateUserSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateUserSettingsResponse)
+	err := c.cc.Invoke(ctx, UserSettingsService_UpdateUserSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// UserSettingsServiceServer is the server API for UserSettingsService service.
+// All implementations must embed UnimplementedUserSettingsServiceServer
+// for forward compatibility.
+type UserSettingsServiceServer interface {
+	GetUserSettings(context.Context, *GetUserSettingsRequest) (*GetUserSettingsResponse, error)
+	UpdateUserSettings(context.Context, *UpdateUserSettingsRequest) (*UpdateUserSettingsResponse, error)
+	mustEmbedUnimplementedUserSettingsServiceServer()
+}
+
+// UnimplementedUserSettingsServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedUserSettingsServiceServer struct{}
+
+func (UnimplementedUserSettingsServiceServer) GetUserSettings(context.Context, *GetUserSettingsRequest) (*GetUserSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUserSettings not implemented")
+}
+func (UnimplementedUserSettingsServiceServer) UpdateUserSettings(context.Context, *UpdateUserSettingsRequest) (*UpdateUserSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateUserSettings not implemented")
+}
+func (UnimplementedUserSettingsServiceServer) mustEmbedUnimplementedUserSettingsServiceServer() {}
+func (UnimplementedUserSettingsServiceServer) testEmbeddedByValue()                             {}
+
+// UnsafeUserSettingsServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to UserSettingsServiceServer will
+// result in compilation errors.
+type UnsafeUserSettingsServiceServer interface {
+	mustEmbedUnimplementedUserSettingsServiceServer()
+}
+
+func RegisterUserSettingsServiceServer(s grpc.ServiceRegistrar, srv UserSettingsServiceServer) {
+	// If the following call panics, it indicates UnimplementedUserSettingsServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&UserSettingsService_ServiceDesc, srv)
+}
+
+func _UserSettingsService_GetUserSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserSettingsServiceServer).GetUserSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserSettingsService_GetUserSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserSettingsServiceServer).GetUserSettings(ctx, req.(*GetUserSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UserSettingsService_UpdateUserSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserSettingsServiceServer).UpdateUserSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserSettingsService_UpdateUserSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserSettingsServiceServer).UpdateUserSettings(ctx, req.(*UpdateUserSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// UserSettingsService_ServiceDesc is the grpc.ServiceDesc for UserSettingsService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var UserSettingsService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "etu.UserSettingsService",
+	HandlerType: (*UserSettingsServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetUserSettings",
+			Handler:    _UserSettingsService_GetUserSettings_Handler,
+		},
+		{
+			MethodName: "UpdateUserSettings",
+			Handler:    _UserSettingsService_UpdateUserSettings_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "proto/etu.proto",
+}

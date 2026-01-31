@@ -23,11 +23,11 @@ type Post struct {
 
 // Client wraps the Notion API client.
 type Client struct {
-	notionKey    string
-	rootPage     string
-	cachedDbID   notionapi.DatabaseID
-	client       *notionapi.Client
-	clientOnce   sync.Once
+	notionKey  string
+	rootPage   string
+	cachedDbID notionapi.DatabaseID
+	client     *notionapi.Client
+	clientOnce sync.Once
 }
 
 // NewClient creates a new Notion client from environment variables.
@@ -37,10 +37,15 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("NOTION_KEY environment variable is required")
 	}
 
+	return NewClientWithKey(notionKey), nil
+}
+
+// NewClientWithKey creates a new Notion client with a specific API key.
+func NewClientWithKey(notionKey string) *Client {
 	return &Client{
 		notionKey: notionKey,
 		rootPage:  "Journal",
-	}, nil
+	}
 }
 
 // getClient returns a cached Notion client.

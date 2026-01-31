@@ -553,3 +553,64 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 		return nil
 	})
 }
+
+// GetUserSettings retrieves user settings for a user
+func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error) {
+	var user User
+	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get user: %w", result.Error)
+	}
+	return &user, nil
+}
+
+// UpdateUserSettings updates or creates user settings
+func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, username *string) (*User, error) {
+	now := time.Now()
+
+	var user User
+	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
+
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, fmt.Errorf("user not found")
+	} else if result.Error != nil {
+		return nil, fmt.Errorf("failed to get user: %w", result.Error)
+	}
+
+	// Update user fields
+	updates := map[string]interface{}{
+		"updatedAt": now,
+	}
+	if notionKey != nil {
+		updates["notionKey"] = *notionKey
+	}
+	if username != nil {
+		updates["username"] = *username
+	}
+
+	if err := db.conn.WithContext(ctx).Model(&user).Updates(updates).Error; err != nil {
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+
+	// Reload to get updated values
+	if err := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user).Error; err != nil {
+		return nil, fmt.Errorf("failed to reload user: %w", err)
+	}
+
+	return &user, nil
+}
+
+// GetUsersWithNotionKeys retrieves all users who have a Notion API key configured
+func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
+	var users []User
+	err := db.conn.WithContext(ctx).
+		Where(`"notionKey" IS NOT NULL AND "notionKey" != ''`).
+		Find(&users).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users with Notion keys: %w", err)
+	}
+	return users, nil
+}

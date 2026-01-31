@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Authenticator handles API key authentication
@@ -61,7 +62,11 @@ func (a *Authenticator) VerifyAPIKey(ctx context.Context, apiKey string) (string
 	if err != nil {
 		return "", fmt.Errorf("failed to query API keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}()
 
 	// Check each potential match
 	for rows.Next() {

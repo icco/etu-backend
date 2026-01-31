@@ -48,6 +48,15 @@ message ApiKey {
   optional Timestamp last_used = 5;
 }
 
+// UserSettings message
+message UserSettings {
+  string user_id = 1;
+  optional string notion_key = 2;
+  optional string username = 3;
+  Timestamp created_at = 4;
+  Timestamp updated_at = 5;
+}
+
 // Request/Response messages for Notes
 
 message ListNotesRequest {
@@ -203,6 +212,26 @@ message VerifyApiKeyResponse {
   optional string user_id = 2;
 }
 
+// UserSettings request/response messages
+
+message GetUserSettingsRequest {
+  string user_id = 1;
+}
+
+message GetUserSettingsResponse {
+  UserSettings settings = 1;
+}
+
+message UpdateUserSettingsRequest {
+  string user_id = 1;
+  optional string notion_key = 2;
+  optional string username = 3;
+}
+
+message UpdateUserSettingsResponse {
+  UserSettings settings = 1;
+}
+
 // Service definitions
 
 service NotesService {
@@ -230,4 +259,9 @@ service ApiKeysService {
   rpc ListApiKeys(ListApiKeysRequest) returns (ListApiKeysResponse);
   rpc DeleteApiKey(DeleteApiKeyRequest) returns (DeleteApiKeyResponse);
   rpc VerifyApiKey(VerifyApiKeyRequest) returns (VerifyApiKeyResponse);
+}
+
+service UserSettingsService {
+  rpc GetUserSettings(GetUserSettingsRequest) returns (GetUserSettingsResponse);
+  rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (UpdateUserSettingsResponse);
 }

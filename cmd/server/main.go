@@ -45,7 +45,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 	log.Println("Connected to database")
 
 	// Initialize authenticator
@@ -53,7 +57,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize authenticator: %v", err)
 	}
-	defer authenticator.Close()
+	defer func() {
+		if err := authenticator.Close(); err != nil {
+			log.Printf("Error closing authenticator: %v", err)
+		}
+	}()
 	log.Println("Authenticator initialized")
 
 	// Create gRPC server with authentication interceptor
@@ -66,11 +74,13 @@ func main() {
 	tagsService := service.NewTagsService(database)
 	authService := service.NewAuthService(database)
 	apiKeysService := service.NewApiKeysService(database)
+	userSettingsService := service.NewUserSettingsService(database)
 
 	pb.RegisterNotesServiceServer(server, notesService)
 	pb.RegisterTagsServiceServer(server, tagsService)
 	pb.RegisterAuthServiceServer(server, authService)
 	pb.RegisterApiKeysServiceServer(server, apiKeysService)
+	pb.RegisterUserSettingsServiceServer(server, userSettingsService)
 
 	// Enable reflection for development/debugging
 	reflection.Register(server)

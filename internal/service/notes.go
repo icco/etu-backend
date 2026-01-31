@@ -31,6 +31,11 @@ func (s *NotesService) ListNotes(ctx context.Context, req *pb.ListNotesRequest) 
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
 	limit := int(req.Limit)
 	if limit <= 0 {
 		limit = DefaultNotesLimit
@@ -71,6 +76,11 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		return nil, status.Error(codes.InvalidArgument, "content is required")
 	}
 
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
 	note, err := s.db.CreateNote(ctx, req.UserId, req.Content, req.Tags)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create note: %v", err)
@@ -88,6 +98,11 @@ func (s *NotesService) GetNote(ctx context.Context, req *pb.GetNoteRequest) (*pb
 	}
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
 	}
 
 	note, err := s.db.GetNote(ctx, req.UserId, req.Id)
@@ -110,6 +125,11 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 	}
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
 	}
 
 	var content *string
@@ -137,6 +157,11 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 	}
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
 	}
 
 	deleted, err := s.db.DeleteNote(ctx, req.UserId, req.Id)

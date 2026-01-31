@@ -26,6 +26,11 @@ func (s *TagsService) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*p
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
 	tags, err := s.db.ListTags(ctx, req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list tags: %v", err)

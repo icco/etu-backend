@@ -1,6 +1,7 @@
 package syncdb
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -57,6 +58,11 @@ func (db *DB) Close() error {
 		return err
 	}
 	return sqlDB.Close()
+}
+
+// GetDB returns the underlying GORM connection
+func (db *DB) GetDB() *gorm.DB {
+	return db.conn
 }
 
 // AutoMigrate runs auto migrations for all tables
@@ -283,4 +289,29 @@ func (db *DB) GetArchivedNotePageIDs(userID string) ([]string, error) {
 	// Placeholder: This would query for soft-deleted notes
 	// For now, return empty since we don't have soft-delete implemented
 	return []string{}, nil
+}
+
+// GetUsersWithNotionKeys retrieves all users who have a Notion API key configured
+func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
+	var users []User
+	err := db.conn.WithContext(ctx).
+		Where(`"notionKey" IS NOT NULL AND "notionKey" != ''`).
+		Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// GetUserSettings retrieves user settings for a user
+func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error) {
+	var user User
+	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return &user, nil
 }
