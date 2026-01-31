@@ -37,6 +37,9 @@ message User {
   optional Timestamp subscription_end = 6;
   Timestamp created_at = 7;
   optional string stripe_customer_id = 8;
+  optional string notion_key = 9;
+  optional string username = 10;
+  Timestamp updated_at = 11;
 }
 
 // API Key message
@@ -48,8 +51,9 @@ message ApiKey {
   optional Timestamp last_used = 5;
 }
 
-// UserSettings message
+// UserSettings message (deprecated - use User instead)
 message UserSettings {
+  option deprecated = true;
   string user_id = 1;
   optional string notion_key = 2;
   optional string username = 3;
@@ -219,7 +223,8 @@ message GetUserSettingsRequest {
 }
 
 message GetUserSettingsResponse {
-  UserSettings settings = 1;
+  UserSettings settings = 1 [deprecated = true]; // Deprecated: use user field instead
+  User user = 2;
 }
 
 message UpdateUserSettingsRequest {
@@ -229,7 +234,8 @@ message UpdateUserSettingsRequest {
 }
 
 message UpdateUserSettingsResponse {
-  UserSettings settings = 1;
+  UserSettings settings = 1 [deprecated = true]; // Deprecated: use user field instead
+  User user = 2;
 }
 
 // Service definitions

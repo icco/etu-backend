@@ -43,19 +43,7 @@ func (s *UserSettingsService) GetUserSettings(ctx context.Context, req *pb.GetUs
 	}
 
 	return &pb.GetUserSettingsResponse{
-		Settings: &pb.UserSettings{
-			UserId:    user.ID,
-			NotionKey: user.NotionKey,
-			Username:  user.Username,
-			CreatedAt: &pb.Timestamp{
-				Seconds: user.CreatedAt.Unix(),
-				Nanos:   int32(user.CreatedAt.Nanosecond()),
-			},
-			UpdatedAt: &pb.Timestamp{
-				Seconds: user.UpdatedAt.Unix(),
-				Nanos:   int32(user.UpdatedAt.Nanosecond()),
-			},
-		},
+		User: userToProto(user),
 	}, nil
 }
 
@@ -76,18 +64,6 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 	}
 
 	return &pb.UpdateUserSettingsResponse{
-		Settings: &pb.UserSettings{
-			UserId:    user.ID,
-			NotionKey: user.NotionKey,
-			Username:  user.Username,
-			CreatedAt: &pb.Timestamp{
-				Seconds: user.CreatedAt.Unix(),
-				Nanos:   int32(user.CreatedAt.Nanosecond()),
-			},
-			UpdatedAt: &pb.Timestamp{
-				Seconds: user.UpdatedAt.Unix(),
-				Nanos:   int32(user.UpdatedAt.Nanosecond()),
-			},
-		},
+		User: userToProto(user),
 	}, nil
 }

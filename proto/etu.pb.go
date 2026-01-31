@@ -231,6 +231,9 @@ type User struct {
 	SubscriptionEnd    *Timestamp             `protobuf:"bytes,6,opt,name=subscription_end,json=subscriptionEnd,proto3,oneof" json:"subscription_end,omitempty"`
 	CreatedAt          *Timestamp             `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	StripeCustomerId   *string                `protobuf:"bytes,8,opt,name=stripe_customer_id,json=stripeCustomerId,proto3,oneof" json:"stripe_customer_id,omitempty"`
+	NotionKey          *string                `protobuf:"bytes,9,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
+	Username           *string                `protobuf:"bytes,10,opt,name=username,proto3,oneof" json:"username,omitempty"`
+	UpdatedAt          *Timestamp             `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -321,6 +324,27 @@ func (x *User) GetStripeCustomerId() string {
 	return ""
 }
 
+func (x *User) GetNotionKey() string {
+	if x != nil && x.NotionKey != nil {
+		return *x.NotionKey
+	}
+	return ""
+}
+
+func (x *User) GetUsername() string {
+	if x != nil && x.Username != nil {
+		return *x.Username
+	}
+	return ""
+}
+
+func (x *User) GetUpdatedAt() *Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 // API Key message
 type ApiKey struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -398,7 +422,9 @@ func (x *ApiKey) GetLastUsed() *Timestamp {
 	return nil
 }
 
-// UserSettings message
+// UserSettings message (deprecated - use User instead)
+//
+// Deprecated: Marked as deprecated in proto/etu.proto.
 type UserSettings struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
@@ -2056,8 +2082,10 @@ func (x *GetUserSettingsRequest) GetUserId() string {
 }
 
 type GetUserSettingsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Settings      *UserSettings          `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated: Marked as deprecated in proto/etu.proto.
+	Settings      *UserSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"` // Deprecated: use user field instead
+	User          *User         `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2092,9 +2120,17 @@ func (*GetUserSettingsResponse) Descriptor() ([]byte, []int) {
 	return file_proto_etu_proto_rawDescGZIP(), []int{37}
 }
 
+// Deprecated: Marked as deprecated in proto/etu.proto.
 func (x *GetUserSettingsResponse) GetSettings() *UserSettings {
 	if x != nil {
 		return x.Settings
+	}
+	return nil
+}
+
+func (x *GetUserSettingsResponse) GetUser() *User {
+	if x != nil {
+		return x.User
 	}
 	return nil
 }
@@ -2160,8 +2196,10 @@ func (x *UpdateUserSettingsRequest) GetUsername() string {
 }
 
 type UpdateUserSettingsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Settings      *UserSettings          `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated: Marked as deprecated in proto/etu.proto.
+	Settings      *UserSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"` // Deprecated: use user field instead
+	User          *User         `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2196,9 +2234,17 @@ func (*UpdateUserSettingsResponse) Descriptor() ([]byte, []int) {
 	return file_proto_etu_proto_rawDescGZIP(), []int{39}
 }
 
+// Deprecated: Marked as deprecated in proto/etu.proto.
 func (x *UpdateUserSettingsResponse) GetSettings() *UserSettings {
 	if x != nil {
 		return x.Settings
+	}
+	return nil
+}
+
+func (x *UpdateUserSettingsResponse) GetUser() *User {
+	if x != nil {
+		return x.User
 	}
 	return nil
 }
@@ -2224,7 +2270,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x12-\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x0e.etu.TimestampR\tcreatedAt\"\xf2\x02\n" +
+	"created_at\x18\x04 \x01(\v2\x0e.etu.TimestampR\tcreatedAt\"\x82\x04\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -2234,11 +2280,19 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x10subscription_end\x18\x06 \x01(\v2\x0e.etu.TimestampH\x02R\x0fsubscriptionEnd\x88\x01\x01\x12-\n" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x0e.etu.TimestampR\tcreatedAt\x121\n" +
-	"\x12stripe_customer_id\x18\b \x01(\tH\x03R\x10stripeCustomerId\x88\x01\x01B\a\n" +
+	"\x12stripe_customer_id\x18\b \x01(\tH\x03R\x10stripeCustomerId\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"notion_key\x18\t \x01(\tH\x04R\tnotionKey\x88\x01\x01\x12\x1f\n" +
+	"\busername\x18\n" +
+	" \x01(\tH\x05R\busername\x88\x01\x01\x12-\n" +
+	"\n" +
+	"updated_at\x18\v \x01(\v2\x0e.etu.TimestampR\tupdatedAtB\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
-	"\x13_stripe_customer_id\"\xba\x01\n" +
+	"\x13_stripe_customer_idB\r\n" +
+	"\v_notion_keyB\v\n" +
+	"\t_username\"\xba\x01\n" +
 	"\x06ApiKey\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
@@ -2248,7 +2302,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"created_at\x18\x04 \x01(\v2\x0e.etu.TimestampR\tcreatedAt\x120\n" +
 	"\tlast_used\x18\x05 \x01(\v2\x0e.etu.TimestampH\x00R\blastUsed\x88\x01\x01B\f\n" +
 	"\n" +
-	"_last_used\"\xe6\x01\n" +
+	"_last_used\"\xea\x01\n" +
 	"\fUserSettings\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
 	"\n" +
@@ -2257,7 +2311,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x04 \x01(\v2\x0e.etu.TimestampR\tcreatedAt\x12-\n" +
 	"\n" +
-	"updated_at\x18\x05 \x01(\v2\x0e.etu.TimestampR\tupdatedAtB\r\n" +
+	"updated_at\x18\x05 \x01(\v2\x0e.etu.TimestampR\tupdatedAt:\x02\x18\x01B\r\n" +
 	"\v_notion_keyB\v\n" +
 	"\t_username\"\xbf\x01\n" +
 	"\x10ListNotesRequest\x12\x17\n" +
@@ -2358,18 +2412,20 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\n" +
 	"\b_user_id\"1\n" +
 	"\x16GetUserSettingsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"H\n" +
-	"\x17GetUserSettingsResponse\x12-\n" +
-	"\bsettings\x18\x01 \x01(\v2\x11.etu.UserSettingsR\bsettings\"\x95\x01\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"k\n" +
+	"\x17GetUserSettingsResponse\x121\n" +
+	"\bsettings\x18\x01 \x01(\v2\x11.etu.UserSettingsB\x02\x18\x01R\bsettings\x12\x1d\n" +
+	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04user\"\x95\x01\n" +
 	"\x19UpdateUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
 	"\n" +
 	"notion_key\x18\x02 \x01(\tH\x00R\tnotionKey\x88\x01\x01\x12\x1f\n" +
 	"\busername\x18\x03 \x01(\tH\x01R\busername\x88\x01\x01B\r\n" +
 	"\v_notion_keyB\v\n" +
-	"\t_username\"K\n" +
-	"\x1aUpdateUserSettingsResponse\x12-\n" +
-	"\bsettings\x18\x01 \x01(\v2\x11.etu.UserSettingsR\bsettings2\xbd\x02\n" +
+	"\t_username\"n\n" +
+	"\x1aUpdateUserSettingsResponse\x121\n" +
+	"\bsettings\x18\x01 \x01(\v2\x11.etu.UserSettingsB\x02\x18\x01R\bsettings\x12\x1d\n" +
+	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04user2\xbd\x02\n" +
 	"\fNotesService\x12:\n" +
 	"\tListNotes\x12\x15.etu.ListNotesRequest\x1a\x16.etu.ListNotesResponse\x12=\n" +
 	"\n" +
@@ -2457,64 +2513,67 @@ var file_proto_etu_proto_depIdxs = []int32{
 	0,  // 2: etu.Tag.created_at:type_name -> etu.Timestamp
 	0,  // 3: etu.User.subscription_end:type_name -> etu.Timestamp
 	0,  // 4: etu.User.created_at:type_name -> etu.Timestamp
-	0,  // 5: etu.ApiKey.created_at:type_name -> etu.Timestamp
-	0,  // 6: etu.ApiKey.last_used:type_name -> etu.Timestamp
-	0,  // 7: etu.UserSettings.created_at:type_name -> etu.Timestamp
-	0,  // 8: etu.UserSettings.updated_at:type_name -> etu.Timestamp
-	1,  // 9: etu.ListNotesResponse.notes:type_name -> etu.Note
-	1,  // 10: etu.CreateNoteResponse.note:type_name -> etu.Note
-	1,  // 11: etu.GetNoteResponse.note:type_name -> etu.Note
-	1,  // 12: etu.UpdateNoteResponse.note:type_name -> etu.Note
-	2,  // 13: etu.ListTagsResponse.tags:type_name -> etu.Tag
-	3,  // 14: etu.RegisterResponse.user:type_name -> etu.User
-	3,  // 15: etu.AuthenticateResponse.user:type_name -> etu.User
-	3,  // 16: etu.GetUserResponse.user:type_name -> etu.User
-	3,  // 17: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	0,  // 18: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> etu.Timestamp
-	3,  // 19: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
-	4,  // 20: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
-	4,  // 21: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
-	5,  // 22: etu.GetUserSettingsResponse.settings:type_name -> etu.UserSettings
-	5,  // 23: etu.UpdateUserSettingsResponse.settings:type_name -> etu.UserSettings
-	6,  // 24: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	8,  // 25: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	10, // 26: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	12, // 27: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	14, // 28: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	16, // 29: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	18, // 30: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	20, // 31: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	22, // 32: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	24, // 33: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	26, // 34: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	28, // 35: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	30, // 36: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	32, // 37: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	34, // 38: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	36, // 39: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	38, // 40: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	7,  // 41: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	9,  // 42: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	11, // 43: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	13, // 44: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	15, // 45: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	17, // 46: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	19, // 47: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	21, // 48: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	23, // 49: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	25, // 50: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	27, // 51: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	29, // 52: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	31, // 53: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	33, // 54: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	35, // 55: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	37, // 56: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	39, // 57: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	41, // [41:58] is the sub-list for method output_type
-	24, // [24:41] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	0,  // 5: etu.User.updated_at:type_name -> etu.Timestamp
+	0,  // 6: etu.ApiKey.created_at:type_name -> etu.Timestamp
+	0,  // 7: etu.ApiKey.last_used:type_name -> etu.Timestamp
+	0,  // 8: etu.UserSettings.created_at:type_name -> etu.Timestamp
+	0,  // 9: etu.UserSettings.updated_at:type_name -> etu.Timestamp
+	1,  // 10: etu.ListNotesResponse.notes:type_name -> etu.Note
+	1,  // 11: etu.CreateNoteResponse.note:type_name -> etu.Note
+	1,  // 12: etu.GetNoteResponse.note:type_name -> etu.Note
+	1,  // 13: etu.UpdateNoteResponse.note:type_name -> etu.Note
+	2,  // 14: etu.ListTagsResponse.tags:type_name -> etu.Tag
+	3,  // 15: etu.RegisterResponse.user:type_name -> etu.User
+	3,  // 16: etu.AuthenticateResponse.user:type_name -> etu.User
+	3,  // 17: etu.GetUserResponse.user:type_name -> etu.User
+	3,  // 18: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
+	0,  // 19: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> etu.Timestamp
+	3,  // 20: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
+	4,  // 21: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
+	4,  // 22: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
+	5,  // 23: etu.GetUserSettingsResponse.settings:type_name -> etu.UserSettings
+	3,  // 24: etu.GetUserSettingsResponse.user:type_name -> etu.User
+	5,  // 25: etu.UpdateUserSettingsResponse.settings:type_name -> etu.UserSettings
+	3,  // 26: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
+	6,  // 27: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	8,  // 28: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	10, // 29: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	12, // 30: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	14, // 31: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	16, // 32: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	18, // 33: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	20, // 34: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	22, // 35: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	24, // 36: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	26, // 37: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	28, // 38: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	30, // 39: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	32, // 40: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	34, // 41: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	36, // 42: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	38, // 43: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	7,  // 44: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	9,  // 45: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	11, // 46: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	13, // 47: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	15, // 48: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	17, // 49: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	19, // 50: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	21, // 51: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	23, // 52: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	25, // 53: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	27, // 54: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	29, // 55: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	31, // 56: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	33, // 57: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	35, // 58: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	37, // 59: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	39, // 60: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	44, // [44:61] is the sub-list for method output_type
+	27, // [27:44] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }

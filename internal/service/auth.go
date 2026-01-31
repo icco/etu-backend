@@ -171,6 +171,7 @@ func userToProto(u *db.User) *pb.User {
 		Email:              u.Email,
 		SubscriptionStatus: u.SubscriptionStatus,
 		CreatedAt:          &pb.Timestamp{Seconds: u.CreatedAt.Unix(), Nanos: int32(u.CreatedAt.Nanosecond())},
+		UpdatedAt:          &pb.Timestamp{Seconds: u.UpdatedAt.Unix(), Nanos: int32(u.UpdatedAt.Nanosecond())},
 	}
 
 	if u.Name != nil {
@@ -187,6 +188,12 @@ func userToProto(u *db.User) *pb.User {
 	}
 	if u.StripeCustomerID != nil {
 		pbUser.StripeCustomerId = u.StripeCustomerID
+	}
+	if u.NotionKey != nil {
+		pbUser.NotionKey = u.NotionKey
+	}
+	if u.Username != nil {
+		pbUser.Username = u.Username
 	}
 
 	return pbUser
