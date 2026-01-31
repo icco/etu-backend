@@ -281,3 +281,10 @@ To generate tags every 6 hours:
    - Adds only the number of tags needed to reach 3 total
    - Updates the note's `updatedAt` timestamp
 3. Waits for the configured delay (default 2s) between requests to avoid rate limiting
+
+## License
+
+This project uses a dual-license structure:
+
+- **Backend code**: [CC-BY-NC-4.0](https://creativecommons.org/licenses/by-nc/4.0/) - See [LICENSE](LICENSE)
+- **Proto package** (`packages/etu-proto/`): [MIT](packages/etu-proto/LICENSE)
