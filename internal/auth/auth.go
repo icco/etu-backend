@@ -13,6 +13,47 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// ContextKey is the type used for context keys in authentication.
+// Exported so all packages use the same type for context key comparison.
+type ContextKey string
+
+const (
+	// UserIDKey is the context key for storing the authenticated user ID
+	UserIDKey ContextKey = "userID"
+	// AuthTypeKey is the context key for storing the authentication type
+	AuthTypeKey ContextKey = "authType"
+)
+
+// GetUserID extracts the user ID from context
+func GetUserID(ctx context.Context) (string, error) {
+	userID, ok := ctx.Value(UserIDKey).(string)
+	if !ok || userID == "" {
+		return "", fmt.Errorf("user ID not found in context")
+	}
+	return userID, nil
+}
+
+// GetAuthType extracts the authentication type from context ("m2m" or "apikey")
+func GetAuthType(ctx context.Context) string {
+	authType, ok := ctx.Value(AuthTypeKey).(string)
+	if !ok {
+		return ""
+	}
+	return authType
+}
+
+// IsM2MAuth returns true if the request was authenticated via M2M token
+func IsM2MAuth(ctx context.Context) bool {
+	return GetAuthType(ctx) == "m2m"
+}
+
+// SetAuthContext adds authentication info to the context
+func SetAuthContext(ctx context.Context, userID, authType string) context.Context {
+	ctx = context.WithValue(ctx, UserIDKey, userID)
+	ctx = context.WithValue(ctx, AuthTypeKey, authType)
+	return ctx
+}
+
 // Authenticator handles API key authentication
 type Authenticator struct {
 	db *sql.DB

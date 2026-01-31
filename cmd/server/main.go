@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -220,8 +219,7 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 		// Check for GRPC API key (server-to-server auth)
 		if grpcApiKey != "" && token == grpcApiKey {
 			// GRPC API key authentication successful - no user context
-			ctx = context.WithValue(ctx, userIDKey, "m2m")
-			ctx = context.WithValue(ctx, authTypeKey, "m2m")
+			ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
 			log.Printf("GRPC API key authenticated request: method=%s", info.FullMethod)
 			return handler(ctx, req)
 		}
@@ -233,8 +231,7 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 		}
 
 		// Add user ID to context for use by handlers
-		ctx = context.WithValue(ctx, userIDKey, userID)
-		ctx = context.WithValue(ctx, authTypeKey, "apikey")
+		ctx = auth.SetAuthContext(ctx, userID, "apikey")
 
 		// Log the authenticated request
 		log.Printf("Authenticated request: method=%s user=%s", info.FullMethod, userID)
@@ -243,32 +240,3 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 	}
 }
 
-type contextKey string
-
-const (
-	userIDKey   contextKey = "userID"
-	authTypeKey contextKey = "authType"
-)
-
-// GetUserID extracts the user ID from context
-func GetUserID(ctx context.Context) (string, error) {
-	userID, ok := ctx.Value(userIDKey).(string)
-	if !ok || userID == "" {
-		return "", fmt.Errorf("user ID not found in context")
-	}
-	return userID, nil
-}
-
-// GetAuthType extracts the authentication type from context ("m2m" or "apikey")
-func GetAuthType(ctx context.Context) string {
-	authType, ok := ctx.Value(authTypeKey).(string)
-	if !ok {
-		return ""
-	}
-	return authType
-}
-
-// IsM2MAuth returns true if the request was authenticated via M2M token
-func IsM2MAuth(ctx context.Context) bool {
-	return GetAuthType(ctx) == "m2m"
-}
