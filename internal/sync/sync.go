@@ -89,8 +89,8 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 		// Upsert the note
 		_, isNew, upsertErr := s.db.UpsertNoteFromNotion(
 			userID,
-			post.ID,       // Notion UUID (stored in ID property)
-			post.PageID,   // Notion page ID
+			post.ID,     // Notion UUID (stored in ID property)
+			post.PageID, // Notion page ID
 			post.Text,
 			post.Tags,
 			post.CreatedAt,

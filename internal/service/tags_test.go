@@ -66,10 +66,10 @@ func TestListTags(t *testing.T) {
 	svc.addTag("user-456", "other", 1)
 
 	tests := []struct {
-		name       string
-		req        *pb.ListTagsRequest
-		wantErr    codes.Code
-		wantCount  int
+		name      string
+		req       *pb.ListTagsRequest
+		wantErr   codes.Code
+		wantCount int
 	}{
 		{
 			name: "valid list",
@@ -80,8 +80,8 @@ func TestListTags(t *testing.T) {
 			wantCount: 2,
 		},
 		{
-			name: "missing user_id",
-			req: &pb.ListTagsRequest{},
+			name:    "missing user_id",
+			req:     &pb.ListTagsRequest{},
 			wantErr: codes.InvalidArgument,
 		},
 		{

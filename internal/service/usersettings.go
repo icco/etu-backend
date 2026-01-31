@@ -37,7 +37,7 @@ func (s *UserSettingsService) GetUserSettings(ctx context.Context, req *pb.GetUs
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get user settings: %v", err)
 	}
-	
+
 	if user == nil {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}

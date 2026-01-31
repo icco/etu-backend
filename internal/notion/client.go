@@ -23,11 +23,11 @@ type Post struct {
 
 // Client wraps the Notion API client.
 type Client struct {
-	notionKey    string
-	rootPage     string
-	cachedDbID   notionapi.DatabaseID
-	client       *notionapi.Client
-	clientOnce   sync.Once
+	notionKey  string
+	rootPage   string
+	cachedDbID notionapi.DatabaseID
+	client     *notionapi.Client
+	clientOnce sync.Once
 }
 
 // NewClient creates a new Notion client from environment variables.

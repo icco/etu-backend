@@ -570,16 +570,16 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 // UpdateUserSettings updates or creates user settings
 func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, username *string) (*User, error) {
 	now := time.Now()
-	
+
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
-	
+
 	if result.Error == gorm.ErrRecordNotFound {
 		return nil, fmt.Errorf("user not found")
 	} else if result.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", result.Error)
 	}
-	
+
 	// Update user fields
 	updates := map[string]interface{}{
 		"updatedAt": now,
@@ -590,16 +590,16 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	if username != nil {
 		updates["username"] = *username
 	}
-	
+
 	if err := db.conn.WithContext(ctx).Model(&user).Updates(updates).Error; err != nil {
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
-	
+
 	// Reload to get updated values
 	if err := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user).Error; err != nil {
 		return nil, fmt.Errorf("failed to reload user: %w", err)
 	}
-	
+
 	return &user, nil
 }
 
