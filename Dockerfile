@@ -1,9 +1,12 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-bookworm AS builder
+
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | bash
+RUN apt-get update && apt-get install -y task git && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache git
+ENV GOOS=linux
+ENV CGO_ENABLED=0
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -13,16 +16,14 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /server ./cmd/server
-
+RUN go build -ldflags="-s -w" -o /bin/server ./cmd/server \
+    && go build -ldflags="-s -w" -o /bin/sync ./cmd/sync
 # Final image
-FROM alpine:3.21
-
-RUN apk add --no-cache ca-certificates
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
-COPY --from=builder /server /app/server
+COPY --from=builder /app/bin/server /app/server
 
 EXPOSE 8080 50051
 
