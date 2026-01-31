@@ -239,4 +239,3 @@ func authInterceptor(authenticator *auth.Authenticator) grpc.UnaryServerIntercep
 		return handler(ctx, req)
 	}
 }
-
