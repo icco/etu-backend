@@ -16,8 +16,7 @@ RUN go mod download
 COPY . .
 
 # Build the binary
-RUN go build -ldflags="-s -w" -o /bin/server ./cmd/server \
-    && go build -ldflags="-s -w" -o /bin/sync ./cmd/sync
+RUN task build
 # Final image
 FROM debian:bookworm-slim
 
