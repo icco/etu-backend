@@ -1,7 +1,7 @@
 FROM golang:1.25-bookworm AS builder
 
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | bash
-RUN apt update && apt install task git
+RUN apt-get update && apt-get install -y task git && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
