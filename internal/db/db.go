@@ -568,7 +568,7 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 }
 
 // UpdateUserSettings updates or creates user settings
-func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, username *string) (*User, error) {
+func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name *string) (*User, error) {
 	now := time.Now()
 
 	var user User
@@ -587,8 +587,8 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	if notionKey != nil {
 		updates["notionKey"] = *notionKey
 	}
-	if username != nil {
-		updates["username"] = *username
+	if name != nil {
+		updates["name"] = *name
 	}
 
 	if err := db.conn.WithContext(ctx).Model(&user).Updates(updates).Error; err != nil {

@@ -38,7 +38,7 @@ message User {
   Timestamp created_at = 7;
   optional string stripe_customer_id = 8;
   optional string notion_key = 9;
-  optional string username = 10;
+  reserved 10; // was username, use name instead
   Timestamp updated_at = 11;
 }
 
@@ -49,16 +49,6 @@ message ApiKey {
   string key_prefix = 3;
   Timestamp created_at = 4;
   optional Timestamp last_used = 5;
-}
-
-// UserSettings message (deprecated - use User instead)
-message UserSettings {
-  option deprecated = true;
-  string user_id = 1;
-  optional string notion_key = 2;
-  optional string username = 3;
-  Timestamp created_at = 4;
-  Timestamp updated_at = 5;
 }
 
 // Request/Response messages for Notes
@@ -223,18 +213,19 @@ message GetUserSettingsRequest {
 }
 
 message GetUserSettingsResponse {
-  UserSettings settings = 1 [deprecated = true]; // Deprecated: use user field instead
+  reserved 1; // was settings (UserSettings), use user instead
   User user = 2;
 }
 
 message UpdateUserSettingsRequest {
   string user_id = 1;
   optional string notion_key = 2;
-  optional string username = 3;
+  reserved 3; // was username, use name instead
+  optional string name = 4;
 }
 
 message UpdateUserSettingsResponse {
-  UserSettings settings = 1 [deprecated = true]; // Deprecated: use user field instead
+  reserved 1; // was settings (UserSettings), use user instead
   User user = 2;
 }
 

@@ -192,9 +192,6 @@ func userToProto(u *db.User) *pb.User {
 	if u.NotionKey != nil {
 		pbUser.NotionKey = u.NotionKey
 	}
-	if u.Username != nil {
-		pbUser.Username = u.Username
-	}
 
 	return pbUser
 }
