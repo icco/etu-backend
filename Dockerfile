@@ -22,8 +22,8 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-COPY --from=builder /app/bin/server /app/server
+COPY --from=builder /app/bin/ /app/bin/
 
 EXPOSE 8080 50051
 
-CMD ["/app/server"]
+CMD ["/app/bin/server"]
