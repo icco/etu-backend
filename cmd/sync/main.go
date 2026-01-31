@@ -43,7 +43,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer database.Close()
+	defer func() {
+		if err := database.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 	log.Println("Connected to database")
 
 	// Run auto-migrations to ensure all tables exist
@@ -137,10 +141,6 @@ func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncM
 	}
 
 	log.Printf("Completed sync for all users: %d succeeded, %d failed", successCount, failureCount)
-}
-
-func performSync(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) {
-	performSyncWithResult(ctx, syncer, userID, fullSync, syncMode)
 }
 
 func performSyncWithResult(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) bool {
