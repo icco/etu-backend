@@ -6,7 +6,7 @@ RUN apt update && apt install task git
 WORKDIR /app
 
 ENV GOOS=linux
-ENV CGO_ENABLED=1
+ENV CGO_ENABLED=0
 
 # Copy go mod files
 COPY go.mod go.sum ./
