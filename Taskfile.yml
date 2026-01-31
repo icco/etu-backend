@@ -35,12 +35,15 @@ tasks:
       - go run ./cmd/server
 
   sync:
-    desc: Run sync job (requires USER_ID env var, optionally FULL_SYNC=true and INTERVAL=1h)
+    desc: Run sync job (requires GRPC_API_KEY env var, optionally FULL_SYNC=true, DIRECTION=from-notion|to-notion|bidirectional and INTERVAL=1h)
     cmds:
       - |
-        ARGS="-user=${USER_ID}"
+        ARGS=""
         if [ "${FULL_SYNC}" = "true" ]; then
           ARGS="$ARGS -full"
+        fi
+        if [ -n "${DIRECTION}" ]; then
+          ARGS="$ARGS -direction=${DIRECTION}"
         fi
         if [ -n "${INTERVAL}" ]; then
           ARGS="$ARGS -interval=${INTERVAL}"
@@ -48,10 +51,10 @@ tasks:
         go run ./cmd/sync $ARGS
 
   taggen:
-    desc: Run tag generation job (requires USER_ID and GEMINI_API_KEY env vars, optionally DRY_RUN=true and INTERVAL=1h)
+    desc: Run tag generation job (requires GRPC_API_KEY and GEMINI_API_KEY env vars, optionally DRY_RUN=true and INTERVAL=1h)
     cmds:
       - |
-        ARGS="-user=${USER_ID}"
+        ARGS=""
         if [ "${DRY_RUN}" = "true" ]; then
           ARGS="$ARGS -dry-run"
         fi

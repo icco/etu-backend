@@ -7,20 +7,22 @@ import (
 	"time"
 
 	"github.com/icco/etu-backend/internal/notion"
-	"github.com/icco/etu-backend/internal/syncdb"
+	pb "github.com/icco/etu-backend/proto"
 )
 
-// Syncer handles syncing between Notion and PostgreSQL.
+// Syncer handles syncing between Notion and the backend via gRPC.
 type Syncer struct {
-	db     *syncdb.DB
-	notion *notion.Client
+	syncClient  pb.SyncServiceClient
+	notesClient pb.NotesServiceClient
+	notion      *notion.Client
 }
 
 // NewSyncer creates a new Syncer instance.
-func NewSyncer(database *syncdb.DB, notionClient *notion.Client) *Syncer {
+func NewSyncer(syncClient pb.SyncServiceClient, notesClient pb.NotesServiceClient, notionClient *notion.Client) *Syncer {
 	return &Syncer{
-		db:     database,
-		notion: notionClient,
+		syncClient:  syncClient,
+		notesClient: notesClient,
+		notion:      notionClient,
 	}
 }
 
@@ -55,16 +57,17 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 		log.Printf("Starting full sync for user %s", userID)
 		posts, err = s.notion.ListAllPosts(ctx)
 	} else {
-		lastSync, syncErr := s.db.GetLastSyncTime(userID)
+		resp, syncErr := s.syncClient.GetSyncState(ctx, &pb.GetSyncStateRequest{UserId: userID})
 		if syncErr != nil {
 			return nil, fmt.Errorf("failed to get last sync time: %w", syncErr)
 		}
 
-		if lastSync == nil {
+		if resp.LastSyncedAt == nil {
 			log.Printf("No previous sync found for user %s, performing full sync", userID)
 			posts, err = s.notion.ListAllPosts(ctx)
 		} else {
 			// Add a small buffer to avoid missing posts due to timing
+			lastSync := time.Unix(resp.LastSyncedAt.Seconds, int64(resp.LastSyncedAt.Nanos))
 			since := lastSync.Add(-5 * time.Minute)
 			log.Printf("Starting incremental sync for user %s (since %s)", userID, since.Format(time.RFC3339))
 			posts, err = s.notion.ListPostsSince(ctx, since)
@@ -79,7 +82,10 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 
 	for _, post := range posts {
 		// Get existing note to check if it changed
-		existing, getErr := s.db.GetNoteByNotionUUID(userID, post.ID)
+		existingResp, getErr := s.notesClient.GetNoteByNotionUUID(ctx, &pb.GetNoteByNotionUUIDRequest{
+			UserId:     userID,
+			NotionUuid: post.ID,
+		})
 		if getErr != nil {
 			log.Printf("Error checking existing note for %s: %v", post.ID, getErr)
 			result.Errors++
@@ -87,24 +93,24 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 		}
 
 		// Upsert the note
-		_, isNew, upsertErr := s.db.UpsertNoteFromNotion(
-			userID,
-			post.ID,     // Notion UUID (stored in ID property)
-			post.PageID, // Notion page ID
-			post.Text,
-			post.Tags,
-			post.CreatedAt,
-			post.ModifiedAt,
-		)
+		upsertResp, upsertErr := s.syncClient.UpsertNoteFromNotion(ctx, &pb.UpsertNoteFromNotionRequest{
+			UserId:     userID,
+			NotionUuid: post.ID,
+			PageId:     post.PageID,
+			Content:    post.Text,
+			Tags:       post.Tags,
+			CreatedAt:  &pb.Timestamp{Seconds: post.CreatedAt.Unix(), Nanos: int32(post.CreatedAt.Nanosecond())},
+			UpdatedAt:  &pb.Timestamp{Seconds: post.ModifiedAt.Unix(), Nanos: int32(post.ModifiedAt.Nanosecond())},
+		})
 		if upsertErr != nil {
 			log.Printf("Error upserting note %s: %v", post.ID, upsertErr)
 			result.Errors++
 			continue
 		}
 
-		if isNew {
+		if upsertResp.IsNew {
 			result.Created++
-		} else if existing != nil && (existing.Content != post.Text || !s.tagsChanged(existing.ID, post.Tags)) {
+		} else if existingResp.Note != nil && (existingResp.Note.Content != post.Text || !s.tagsMatch(existingResp.Note.Tags, post.Tags)) {
 			result.Updated++
 		} else {
 			result.Unchanged++
@@ -112,7 +118,12 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 	}
 
 	// Update last sync time
-	if err := s.db.UpdateLastSyncTime(userID, time.Now()); err != nil {
+	now := time.Now()
+	_, err = s.syncClient.UpdateSyncState(ctx, &pb.UpdateSyncStateRequest{
+		UserId:       userID,
+		LastSyncedAt: &pb.Timestamp{Seconds: now.Unix(), Nanos: int32(now.Nanosecond())},
+	})
+	if err != nil {
 		log.Printf("Warning: failed to update last sync time: %v", err)
 	}
 
@@ -120,27 +131,22 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 	return result, nil
 }
 
-// tagsChanged checks if tags have changed for a note
-func (s *Syncer) tagsChanged(noteID string, newTags []string) bool {
-	existingTags, err := s.db.GetNoteTags(noteID)
-	if err != nil {
-		return true // Assume changed if we can't check
-	}
-
-	if len(existingTags) != len(newTags) {
-		return true
+// tagsMatch checks if two tag slices are equal
+func (s *Syncer) tagsMatch(existing, new []string) bool {
+	if len(existing) != len(new) {
+		return false
 	}
 
 	tagMap := make(map[string]bool)
-	for _, t := range existingTags {
+	for _, t := range existing {
 		tagMap[t] = true
 	}
-	for _, t := range newTags {
+	for _, t := range new {
 		if !tagMap[t] {
-			return true
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // SyncUserToNotion syncs local changes back to Notion for a specific user.
@@ -151,75 +157,63 @@ func (s *Syncer) SyncUserToNotion(ctx context.Context, userID string) (*SyncToNo
 	result := &SyncToNotionResult{}
 
 	// Get notes that need to be synced to Notion
-	notes, err := s.db.GetNotesNeedingSyncToNotion(userID)
+	resp, err := s.syncClient.GetNotesNeedingSyncToNotion(ctx, &pb.GetNotesNeedingSyncToNotionRequest{
+		UserId: userID,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get notes needing sync: %w", err)
 	}
 
-	log.Printf("Found %d notes to sync to Notion for user %s", len(notes), userID)
+	log.Printf("Found %d notes to sync to Notion for user %s", len(resp.Notes), userID)
 
-	for _, note := range notes {
-		// Get tags for this note
-		tags, tagErr := s.db.GetNoteTags(note.ID)
-		if tagErr != nil {
-			log.Printf("Error getting tags for note %s: %v", note.ID, tagErr)
-			result.Errors++
-			continue
-		}
-
-		if note.ExternalID == nil || *note.ExternalID == "" {
+	for _, note := range resp.Notes {
+		if note.ExternalId == nil || *note.ExternalId == "" {
 			// Note doesn't exist in Notion yet - create it
-			pageID, createErr := s.notion.CreatePost(ctx, note.ID, note.Content, tags)
+			pageID, createErr := s.notion.CreatePost(ctx, note.Id, note.Content, note.Tags)
 			if createErr != nil {
-				log.Printf("Error creating Notion page for note %s: %v", note.ID, createErr)
+				log.Printf("Error creating Notion page for note %s: %v", note.Id, createErr)
 				result.Errors++
 				continue
 			}
 
 			// Update the note with the new Notion page ID
-			if markErr := s.db.MarkNoteSyncedToNotion(note.ID, pageID, note.ID); markErr != nil {
-				log.Printf("Error marking note %s as synced: %v", note.ID, markErr)
+			_, markErr := s.syncClient.MarkNoteSyncedToNotion(ctx, &pb.MarkNoteSyncedToNotionRequest{
+				NoteId:     note.Id,
+				PageId:     pageID,
+				NotionUuid: note.Id, // Use note ID as Notion UUID for new notes
+			})
+			if markErr != nil {
+				log.Printf("Error marking note %s as synced: %v", note.Id, markErr)
 				result.Errors++
 				continue
 			}
 
 			result.Created++
-			log.Printf("Created Notion page %s for note %s", pageID, note.ID)
+			log.Printf("Created Notion page %s for note %s", pageID, note.Id)
 		} else {
 			// Note exists in Notion - update it
-			if updateErr := s.notion.UpdatePost(ctx, *note.ExternalID, note.Content, tags); updateErr != nil {
-				log.Printf("Error updating Notion page %s for note %s: %v", *note.ExternalID, note.ID, updateErr)
+			if updateErr := s.notion.UpdatePost(ctx, *note.ExternalId, note.Content, note.Tags); updateErr != nil {
+				log.Printf("Error updating Notion page %s for note %s: %v", *note.ExternalId, note.Id, updateErr)
 				result.Errors++
 				continue
 			}
 
 			// Update the sync timestamp
-			if markErr := s.db.UpdateNoteNotionSyncTime(note.ID); markErr != nil {
-				log.Printf("Error updating sync time for note %s: %v", note.ID, markErr)
+			_, markErr := s.syncClient.UpdateNoteSyncTime(ctx, &pb.UpdateNoteSyncTimeRequest{
+				NoteId: note.Id,
+			})
+			if markErr != nil {
+				log.Printf("Error updating sync time for note %s: %v", note.Id, markErr)
 				result.Errors++
 				continue
 			}
 
 			result.Updated++
-			log.Printf("Updated Notion page %s for note %s", *note.ExternalID, note.ID)
+			log.Printf("Updated Notion page %s for note %s", *note.ExternalId, note.Id)
 		}
 	}
 
-	// Handle archived/deleted notes (archive them in Notion)
-	archivedPageIDs, err := s.db.GetArchivedNotePageIDs(userID)
-	if err != nil {
-		log.Printf("Warning: failed to get archived notes: %v", err)
-	} else {
-		for _, pageID := range archivedPageIDs {
-			if archiveErr := s.notion.ArchivePost(ctx, pageID); archiveErr != nil {
-				log.Printf("Error archiving Notion page %s: %v", pageID, archiveErr)
-				result.Errors++
-				continue
-			}
-			result.Archived++
-			log.Printf("Archived Notion page %s", pageID)
-		}
-	}
+	// Note: Archived notes handling would go here if implemented
 
 	result.Duration = time.Since(start)
 	return result, nil

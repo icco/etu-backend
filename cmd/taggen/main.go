@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/icco/etu-backend/internal/ai"
-	"github.com/icco/etu-backend/internal/db"
+	pb "github.com/icco/etu-backend/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -26,24 +29,38 @@ func main() {
 		log.Fatal("Error: GEMINI_API_KEY environment variable not set")
 	}
 
+	// Get gRPC server address
+	grpcAddr := os.Getenv("GRPC_SERVER_ADDR")
+	if grpcAddr == "" {
+		grpcAddr = "localhost:50051"
+	}
+
+	// Get API key for authentication
+	grpcApiKey := os.Getenv("GRPC_API_KEY")
+	if grpcApiKey == "" {
+		log.Fatal("Error: GRPC_API_KEY environment variable not set")
+	}
+
 	log.Printf("Starting Gemini tag generation job for all users")
 	log.Printf("  Dry run: %v", *dryRun)
 	log.Printf("  Delay: %s", *delay)
+	log.Printf("  Server: %s", grpcAddr)
 	if *interval > 0 {
 		log.Printf("  Interval: %s", *interval)
 	}
 
-	// Initialize database
-	database, err := db.New()
+	// Connect to gRPC server
+	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to gRPC server: %v", err)
 	}
-	defer func() {
-		if err := database.Close(); err != nil {
-			log.Printf("Error closing database: %v", err)
-		}
-	}()
-	log.Println("Connected to database")
+	defer conn.Close()
+	log.Println("Connected to gRPC server")
+
+	// Create gRPC clients
+	authClient := pb.NewAuthServiceClient(conn)
+	notesClient := pb.NewNotesServiceClient(conn)
+	tagsClient := pb.NewTagsServiceClient(conn)
 
 	// Handle graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -58,17 +75,20 @@ func main() {
 		cancel()
 	}()
 
+	// Add API key to context for all requests
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", grpcApiKey)
+
 	if *interval > 0 {
 		// Run continuously
-		runContinuously(ctx, database, geminiKey, *dryRun, *delay, *interval)
+		runContinuously(ctx, authClient, notesClient, tagsClient, geminiKey, *dryRun, *delay, *interval)
 	} else {
 		// Run once
-		runOnce(ctx, database, geminiKey, *dryRun, *delay)
+		runOnce(ctx, authClient, notesClient, tagsClient, geminiKey, *dryRun, *delay)
 	}
 }
 
-func runOnce(ctx context.Context, database *db.DB, geminiKey string, dryRun bool, delay time.Duration) {
-	result, err := generateTagsForAllUsers(ctx, database, geminiKey, dryRun, delay)
+func runOnce(ctx context.Context, authClient pb.AuthServiceClient, notesClient pb.NotesServiceClient, tagsClient pb.TagsServiceClient, geminiKey string, dryRun bool, delay time.Duration) {
+	result, err := generateTagsForAllUsers(ctx, authClient, notesClient, tagsClient, geminiKey, dryRun, delay)
 	if err != nil {
 		log.Fatalf("Tag generation failed: %v", err)
 	}
@@ -80,9 +100,9 @@ func runOnce(ctx context.Context, database *db.DB, geminiKey string, dryRun bool
 	log.Printf("  Errors: %d", result.Errors)
 }
 
-func runContinuously(ctx context.Context, database *db.DB, geminiKey string, dryRun bool, delay time.Duration, interval time.Duration) {
+func runContinuously(ctx context.Context, authClient pb.AuthServiceClient, notesClient pb.NotesServiceClient, tagsClient pb.TagsServiceClient, geminiKey string, dryRun bool, delay time.Duration, interval time.Duration) {
 	// Run immediately on start
-	performTagGeneration(ctx, database, geminiKey, dryRun, delay)
+	performTagGeneration(ctx, authClient, notesClient, tagsClient, geminiKey, dryRun, delay)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -93,15 +113,15 @@ func runContinuously(ctx context.Context, database *db.DB, geminiKey string, dry
 			log.Println("Shutting down tag generation job")
 			return
 		case <-ticker.C:
-			performTagGeneration(ctx, database, geminiKey, dryRun, delay)
+			performTagGeneration(ctx, authClient, notesClient, tagsClient, geminiKey, dryRun, delay)
 		}
 	}
 }
 
-func performTagGeneration(ctx context.Context, database *db.DB, geminiKey string, dryRun bool, delay time.Duration) {
+func performTagGeneration(ctx context.Context, authClient pb.AuthServiceClient, notesClient pb.NotesServiceClient, tagsClient pb.TagsServiceClient, geminiKey string, dryRun bool, delay time.Duration) {
 	log.Printf("Starting tag generation at %s", time.Now().Format(time.RFC3339))
 
-	result, err := generateTagsForAllUsers(ctx, database, geminiKey, dryRun, delay)
+	result, err := generateTagsForAllUsers(ctx, authClient, notesClient, tagsClient, geminiKey, dryRun, delay)
 	if err != nil {
 		log.Printf("Tag generation failed: %v", err)
 		return
@@ -112,19 +132,19 @@ func performTagGeneration(ctx context.Context, database *db.DB, geminiKey string
 }
 
 // generateTagsForAllUsers generates tags for all users in the database
-func generateTagsForAllUsers(ctx context.Context, database *db.DB, geminiKey string, dryRun bool, delay time.Duration) (*TagGenResult, error) {
+func generateTagsForAllUsers(ctx context.Context, authClient pb.AuthServiceClient, notesClient pb.NotesServiceClient, tagsClient pb.TagsServiceClient, geminiKey string, dryRun bool, delay time.Duration) (*TagGenResult, error) {
 	start := time.Now()
 	result := &TagGenResult{}
 
-	// Get all users
-	users, err := database.ListAllUsers(ctx)
+	// Get all users via gRPC
+	usersResp, err := authClient.ListAllUsers(ctx, &pb.ListAllUsersRequest{})
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("Found %d users to process", len(users))
+	log.Printf("Found %d users to process", len(usersResp.Users))
 
-	for _, user := range users {
+	for _, user := range usersResp.Users {
 		select {
 		case <-ctx.Done():
 			result.Duration = time.Since(start)
@@ -132,10 +152,10 @@ func generateTagsForAllUsers(ctx context.Context, database *db.DB, geminiKey str
 		default:
 		}
 
-		log.Printf("Processing user %s", user.ID)
-		userResult, err := generateTagsForUser(ctx, database, user.ID, geminiKey, dryRun, delay)
+		log.Printf("Processing user %s", user.Id)
+		userResult, err := generateTagsForUser(ctx, notesClient, tagsClient, user.Id, geminiKey, dryRun, delay)
 		if err != nil {
-			log.Printf("Failed to generate tags for user %s: %v", user.ID, err)
+			log.Printf("Failed to generate tags for user %s: %v", user.Id, err)
 			result.Errors++
 			continue
 		}
@@ -159,33 +179,36 @@ type TagGenResult struct {
 	Duration       time.Duration
 }
 
-func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey string, dryRun bool, delay time.Duration) (*TagGenResult, error) {
+func generateTagsForUser(ctx context.Context, notesClient pb.NotesServiceClient, tagsClient pb.TagsServiceClient, userID, geminiKey string, dryRun bool, delay time.Duration) (*TagGenResult, error) {
 	result := &TagGenResult{}
 
 	// Fetch all existing tags for the user to prefer reusing them
-	existingTags, err := database.ListTags(ctx, userID)
+	tagsResp, err := tagsClient.ListTags(ctx, &pb.ListTagsRequest{UserId: userID})
 	if err != nil {
 		return nil, err
 	}
 
 	// Create a map of existing tag names (lowercase) for easy lookup
 	existingTagNames := make(map[string]bool)
-	existingTagList := make([]string, 0, len(existingTags))
-	for _, tag := range existingTags {
+	existingTagList := make([]string, 0, len(tagsResp.Tags))
+	for _, tag := range tagsResp.Tags {
 		lowerName := strings.ToLower(tag.Name)
 		existingTagNames[lowerName] = true
 		existingTagList = append(existingTagList, lowerName)
 	}
 
 	// Fetch notes with less than 3 tags
-	notes, err := database.GetNotesWithFewTags(ctx, userID, 3)
+	notesResp, err := notesClient.GetNotesWithFewTags(ctx, &pb.GetNotesWithFewTagsRequest{
+		UserId:  userID,
+		MaxTags: 3,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("Found %d notes with fewer than 3 tags", len(notes))
+	log.Printf("Found %d notes with fewer than 3 tags", len(notesResp.Notes))
 
-	for _, note := range notes {
+	for _, note := range notesResp.Notes {
 		result.NotesProcessed++
 
 		// Calculate how many tags we can add
@@ -196,12 +219,12 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey
 			continue
 		}
 
-		log.Printf("Processing note %s (current tags: %d)", note.ID, currentTagCount)
+		log.Printf("Processing note %s (current tags: %d)", note.Id, currentTagCount)
 
 		// Generate tags using Gemini, passing existing tags
 		generatedTags, err := ai.GenerateTags(ctx, note.Content, existingTagList, geminiKey)
 		if err != nil {
-			log.Printf("Failed to generate tags for note %s: %v", note.ID, err)
+			log.Printf("Failed to generate tags for note %s: %v", note.Id, err)
 			result.Errors++
 			continue
 		}
@@ -210,7 +233,7 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey
 		var newTags []string
 		existingNoteTagNames := make(map[string]bool)
 		for _, tag := range note.Tags {
-			existingNoteTagNames[strings.ToLower(tag.Name)] = true
+			existingNoteTagNames[strings.ToLower(tag)] = true
 		}
 
 		// Prefer existing tags over new ones
@@ -240,16 +263,21 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID, geminiKey
 		}
 
 		if len(newTags) == 0 {
-			log.Printf("No new tags to add for note %s", note.ID)
+			log.Printf("No new tags to add for note %s", note.Id)
 			continue
 		}
 
-		log.Printf("Adding %d tags to note %s: %v", len(newTags), note.ID, newTags)
+		log.Printf("Adding %d tags to note %s: %v", len(newTags), note.Id, newTags)
 
 		if !dryRun {
-			// Add tags to the note
-			if err := database.AddTagsToNote(ctx, userID, note.ID, newTags); err != nil {
-				log.Printf("Failed to add tags to note %s: %v", note.ID, err)
+			// Add tags to the note via gRPC
+			_, err := notesClient.AddTagsToNote(ctx, &pb.AddTagsToNoteRequest{
+				UserId: userID,
+				NoteId: note.Id,
+				Tags:   newTags,
+			})
+			if err != nil {
+				log.Printf("Failed to add tags to note %s: %v", note.Id, err)
 				result.Errors++
 				continue
 			}

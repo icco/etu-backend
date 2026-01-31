@@ -11,7 +11,10 @@ import (
 
 	"github.com/icco/etu-backend/internal/notion"
 	"github.com/icco/etu-backend/internal/sync"
-	"github.com/icco/etu-backend/internal/syncdb"
+	pb "github.com/icco/etu-backend/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -31,29 +34,39 @@ func main() {
 		log.Fatalf("Error: invalid -direction value %q. Must be one of: from-notion, to-notion, bidirectional", *direction)
 	}
 
+	// Get gRPC server address
+	grpcAddr := os.Getenv("GRPC_SERVER_ADDR")
+	if grpcAddr == "" {
+		grpcAddr = "localhost:50051"
+	}
+
+	// Get API key for authentication
+	grpcApiKey := os.Getenv("GRPC_API_KEY")
+	if grpcApiKey == "" {
+		log.Fatal("Error: GRPC_API_KEY environment variable not set")
+	}
+
 	log.Printf("Starting Notion sync job for all users with Notion keys")
 	log.Printf("  Direction: %s", *direction)
 	log.Printf("  Full sync: %v", *fullSync)
+	log.Printf("  Server: %s", grpcAddr)
 	if *interval > 0 {
 		log.Printf("  Interval: %s", *interval)
 	}
 
-	// Initialize database with GORM
-	database, err := syncdb.New()
+	// Connect to gRPC server
+	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to gRPC server: %v", err)
 	}
-	defer func() {
-		if err := database.Close(); err != nil {
-			log.Printf("Error closing database: %v", err)
-		}
-	}()
-	log.Println("Connected to database")
+	defer conn.Close()
+	log.Println("Connected to gRPC server")
 
-	// Run auto-migrations to ensure all tables exist
-	if err := database.AutoMigrate(); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
+	// Create gRPC clients
+	authClient := pb.NewAuthServiceClient(conn)
+	syncClient := pb.NewSyncServiceClient(conn)
+	notesClient := pb.NewNotesServiceClient(conn)
+	userSettingsClient := pb.NewUserSettingsServiceClient(conn)
 
 	// Handle graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -68,22 +81,25 @@ func main() {
 		cancel()
 	}()
 
+	// Add API key to context for all requests
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", grpcApiKey)
+
 	if *interval > 0 {
 		// Run continuously
-		runContinuously(ctx, database, *fullSync, *direction, *interval)
+		runContinuously(ctx, authClient, syncClient, notesClient, userSettingsClient, *fullSync, *direction, *interval)
 	} else {
 		// Run once
-		runOnce(ctx, database, *fullSync, *direction)
+		runOnce(ctx, authClient, syncClient, notesClient, userSettingsClient, *fullSync, *direction)
 	}
 }
 
-func runOnce(ctx context.Context, database *syncdb.DB, fullSync bool, syncMode string) {
-	syncAllUsers(ctx, database, fullSync, syncMode)
+func runOnce(ctx context.Context, authClient pb.AuthServiceClient, syncClient pb.SyncServiceClient, notesClient pb.NotesServiceClient, userSettingsClient pb.UserSettingsServiceClient, fullSync bool, syncMode string) {
+	syncAllUsers(ctx, authClient, syncClient, notesClient, userSettingsClient, fullSync, syncMode)
 }
 
-func runContinuously(ctx context.Context, database *syncdb.DB, fullSync bool, syncMode string, interval time.Duration) {
+func runContinuously(ctx context.Context, authClient pb.AuthServiceClient, syncClient pb.SyncServiceClient, notesClient pb.NotesServiceClient, userSettingsClient pb.UserSettingsServiceClient, fullSync bool, syncMode string, interval time.Duration) {
 	// Run immediately on start
-	syncAllUsers(ctx, database, fullSync, syncMode)
+	syncAllUsers(ctx, authClient, syncClient, notesClient, userSettingsClient, fullSync, syncMode)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -95,44 +111,52 @@ func runContinuously(ctx context.Context, database *syncdb.DB, fullSync bool, sy
 			return
 		case <-ticker.C:
 			// After the first run, always do incremental syncs unless --full was specified
-			syncAllUsers(ctx, database, fullSync, syncMode)
+			syncAllUsers(ctx, authClient, syncClient, notesClient, userSettingsClient, fullSync, syncMode)
 		}
 	}
 }
 
-func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncMode string) {
+func syncAllUsers(ctx context.Context, authClient pb.AuthServiceClient, syncClient pb.SyncServiceClient, notesClient pb.NotesServiceClient, userSettingsClient pb.UserSettingsServiceClient, fullSync bool, syncMode string) {
 	log.Printf("Starting sync for all users at %s", time.Now().Format(time.RFC3339))
 
-	// Get all users with Notion keys
-	users, err := database.GetUsersWithNotionKeys(ctx)
+	// Get all users with Notion keys via gRPC
+	usersResp, err := authClient.ListUsersWithNotionKeys(ctx, &pb.ListUsersWithNotionKeysRequest{})
 	if err != nil {
 		log.Printf("Error: Failed to get users with Notion keys: %v", err)
 		return
 	}
 
-	if len(users) == 0 {
+	if len(usersResp.Users) == 0 {
 		log.Println("No users with Notion API keys configured")
 		return
 	}
 
-	log.Printf("Found %d user(s) with Notion keys configured", len(users))
+	log.Printf("Found %d user(s) with Notion keys configured", len(usersResp.Users))
 
 	successCount := 0
 	failureCount := 0
 
-	for _, user := range users {
-		if user.NotionKey == nil || *user.NotionKey == "" {
+	for _, user := range usersResp.Users {
+		// Get user settings to get the Notion key
+		settingsResp, err := userSettingsClient.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: user.Id})
+		if err != nil {
+			log.Printf("Error getting settings for user %s: %v", user.Id, err)
+			failureCount++
 			continue
 		}
 
-		log.Printf("Syncing user %s...", user.ID)
+		if settingsResp.Settings.NotionKey == nil || *settingsResp.Settings.NotionKey == "" {
+			continue
+		}
+
+		log.Printf("Syncing user %s...", user.Id)
 
 		// Create Notion client with user's API key
-		notionClient := notion.NewClientWithKey(*user.NotionKey)
-		syncer := sync.NewSyncer(database, notionClient)
+		notionClient := notion.NewClientWithKey(*settingsResp.Settings.NotionKey)
+		syncer := sync.NewSyncer(syncClient, notesClient, notionClient)
 
 		// Try to sync and track success/failure
-		syncResult := performSyncWithResult(ctx, syncer, user.ID, fullSync, syncMode)
+		syncResult := performSyncWithResult(ctx, syncer, user.Id, fullSync, syncMode)
 		if syncResult {
 			successCount++
 		} else {
