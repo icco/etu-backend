@@ -41,7 +41,7 @@ Return ONLY a JSON array of strings, nothing else. Example: ["tag1", "tag2", "ta
 Journal entry:
 %s`, existingTagsStr, text)
 
-	resp, err := client.Models.GenerateContent(ctx, "gemini-1.5-flash-8b", []*genai.Content{
+	resp, err := client.Models.GenerateContent(ctx, "gemini-2.0-flash", []*genai.Content{
 		genai.NewContentFromText(prompt, genai.RoleUser),
 	}, &genai.GenerateContentConfig{
 		Temperature:      genai.Ptr(float32(0.3)), // Lower temperature for more consistent results
