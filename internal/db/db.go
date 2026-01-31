@@ -614,3 +614,13 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 	}
 	return users, nil
 }
+
+// ListAllUsers retrieves all users
+func (db *DB) ListAllUsers(ctx context.Context) ([]User, error) {
+	var users []User
+	err := db.conn.WithContext(ctx).Find(&users).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to query users: %w", err)
+	}
+	return users, nil
+}
