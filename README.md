@@ -1,5 +1,8 @@
 # etu-backend
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/icco/etu-backend.svg)](https://pkg.go.dev/github.com/icco/etu-backend)
+[![CI](https://github.com/icco/etu-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/icco/etu-backend/actions/workflows/ci.yml)
+
 A gRPC-based notes and tags management API written in Go. This service provides a backend for managing user notes with tagging functionality and API key-based authentication.
 
 ## Features
@@ -26,20 +29,28 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 etu-backend/
 ├── cmd/
 │   ├── server/          # gRPC API server entry point
-│   └── sync/            # Notion sync job entry point
+│   ├── sync/            # Notion sync job entry point
+│   └── taggen/          # AI tag generation job entry point
 ├── internal/
+│   ├── ai/              # AI integration (Gemini)
 │   ├── auth/            # API key authentication
 │   ├── db/              # Database layer (PostgreSQL)
+│   ├── models/          # Shared data models
 │   ├── notion/          # Notion API client
 │   ├── service/         # gRPC service implementations
 │   ├── sync/            # Notion-to-PostgreSQL sync logic
 │   └── syncdb/          # GORM database layer for sync
 ├── proto/               # Protocol buffer definitions
+├── packages/etu-proto/  # TypeScript proto package
 ├── .github/workflows/   # CI/CD pipelines
 ├── Dockerfile
 ├── Taskfile.yml
 └── go.mod
 ```
+
+## Documentation
+
+Full API documentation is available on [pkg.go.dev](https://pkg.go.dev/github.com/icco/etu-backend).
 
 ## Prerequisites
 
