@@ -2043,6 +2043,8 @@ type UpdateUserSettingsRequest struct {
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	NotionKey     *string                `protobuf:"bytes,2,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
 	Name          *string                `protobuf:"bytes,4,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Image         *string                `protobuf:"bytes,5,opt,name=image,proto3,oneof" json:"image,omitempty"`
+	Password      *string                `protobuf:"bytes,6,opt,name=password,proto3,oneof" json:"password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2094,6 +2096,20 @@ func (x *UpdateUserSettingsRequest) GetNotionKey() string {
 func (x *UpdateUserSettingsRequest) GetName() string {
 	if x != nil && x.Name != nil {
 		return *x.Name
+	}
+	return ""
+}
+
+func (x *UpdateUserSettingsRequest) GetImage() string {
+	if x != nil && x.Image != nil {
+		return *x.Image
+	}
+	return ""
+}
+
+func (x *UpdateUserSettingsRequest) GetPassword() string {
+	if x != nil && x.Password != nil {
+		return *x.Password
 	}
 	return ""
 }
@@ -2294,14 +2310,18 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x16GetUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\">\n" +
 	"\x17GetUserSettingsResponse\x12\x1d\n" +
-	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\x8f\x01\n" +
+	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xe2\x01\n" +
 	"\x19UpdateUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
 	"\n" +
 	"notion_key\x18\x02 \x01(\tH\x00R\tnotionKey\x88\x01\x01\x12\x17\n" +
-	"\x04name\x18\x04 \x01(\tH\x01R\x04name\x88\x01\x01B\r\n" +
+	"\x04name\x18\x04 \x01(\tH\x01R\x04name\x88\x01\x01\x12\x19\n" +
+	"\x05image\x18\x05 \x01(\tH\x02R\x05image\x88\x01\x01\x12\x1f\n" +
+	"\bpassword\x18\x06 \x01(\tH\x03R\bpassword\x88\x01\x01B\r\n" +
 	"\v_notion_keyB\a\n" +
-	"\x05_nameJ\x04\b\x03\x10\x04\"A\n" +
+	"\x05_nameB\b\n" +
+	"\x06_imageB\v\n" +
+	"\t_passwordJ\x04\b\x03\x10\x04\"A\n" +
 	"\x1aUpdateUserSettingsResponse\x12\x1d\n" +
 	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x022\xbd\x02\n" +
 	"\fNotesService\x12:\n" +

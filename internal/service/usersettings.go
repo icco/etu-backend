@@ -58,7 +58,7 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		return nil, err
 	}
 
-	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name)
+	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, req.Image, req.Password)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
 	}

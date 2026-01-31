@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/icco/etu-backend/internal/models"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -568,7 +569,7 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 }
 
 // UpdateUserSettings updates or creates user settings
-func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name *string) (*User, error) {
+func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name, image, password *string) (*User, error) {
 	now := time.Now()
 
 	var user User
@@ -589,6 +590,16 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	}
 	if name != nil {
 		updates["name"] = *name
+	}
+	if image != nil {
+		updates["image"] = *image
+	}
+	if password != nil && *password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, fmt.Errorf("failed to hash password: %w", err)
+		}
+		updates["passwordHash"] = string(hash)
 	}
 
 	if err := db.conn.WithContext(ctx).Model(&user).Updates(updates).Error; err != nil {
