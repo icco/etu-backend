@@ -32,6 +32,11 @@ func (s *ApiKeysService) CreateApiKey(ctx context.Context, req *pb.CreateApiKeyR
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
 	// Generate a random API key: etu_<64 hex characters>
 	randomBytes := make([]byte, 32)
 	if _, err := rand.Read(randomBytes); err != nil {
@@ -66,6 +71,11 @@ func (s *ApiKeysService) ListApiKeys(ctx context.Context, req *pb.ListApiKeysReq
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
 	keys, err := s.db.ListApiKeys(ctx, req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list API keys: %v", err)
@@ -88,6 +98,11 @@ func (s *ApiKeysService) DeleteApiKey(ctx context.Context, req *pb.DeleteApiKeyR
 	}
 	if req.KeyId == "" {
 		return nil, status.Error(codes.InvalidArgument, "key_id is required")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
 	}
 
 	deleted, err := s.db.DeleteApiKey(ctx, req.UserId, req.KeyId)

@@ -92,6 +92,11 @@ func (s *AuthService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
 	user, err := s.db.GetUser(ctx, req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)

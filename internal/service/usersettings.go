@@ -28,9 +28,10 @@ func (s *UserSettingsService) GetUserSettings(ctx context.Context, req *pb.GetUs
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
-	// TODO: Verify that authenticated user matches req.UserId
-	// This should be done via middleware or by extracting user ID from context
-	// For now, assuming authentication is handled by the gRPC interceptor
+	// Verify the authenticated user is authorized to access this user's settings
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
 
 	user, err := s.db.GetUserSettings(ctx, req.UserId)
 	if err != nil {
@@ -64,9 +65,10 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 
-	// TODO: Verify that authenticated user matches req.UserId
-	// This should be done via middleware or by extracting user ID from context
-	// For now, assuming authentication is handled by the gRPC interceptor
+	// Verify the authenticated user is authorized to update this user's settings
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
 
 	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Username)
 	if err != nil {
