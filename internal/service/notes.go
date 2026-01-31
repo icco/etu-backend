@@ -174,6 +174,97 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 	}, nil
 }
 
+// GetNotesWithFewTags retrieves notes with fewer than maxTags tags
+func (s *NotesService) GetNotesWithFewTags(ctx context.Context, req *pb.GetNotesWithFewTagsRequest) (*pb.GetNotesWithFewTagsResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+	if req.MaxTags <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "max_tags must be positive")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
+	notes, err := s.db.GetNotesWithFewTags(ctx, req.UserId, int(req.MaxTags))
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get notes: %v", err)
+	}
+
+	pbNotes := make([]*pb.Note, len(notes))
+	for i := range notes {
+		pbNotes[i] = noteToProto(&notes[i])
+	}
+
+	return &pb.GetNotesWithFewTagsResponse{
+		Notes: pbNotes,
+	}, nil
+}
+
+// AddTagsToNote adds tags to a note without removing existing tags
+func (s *NotesService) AddTagsToNote(ctx context.Context, req *pb.AddTagsToNoteRequest) (*pb.AddTagsToNoteResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+	if req.NoteId == "" {
+		return nil, status.Error(codes.InvalidArgument, "note_id is required")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
+	err := s.db.AddTagsToNote(ctx, req.UserId, req.NoteId, req.Tags)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to add tags: %v", err)
+	}
+
+	// Reload note to get updated tags
+	note, err := s.db.GetNote(ctx, req.UserId, req.NoteId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get updated note: %v", err)
+	}
+	if note == nil {
+		return nil, status.Error(codes.NotFound, "note not found")
+	}
+
+	return &pb.AddTagsToNoteResponse{
+		Note: noteToProto(note),
+	}, nil
+}
+
+// GetNoteByNotionUUID retrieves a note by its Notion UUID
+func (s *NotesService) GetNoteByNotionUUID(ctx context.Context, req *pb.GetNoteByNotionUUIDRequest) (*pb.GetNoteByNotionUUIDResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+	if req.NotionUuid == "" {
+		return nil, status.Error(codes.InvalidArgument, "notion_uuid is required")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
+	note, err := s.db.GetNoteByNotionUUID(ctx, req.UserId, req.NotionUuid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get note: %v", err)
+	}
+
+	var pbNote *pb.Note
+	if note != nil {
+		pbNote = noteToProto(note)
+	}
+
+	return &pb.GetNoteByNotionUUIDResponse{
+		Note: pbNote,
+	}, nil
+}
+
 // noteToProto converts a db.Note to a protobuf Note
 func noteToProto(n *db.Note) *pb.Note {
 	// Convert []Tag to []string
@@ -182,11 +273,26 @@ func noteToProto(n *db.Note) *pb.Note {
 		tagNames[i] = t.Name
 	}
 
-	return &pb.Note{
+	pbNote := &pb.Note{
 		Id:        n.ID,
 		Content:   n.Content,
 		Tags:      tagNames,
 		CreatedAt: &pb.Timestamp{Seconds: n.CreatedAt.Unix(), Nanos: int32(n.CreatedAt.Nanosecond())},
 		UpdatedAt: &pb.Timestamp{Seconds: n.UpdatedAt.Unix(), Nanos: int32(n.UpdatedAt.Nanosecond())},
 	}
+
+	if n.NotionUUID != nil {
+		pbNote.NotionUuid = n.NotionUUID
+	}
+	if n.ExternalID != nil {
+		pbNote.ExternalId = n.ExternalID
+	}
+	if n.LastSyncedToNotion != nil {
+		pbNote.LastSyncedToNotion = &pb.Timestamp{
+			Seconds: n.LastSyncedToNotion.Unix(),
+			Nanos:   int32(n.LastSyncedToNotion.Nanosecond()),
+		}
+	}
+
+	return pbNote
 }

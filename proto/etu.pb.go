@@ -76,14 +76,17 @@ func (x *Timestamp) GetNanos() int32 {
 
 // Note message
 type Note struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
-	Tags          []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"`
-	CreatedAt     *Timestamp             `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *Timestamp             `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Content            string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	Tags               []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"`
+	CreatedAt          *Timestamp             `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt          *Timestamp             `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	NotionUuid         *string                `protobuf:"bytes,6,opt,name=notion_uuid,json=notionUuid,proto3,oneof" json:"notion_uuid,omitempty"`
+	ExternalId         *string                `protobuf:"bytes,7,opt,name=external_id,json=externalId,proto3,oneof" json:"external_id,omitempty"` // Notion page ID
+	LastSyncedToNotion *Timestamp             `protobuf:"bytes,8,opt,name=last_synced_to_notion,json=lastSyncedToNotion,proto3,oneof" json:"last_synced_to_notion,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Note) Reset() {
@@ -147,6 +150,27 @@ func (x *Note) GetCreatedAt() *Timestamp {
 func (x *Note) GetUpdatedAt() *Timestamp {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *Note) GetNotionUuid() string {
+	if x != nil && x.NotionUuid != nil {
+		return *x.NotionUuid
+	}
+	return ""
+}
+
+func (x *Note) GetExternalId() string {
+	if x != nil && x.ExternalId != nil {
+		return *x.ExternalId
+	}
+	return ""
+}
+
+func (x *Note) GetLastSyncedToNotion() *Timestamp {
+	if x != nil {
+		return x.LastSyncedToNotion
 	}
 	return nil
 }
@@ -1051,6 +1075,302 @@ func (x *DeleteNoteResponse) GetSuccess() bool {
 	return false
 }
 
+type GetNotesWithFewTagsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	MaxTags       int32                  `protobuf:"varint,2,opt,name=max_tags,json=maxTags,proto3" json:"max_tags,omitempty"` // Get notes with fewer than this many tags
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotesWithFewTagsRequest) Reset() {
+	*x = GetNotesWithFewTagsRequest{}
+	mi := &file_proto_etu_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotesWithFewTagsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotesWithFewTagsRequest) ProtoMessage() {}
+
+func (x *GetNotesWithFewTagsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotesWithFewTagsRequest.ProtoReflect.Descriptor instead.
+func (*GetNotesWithFewTagsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetNotesWithFewTagsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetNotesWithFewTagsRequest) GetMaxTags() int32 {
+	if x != nil {
+		return x.MaxTags
+	}
+	return 0
+}
+
+type GetNotesWithFewTagsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Notes         []*Note                `protobuf:"bytes,1,rep,name=notes,proto3" json:"notes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotesWithFewTagsResponse) Reset() {
+	*x = GetNotesWithFewTagsResponse{}
+	mi := &file_proto_etu_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotesWithFewTagsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotesWithFewTagsResponse) ProtoMessage() {}
+
+func (x *GetNotesWithFewTagsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotesWithFewTagsResponse.ProtoReflect.Descriptor instead.
+func (*GetNotesWithFewTagsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetNotesWithFewTagsResponse) GetNotes() []*Note {
+	if x != nil {
+		return x.Notes
+	}
+	return nil
+}
+
+type AddTagsToNoteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NoteId        string                 `protobuf:"bytes,2,opt,name=note_id,json=noteId,proto3" json:"note_id,omitempty"`
+	Tags          []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"` // Tags to add (without removing existing)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddTagsToNoteRequest) Reset() {
+	*x = AddTagsToNoteRequest{}
+	mi := &file_proto_etu_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddTagsToNoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddTagsToNoteRequest) ProtoMessage() {}
+
+func (x *AddTagsToNoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddTagsToNoteRequest.ProtoReflect.Descriptor instead.
+func (*AddTagsToNoteRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *AddTagsToNoteRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *AddTagsToNoteRequest) GetNoteId() string {
+	if x != nil {
+		return x.NoteId
+	}
+	return ""
+}
+
+func (x *AddTagsToNoteRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+type AddTagsToNoteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Note          *Note                  `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddTagsToNoteResponse) Reset() {
+	*x = AddTagsToNoteResponse{}
+	mi := &file_proto_etu_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddTagsToNoteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddTagsToNoteResponse) ProtoMessage() {}
+
+func (x *AddTagsToNoteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddTagsToNoteResponse.ProtoReflect.Descriptor instead.
+func (*AddTagsToNoteResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *AddTagsToNoteResponse) GetNote() *Note {
+	if x != nil {
+		return x.Note
+	}
+	return nil
+}
+
+type GetNoteByNotionUUIDRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NotionUuid    string                 `protobuf:"bytes,2,opt,name=notion_uuid,json=notionUuid,proto3" json:"notion_uuid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNoteByNotionUUIDRequest) Reset() {
+	*x = GetNoteByNotionUUIDRequest{}
+	mi := &file_proto_etu_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNoteByNotionUUIDRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNoteByNotionUUIDRequest) ProtoMessage() {}
+
+func (x *GetNoteByNotionUUIDRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNoteByNotionUUIDRequest.ProtoReflect.Descriptor instead.
+func (*GetNoteByNotionUUIDRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetNoteByNotionUUIDRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetNoteByNotionUUIDRequest) GetNotionUuid() string {
+	if x != nil {
+		return x.NotionUuid
+	}
+	return ""
+}
+
+type GetNoteByNotionUUIDResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Note          *Note                  `protobuf:"bytes,1,opt,name=note,proto3,oneof" json:"note,omitempty"` // Optional because note may not exist
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNoteByNotionUUIDResponse) Reset() {
+	*x = GetNoteByNotionUUIDResponse{}
+	mi := &file_proto_etu_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNoteByNotionUUIDResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNoteByNotionUUIDResponse) ProtoMessage() {}
+
+func (x *GetNoteByNotionUUIDResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNoteByNotionUUIDResponse.ProtoReflect.Descriptor instead.
+func (*GetNoteByNotionUUIDResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetNoteByNotionUUIDResponse) GetNote() *Note {
+	if x != nil {
+		return x.Note
+	}
+	return nil
+}
+
 type ListTagsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Required for auth context
@@ -1060,7 +1380,7 @@ type ListTagsRequest struct {
 
 func (x *ListTagsRequest) Reset() {
 	*x = ListTagsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[16]
+	mi := &file_proto_etu_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1072,7 +1392,7 @@ func (x *ListTagsRequest) String() string {
 func (*ListTagsRequest) ProtoMessage() {}
 
 func (x *ListTagsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[16]
+	mi := &file_proto_etu_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1085,7 +1405,7 @@ func (x *ListTagsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTagsRequest.ProtoReflect.Descriptor instead.
 func (*ListTagsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{16}
+	return file_proto_etu_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ListTagsRequest) GetUserId() string {
@@ -1104,7 +1424,7 @@ type ListTagsResponse struct {
 
 func (x *ListTagsResponse) Reset() {
 	*x = ListTagsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[17]
+	mi := &file_proto_etu_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1116,7 +1436,7 @@ func (x *ListTagsResponse) String() string {
 func (*ListTagsResponse) ProtoMessage() {}
 
 func (x *ListTagsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[17]
+	mi := &file_proto_etu_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1129,7 +1449,7 @@ func (x *ListTagsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTagsResponse.ProtoReflect.Descriptor instead.
 func (*ListTagsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{17}
+	return file_proto_etu_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ListTagsResponse) GetTags() []*Tag {
@@ -1149,7 +1469,7 @@ type RegisterRequest struct {
 
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
-	mi := &file_proto_etu_proto_msgTypes[18]
+	mi := &file_proto_etu_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1161,7 +1481,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[18]
+	mi := &file_proto_etu_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1174,7 +1494,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{18}
+	return file_proto_etu_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RegisterRequest) GetEmail() string {
@@ -1200,7 +1520,7 @@ type RegisterResponse struct {
 
 func (x *RegisterResponse) Reset() {
 	*x = RegisterResponse{}
-	mi := &file_proto_etu_proto_msgTypes[19]
+	mi := &file_proto_etu_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1212,7 +1532,7 @@ func (x *RegisterResponse) String() string {
 func (*RegisterResponse) ProtoMessage() {}
 
 func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[19]
+	mi := &file_proto_etu_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1225,7 +1545,7 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
 func (*RegisterResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{19}
+	return file_proto_etu_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RegisterResponse) GetUser() *User {
@@ -1245,7 +1565,7 @@ type AuthenticateRequest struct {
 
 func (x *AuthenticateRequest) Reset() {
 	*x = AuthenticateRequest{}
-	mi := &file_proto_etu_proto_msgTypes[20]
+	mi := &file_proto_etu_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1257,7 +1577,7 @@ func (x *AuthenticateRequest) String() string {
 func (*AuthenticateRequest) ProtoMessage() {}
 
 func (x *AuthenticateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[20]
+	mi := &file_proto_etu_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1270,7 +1590,7 @@ func (x *AuthenticateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthenticateRequest.ProtoReflect.Descriptor instead.
 func (*AuthenticateRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{20}
+	return file_proto_etu_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *AuthenticateRequest) GetEmail() string {
@@ -1297,7 +1617,7 @@ type AuthenticateResponse struct {
 
 func (x *AuthenticateResponse) Reset() {
 	*x = AuthenticateResponse{}
-	mi := &file_proto_etu_proto_msgTypes[21]
+	mi := &file_proto_etu_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1309,7 +1629,7 @@ func (x *AuthenticateResponse) String() string {
 func (*AuthenticateResponse) ProtoMessage() {}
 
 func (x *AuthenticateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[21]
+	mi := &file_proto_etu_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1322,7 +1642,7 @@ func (x *AuthenticateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthenticateResponse.ProtoReflect.Descriptor instead.
 func (*AuthenticateResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{21}
+	return file_proto_etu_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AuthenticateResponse) GetSuccess() bool {
@@ -1348,7 +1668,7 @@ type GetUserRequest struct {
 
 func (x *GetUserRequest) Reset() {
 	*x = GetUserRequest{}
-	mi := &file_proto_etu_proto_msgTypes[22]
+	mi := &file_proto_etu_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1360,7 +1680,7 @@ func (x *GetUserRequest) String() string {
 func (*GetUserRequest) ProtoMessage() {}
 
 func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[22]
+	mi := &file_proto_etu_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1373,7 +1693,7 @@ func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
 func (*GetUserRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{22}
+	return file_proto_etu_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetUserRequest) GetUserId() string {
@@ -1392,7 +1712,7 @@ type GetUserResponse struct {
 
 func (x *GetUserResponse) Reset() {
 	*x = GetUserResponse{}
-	mi := &file_proto_etu_proto_msgTypes[23]
+	mi := &file_proto_etu_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1404,7 +1724,7 @@ func (x *GetUserResponse) String() string {
 func (*GetUserResponse) ProtoMessage() {}
 
 func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[23]
+	mi := &file_proto_etu_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1417,7 +1737,7 @@ func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserResponse.ProtoReflect.Descriptor instead.
 func (*GetUserResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{23}
+	return file_proto_etu_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetUserResponse) GetUser() *User {
@@ -1436,7 +1756,7 @@ type GetUserByStripeCustomerIdRequest struct {
 
 func (x *GetUserByStripeCustomerIdRequest) Reset() {
 	*x = GetUserByStripeCustomerIdRequest{}
-	mi := &file_proto_etu_proto_msgTypes[24]
+	mi := &file_proto_etu_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1448,7 +1768,7 @@ func (x *GetUserByStripeCustomerIdRequest) String() string {
 func (*GetUserByStripeCustomerIdRequest) ProtoMessage() {}
 
 func (x *GetUserByStripeCustomerIdRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[24]
+	mi := &file_proto_etu_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1461,7 +1781,7 @@ func (x *GetUserByStripeCustomerIdRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserByStripeCustomerIdRequest.ProtoReflect.Descriptor instead.
 func (*GetUserByStripeCustomerIdRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{24}
+	return file_proto_etu_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetUserByStripeCustomerIdRequest) GetStripeCustomerId() string {
@@ -1480,7 +1800,7 @@ type GetUserByStripeCustomerIdResponse struct {
 
 func (x *GetUserByStripeCustomerIdResponse) Reset() {
 	*x = GetUserByStripeCustomerIdResponse{}
-	mi := &file_proto_etu_proto_msgTypes[25]
+	mi := &file_proto_etu_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1492,7 +1812,7 @@ func (x *GetUserByStripeCustomerIdResponse) String() string {
 func (*GetUserByStripeCustomerIdResponse) ProtoMessage() {}
 
 func (x *GetUserByStripeCustomerIdResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[25]
+	mi := &file_proto_etu_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1505,7 +1825,7 @@ func (x *GetUserByStripeCustomerIdResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetUserByStripeCustomerIdResponse.ProtoReflect.Descriptor instead.
 func (*GetUserByStripeCustomerIdResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{25}
+	return file_proto_etu_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *GetUserByStripeCustomerIdResponse) GetUser() *User {
@@ -1527,7 +1847,7 @@ type UpdateUserSubscriptionRequest struct {
 
 func (x *UpdateUserSubscriptionRequest) Reset() {
 	*x = UpdateUserSubscriptionRequest{}
-	mi := &file_proto_etu_proto_msgTypes[26]
+	mi := &file_proto_etu_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1539,7 +1859,7 @@ func (x *UpdateUserSubscriptionRequest) String() string {
 func (*UpdateUserSubscriptionRequest) ProtoMessage() {}
 
 func (x *UpdateUserSubscriptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[26]
+	mi := &file_proto_etu_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1552,7 +1872,7 @@ func (x *UpdateUserSubscriptionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSubscriptionRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserSubscriptionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{26}
+	return file_proto_etu_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *UpdateUserSubscriptionRequest) GetUserId() string {
@@ -1592,7 +1912,7 @@ type UpdateUserSubscriptionResponse struct {
 
 func (x *UpdateUserSubscriptionResponse) Reset() {
 	*x = UpdateUserSubscriptionResponse{}
-	mi := &file_proto_etu_proto_msgTypes[27]
+	mi := &file_proto_etu_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1604,7 +1924,7 @@ func (x *UpdateUserSubscriptionResponse) String() string {
 func (*UpdateUserSubscriptionResponse) ProtoMessage() {}
 
 func (x *UpdateUserSubscriptionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[27]
+	mi := &file_proto_etu_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1617,12 +1937,172 @@ func (x *UpdateUserSubscriptionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSubscriptionResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserSubscriptionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{27}
+	return file_proto_etu_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *UpdateUserSubscriptionResponse) GetUser() *User {
 	if x != nil {
 		return x.User
+	}
+	return nil
+}
+
+type ListAllUsersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAllUsersRequest) Reset() {
+	*x = ListAllUsersRequest{}
+	mi := &file_proto_etu_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAllUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAllUsersRequest) ProtoMessage() {}
+
+func (x *ListAllUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAllUsersRequest.ProtoReflect.Descriptor instead.
+func (*ListAllUsersRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{34}
+}
+
+type ListAllUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*User                `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAllUsersResponse) Reset() {
+	*x = ListAllUsersResponse{}
+	mi := &file_proto_etu_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAllUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAllUsersResponse) ProtoMessage() {}
+
+func (x *ListAllUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAllUsersResponse.ProtoReflect.Descriptor instead.
+func (*ListAllUsersResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ListAllUsersResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+type ListUsersWithNotionKeysRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUsersWithNotionKeysRequest) Reset() {
+	*x = ListUsersWithNotionKeysRequest{}
+	mi := &file_proto_etu_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUsersWithNotionKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUsersWithNotionKeysRequest) ProtoMessage() {}
+
+func (x *ListUsersWithNotionKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUsersWithNotionKeysRequest.ProtoReflect.Descriptor instead.
+func (*ListUsersWithNotionKeysRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{36}
+}
+
+type ListUsersWithNotionKeysResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*User                `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUsersWithNotionKeysResponse) Reset() {
+	*x = ListUsersWithNotionKeysResponse{}
+	mi := &file_proto_etu_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUsersWithNotionKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUsersWithNotionKeysResponse) ProtoMessage() {}
+
+func (x *ListUsersWithNotionKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUsersWithNotionKeysResponse.ProtoReflect.Descriptor instead.
+func (*ListUsersWithNotionKeysResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ListUsersWithNotionKeysResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
 	}
 	return nil
 }
@@ -1637,7 +2117,7 @@ type CreateApiKeyRequest struct {
 
 func (x *CreateApiKeyRequest) Reset() {
 	*x = CreateApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[28]
+	mi := &file_proto_etu_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1649,7 +2129,7 @@ func (x *CreateApiKeyRequest) String() string {
 func (*CreateApiKeyRequest) ProtoMessage() {}
 
 func (x *CreateApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[28]
+	mi := &file_proto_etu_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1662,7 +2142,7 @@ func (x *CreateApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*CreateApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{28}
+	return file_proto_etu_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *CreateApiKeyRequest) GetUserId() string {
@@ -1689,7 +2169,7 @@ type CreateApiKeyResponse struct {
 
 func (x *CreateApiKeyResponse) Reset() {
 	*x = CreateApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[29]
+	mi := &file_proto_etu_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1701,7 +2181,7 @@ func (x *CreateApiKeyResponse) String() string {
 func (*CreateApiKeyResponse) ProtoMessage() {}
 
 func (x *CreateApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[29]
+	mi := &file_proto_etu_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1714,7 +2194,7 @@ func (x *CreateApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*CreateApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{29}
+	return file_proto_etu_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *CreateApiKeyResponse) GetApiKey() *ApiKey {
@@ -1740,7 +2220,7 @@ type ListApiKeysRequest struct {
 
 func (x *ListApiKeysRequest) Reset() {
 	*x = ListApiKeysRequest{}
-	mi := &file_proto_etu_proto_msgTypes[30]
+	mi := &file_proto_etu_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1752,7 +2232,7 @@ func (x *ListApiKeysRequest) String() string {
 func (*ListApiKeysRequest) ProtoMessage() {}
 
 func (x *ListApiKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[30]
+	mi := &file_proto_etu_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1765,7 +2245,7 @@ func (x *ListApiKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiKeysRequest.ProtoReflect.Descriptor instead.
 func (*ListApiKeysRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{30}
+	return file_proto_etu_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ListApiKeysRequest) GetUserId() string {
@@ -1784,7 +2264,7 @@ type ListApiKeysResponse struct {
 
 func (x *ListApiKeysResponse) Reset() {
 	*x = ListApiKeysResponse{}
-	mi := &file_proto_etu_proto_msgTypes[31]
+	mi := &file_proto_etu_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1796,7 +2276,7 @@ func (x *ListApiKeysResponse) String() string {
 func (*ListApiKeysResponse) ProtoMessage() {}
 
 func (x *ListApiKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[31]
+	mi := &file_proto_etu_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1809,7 +2289,7 @@ func (x *ListApiKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiKeysResponse.ProtoReflect.Descriptor instead.
 func (*ListApiKeysResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{31}
+	return file_proto_etu_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ListApiKeysResponse) GetApiKeys() []*ApiKey {
@@ -1829,7 +2309,7 @@ type DeleteApiKeyRequest struct {
 
 func (x *DeleteApiKeyRequest) Reset() {
 	*x = DeleteApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[32]
+	mi := &file_proto_etu_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1841,7 +2321,7 @@ func (x *DeleteApiKeyRequest) String() string {
 func (*DeleteApiKeyRequest) ProtoMessage() {}
 
 func (x *DeleteApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[32]
+	mi := &file_proto_etu_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1854,7 +2334,7 @@ func (x *DeleteApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{32}
+	return file_proto_etu_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *DeleteApiKeyRequest) GetUserId() string {
@@ -1880,7 +2360,7 @@ type DeleteApiKeyResponse struct {
 
 func (x *DeleteApiKeyResponse) Reset() {
 	*x = DeleteApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[33]
+	mi := &file_proto_etu_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1892,7 +2372,7 @@ func (x *DeleteApiKeyResponse) String() string {
 func (*DeleteApiKeyResponse) ProtoMessage() {}
 
 func (x *DeleteApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[33]
+	mi := &file_proto_etu_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1905,7 +2385,7 @@ func (x *DeleteApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*DeleteApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{33}
+	return file_proto_etu_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *DeleteApiKeyResponse) GetSuccess() bool {
@@ -1924,7 +2404,7 @@ type VerifyApiKeyRequest struct {
 
 func (x *VerifyApiKeyRequest) Reset() {
 	*x = VerifyApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[34]
+	mi := &file_proto_etu_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1936,7 +2416,7 @@ func (x *VerifyApiKeyRequest) String() string {
 func (*VerifyApiKeyRequest) ProtoMessage() {}
 
 func (x *VerifyApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[34]
+	mi := &file_proto_etu_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1949,7 +2429,7 @@ func (x *VerifyApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*VerifyApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{34}
+	return file_proto_etu_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *VerifyApiKeyRequest) GetRawKey() string {
@@ -1969,7 +2449,7 @@ type VerifyApiKeyResponse struct {
 
 func (x *VerifyApiKeyResponse) Reset() {
 	*x = VerifyApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[35]
+	mi := &file_proto_etu_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1981,7 +2461,7 @@ func (x *VerifyApiKeyResponse) String() string {
 func (*VerifyApiKeyResponse) ProtoMessage() {}
 
 func (x *VerifyApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[35]
+	mi := &file_proto_etu_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1994,7 +2474,7 @@ func (x *VerifyApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*VerifyApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{35}
+	return file_proto_etu_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *VerifyApiKeyResponse) GetValid() bool {
@@ -2020,7 +2500,7 @@ type GetUserSettingsRequest struct {
 
 func (x *GetUserSettingsRequest) Reset() {
 	*x = GetUserSettingsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[36]
+	mi := &file_proto_etu_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2032,7 +2512,7 @@ func (x *GetUserSettingsRequest) String() string {
 func (*GetUserSettingsRequest) ProtoMessage() {}
 
 func (x *GetUserSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[36]
+	mi := &file_proto_etu_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2045,7 +2525,7 @@ func (x *GetUserSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{36}
+	return file_proto_etu_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *GetUserSettingsRequest) GetUserId() string {
@@ -2064,7 +2544,7 @@ type GetUserSettingsResponse struct {
 
 func (x *GetUserSettingsResponse) Reset() {
 	*x = GetUserSettingsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[37]
+	mi := &file_proto_etu_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2076,7 +2556,7 @@ func (x *GetUserSettingsResponse) String() string {
 func (*GetUserSettingsResponse) ProtoMessage() {}
 
 func (x *GetUserSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[37]
+	mi := &file_proto_etu_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2089,7 +2569,7 @@ func (x *GetUserSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{37}
+	return file_proto_etu_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *GetUserSettingsResponse) GetSettings() *UserSettings {
@@ -2110,7 +2590,7 @@ type UpdateUserSettingsRequest struct {
 
 func (x *UpdateUserSettingsRequest) Reset() {
 	*x = UpdateUserSettingsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[38]
+	mi := &file_proto_etu_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2122,7 +2602,7 @@ func (x *UpdateUserSettingsRequest) String() string {
 func (*UpdateUserSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateUserSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[38]
+	mi := &file_proto_etu_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2135,7 +2615,7 @@ func (x *UpdateUserSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{38}
+	return file_proto_etu_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *UpdateUserSettingsRequest) GetUserId() string {
@@ -2168,7 +2648,7 @@ type UpdateUserSettingsResponse struct {
 
 func (x *UpdateUserSettingsResponse) Reset() {
 	*x = UpdateUserSettingsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[39]
+	mi := &file_proto_etu_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2180,7 +2660,7 @@ func (x *UpdateUserSettingsResponse) String() string {
 func (*UpdateUserSettingsResponse) ProtoMessage() {}
 
 func (x *UpdateUserSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[39]
+	mi := &file_proto_etu_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2193,7 +2673,7 @@ func (x *UpdateUserSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSettingsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{39}
+	return file_proto_etu_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *UpdateUserSettingsResponse) GetSettings() *UserSettings {
@@ -2203,6 +2683,614 @@ func (x *UpdateUserSettingsResponse) GetSettings() *UserSettings {
 	return nil
 }
 
+type GetSyncStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSyncStateRequest) Reset() {
+	*x = GetSyncStateRequest{}
+	mi := &file_proto_etu_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStateRequest) ProtoMessage() {}
+
+func (x *GetSyncStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStateRequest.ProtoReflect.Descriptor instead.
+func (*GetSyncStateRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *GetSyncStateRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetSyncStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LastSyncedAt  *Timestamp             `protobuf:"bytes,1,opt,name=last_synced_at,json=lastSyncedAt,proto3,oneof" json:"last_synced_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSyncStateResponse) Reset() {
+	*x = GetSyncStateResponse{}
+	mi := &file_proto_etu_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSyncStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSyncStateResponse) ProtoMessage() {}
+
+func (x *GetSyncStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSyncStateResponse.ProtoReflect.Descriptor instead.
+func (*GetSyncStateResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *GetSyncStateResponse) GetLastSyncedAt() *Timestamp {
+	if x != nil {
+		return x.LastSyncedAt
+	}
+	return nil
+}
+
+type UpdateSyncStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	LastSyncedAt  *Timestamp             `protobuf:"bytes,2,opt,name=last_synced_at,json=lastSyncedAt,proto3" json:"last_synced_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateSyncStateRequest) Reset() {
+	*x = UpdateSyncStateRequest{}
+	mi := &file_proto_etu_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateSyncStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSyncStateRequest) ProtoMessage() {}
+
+func (x *UpdateSyncStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSyncStateRequest.ProtoReflect.Descriptor instead.
+func (*UpdateSyncStateRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *UpdateSyncStateRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UpdateSyncStateRequest) GetLastSyncedAt() *Timestamp {
+	if x != nil {
+		return x.LastSyncedAt
+	}
+	return nil
+}
+
+type UpdateSyncStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateSyncStateResponse) Reset() {
+	*x = UpdateSyncStateResponse{}
+	mi := &file_proto_etu_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateSyncStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSyncStateResponse) ProtoMessage() {}
+
+func (x *UpdateSyncStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSyncStateResponse.ProtoReflect.Descriptor instead.
+func (*UpdateSyncStateResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *UpdateSyncStateResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type UpsertNoteFromNotionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NotionUuid    string                 `protobuf:"bytes,2,opt,name=notion_uuid,json=notionUuid,proto3" json:"notion_uuid,omitempty"`
+	PageId        string                 `protobuf:"bytes,3,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	Content       string                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	CreatedAt     *Timestamp             `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *Timestamp             `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpsertNoteFromNotionRequest) Reset() {
+	*x = UpsertNoteFromNotionRequest{}
+	mi := &file_proto_etu_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpsertNoteFromNotionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpsertNoteFromNotionRequest) ProtoMessage() {}
+
+func (x *UpsertNoteFromNotionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpsertNoteFromNotionRequest.ProtoReflect.Descriptor instead.
+func (*UpsertNoteFromNotionRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *UpsertNoteFromNotionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UpsertNoteFromNotionRequest) GetNotionUuid() string {
+	if x != nil {
+		return x.NotionUuid
+	}
+	return ""
+}
+
+func (x *UpsertNoteFromNotionRequest) GetPageId() string {
+	if x != nil {
+		return x.PageId
+	}
+	return ""
+}
+
+func (x *UpsertNoteFromNotionRequest) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *UpsertNoteFromNotionRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *UpsertNoteFromNotionRequest) GetCreatedAt() *Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *UpsertNoteFromNotionRequest) GetUpdatedAt() *Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type UpsertNoteFromNotionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Note          *Note                  `protobuf:"bytes,1,opt,name=note,proto3" json:"note,omitempty"`
+	IsNew         bool                   `protobuf:"varint,2,opt,name=is_new,json=isNew,proto3" json:"is_new,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpsertNoteFromNotionResponse) Reset() {
+	*x = UpsertNoteFromNotionResponse{}
+	mi := &file_proto_etu_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpsertNoteFromNotionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpsertNoteFromNotionResponse) ProtoMessage() {}
+
+func (x *UpsertNoteFromNotionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpsertNoteFromNotionResponse.ProtoReflect.Descriptor instead.
+func (*UpsertNoteFromNotionResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *UpsertNoteFromNotionResponse) GetNote() *Note {
+	if x != nil {
+		return x.Note
+	}
+	return nil
+}
+
+func (x *UpsertNoteFromNotionResponse) GetIsNew() bool {
+	if x != nil {
+		return x.IsNew
+	}
+	return false
+}
+
+type GetNotesNeedingSyncToNotionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotesNeedingSyncToNotionRequest) Reset() {
+	*x = GetNotesNeedingSyncToNotionRequest{}
+	mi := &file_proto_etu_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotesNeedingSyncToNotionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotesNeedingSyncToNotionRequest) ProtoMessage() {}
+
+func (x *GetNotesNeedingSyncToNotionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotesNeedingSyncToNotionRequest.ProtoReflect.Descriptor instead.
+func (*GetNotesNeedingSyncToNotionRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *GetNotesNeedingSyncToNotionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetNotesNeedingSyncToNotionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Notes         []*Note                `protobuf:"bytes,1,rep,name=notes,proto3" json:"notes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotesNeedingSyncToNotionResponse) Reset() {
+	*x = GetNotesNeedingSyncToNotionResponse{}
+	mi := &file_proto_etu_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotesNeedingSyncToNotionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotesNeedingSyncToNotionResponse) ProtoMessage() {}
+
+func (x *GetNotesNeedingSyncToNotionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotesNeedingSyncToNotionResponse.ProtoReflect.Descriptor instead.
+func (*GetNotesNeedingSyncToNotionResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *GetNotesNeedingSyncToNotionResponse) GetNotes() []*Note {
+	if x != nil {
+		return x.Notes
+	}
+	return nil
+}
+
+type MarkNoteSyncedToNotionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NoteId        string                 `protobuf:"bytes,1,opt,name=note_id,json=noteId,proto3" json:"note_id,omitempty"`
+	PageId        string                 `protobuf:"bytes,2,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	NotionUuid    string                 `protobuf:"bytes,3,opt,name=notion_uuid,json=notionUuid,proto3" json:"notion_uuid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkNoteSyncedToNotionRequest) Reset() {
+	*x = MarkNoteSyncedToNotionRequest{}
+	mi := &file_proto_etu_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkNoteSyncedToNotionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkNoteSyncedToNotionRequest) ProtoMessage() {}
+
+func (x *MarkNoteSyncedToNotionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkNoteSyncedToNotionRequest.ProtoReflect.Descriptor instead.
+func (*MarkNoteSyncedToNotionRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *MarkNoteSyncedToNotionRequest) GetNoteId() string {
+	if x != nil {
+		return x.NoteId
+	}
+	return ""
+}
+
+func (x *MarkNoteSyncedToNotionRequest) GetPageId() string {
+	if x != nil {
+		return x.PageId
+	}
+	return ""
+}
+
+func (x *MarkNoteSyncedToNotionRequest) GetNotionUuid() string {
+	if x != nil {
+		return x.NotionUuid
+	}
+	return ""
+}
+
+type MarkNoteSyncedToNotionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkNoteSyncedToNotionResponse) Reset() {
+	*x = MarkNoteSyncedToNotionResponse{}
+	mi := &file_proto_etu_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkNoteSyncedToNotionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkNoteSyncedToNotionResponse) ProtoMessage() {}
+
+func (x *MarkNoteSyncedToNotionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkNoteSyncedToNotionResponse.ProtoReflect.Descriptor instead.
+func (*MarkNoteSyncedToNotionResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *MarkNoteSyncedToNotionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type UpdateNoteSyncTimeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NoteId        string                 `protobuf:"bytes,1,opt,name=note_id,json=noteId,proto3" json:"note_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateNoteSyncTimeRequest) Reset() {
+	*x = UpdateNoteSyncTimeRequest{}
+	mi := &file_proto_etu_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateNoteSyncTimeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateNoteSyncTimeRequest) ProtoMessage() {}
+
+func (x *UpdateNoteSyncTimeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateNoteSyncTimeRequest.ProtoReflect.Descriptor instead.
+func (*UpdateNoteSyncTimeRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *UpdateNoteSyncTimeRequest) GetNoteId() string {
+	if x != nil {
+		return x.NoteId
+	}
+	return ""
+}
+
+type UpdateNoteSyncTimeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateNoteSyncTimeResponse) Reset() {
+	*x = UpdateNoteSyncTimeResponse{}
+	mi := &file_proto_etu_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateNoteSyncTimeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateNoteSyncTimeResponse) ProtoMessage() {}
+
+func (x *UpdateNoteSyncTimeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateNoteSyncTimeResponse.ProtoReflect.Descriptor instead.
+func (*UpdateNoteSyncTimeResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *UpdateNoteSyncTimeResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_proto_etu_proto protoreflect.FileDescriptor
 
 const file_proto_etu_proto_rawDesc = "" +
@@ -2210,7 +3298,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x0fproto/etu.proto\x12\x03etu\";\n" +
 	"\tTimestamp\x12\x18\n" +
 	"\aseconds\x18\x01 \x01(\x03R\aseconds\x12\x14\n" +
-	"\x05nanos\x18\x02 \x01(\x05R\x05nanos\"\xa2\x01\n" +
+	"\x05nanos\x18\x02 \x01(\x05R\x05nanos\"\xf0\x02\n" +
 	"\x04Note\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x12\n" +
@@ -2218,7 +3306,15 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x04 \x01(\v2\x0e.etu.TimestampR\tcreatedAt\x12-\n" +
 	"\n" +
-	"updated_at\x18\x05 \x01(\v2\x0e.etu.TimestampR\tupdatedAt\"n\n" +
+	"updated_at\x18\x05 \x01(\v2\x0e.etu.TimestampR\tupdatedAt\x12$\n" +
+	"\vnotion_uuid\x18\x06 \x01(\tH\x00R\n" +
+	"notionUuid\x88\x01\x01\x12$\n" +
+	"\vexternal_id\x18\a \x01(\tH\x01R\n" +
+	"externalId\x88\x01\x01\x12F\n" +
+	"\x15last_synced_to_notion\x18\b \x01(\v2\x0e.etu.TimestampH\x02R\x12lastSyncedToNotion\x88\x01\x01B\x0e\n" +
+	"\f_notion_uuidB\x0e\n" +
+	"\f_external_idB\x18\n" +
+	"\x16_last_synced_to_notion\"n\n" +
 	"\x03Tag\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -2300,7 +3396,25 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\".\n" +
 	"\x12DeleteNoteResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"*\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"P\n" +
+	"\x1aGetNotesWithFewTagsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x19\n" +
+	"\bmax_tags\x18\x02 \x01(\x05R\amaxTags\">\n" +
+	"\x1bGetNotesWithFewTagsResponse\x12\x1f\n" +
+	"\x05notes\x18\x01 \x03(\v2\t.etu.NoteR\x05notes\"\\\n" +
+	"\x14AddTagsToNoteRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
+	"\anote_id\x18\x02 \x01(\tR\x06noteId\x12\x12\n" +
+	"\x04tags\x18\x03 \x03(\tR\x04tags\"6\n" +
+	"\x15AddTagsToNoteResponse\x12\x1d\n" +
+	"\x04note\x18\x01 \x01(\v2\t.etu.NoteR\x04note\"V\n" +
+	"\x1aGetNoteByNotionUUIDRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vnotion_uuid\x18\x02 \x01(\tR\n" +
+	"notionUuid\"J\n" +
+	"\x1bGetNoteByNotionUUIDResponse\x12\"\n" +
+	"\x04note\x18\x01 \x01(\v2\t.etu.NoteH\x00R\x04note\x88\x01\x01B\a\n" +
+	"\x05_note\"*\n" +
 	"\x0fListTagsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\"0\n" +
 	"\x10ListTagsResponse\x12\x1c\n" +
@@ -2334,7 +3448,13 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x13_stripe_customer_idB\x13\n" +
 	"\x11_subscription_end\"?\n" +
 	"\x1eUpdateUserSubscriptionResponse\x12\x1d\n" +
-	"\x04user\x18\x01 \x01(\v2\t.etu.UserR\x04user\"B\n" +
+	"\x04user\x18\x01 \x01(\v2\t.etu.UserR\x04user\"\x15\n" +
+	"\x13ListAllUsersRequest\"7\n" +
+	"\x14ListAllUsersResponse\x12\x1f\n" +
+	"\x05users\x18\x01 \x03(\v2\t.etu.UserR\x05users\" \n" +
+	"\x1eListUsersWithNotionKeysRequest\"B\n" +
+	"\x1fListUsersWithNotionKeysResponse\x12\x1f\n" +
+	"\x05users\x18\x01 \x03(\v2\t.etu.UserR\x05users\"B\n" +
 	"\x13CreateApiKeyRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"U\n" +
@@ -2369,7 +3489,46 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\v_notion_keyB\v\n" +
 	"\t_username\"K\n" +
 	"\x1aUpdateUserSettingsResponse\x12-\n" +
-	"\bsettings\x18\x01 \x01(\v2\x11.etu.UserSettingsR\bsettings2\xbd\x02\n" +
+	"\bsettings\x18\x01 \x01(\v2\x11.etu.UserSettingsR\bsettings\".\n" +
+	"\x13GetSyncStateRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"d\n" +
+	"\x14GetSyncStateResponse\x129\n" +
+	"\x0elast_synced_at\x18\x01 \x01(\v2\x0e.etu.TimestampH\x00R\flastSyncedAt\x88\x01\x01B\x11\n" +
+	"\x0f_last_synced_at\"g\n" +
+	"\x16UpdateSyncStateRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x124\n" +
+	"\x0elast_synced_at\x18\x02 \x01(\v2\x0e.etu.TimestampR\flastSyncedAt\"3\n" +
+	"\x17UpdateSyncStateResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xfc\x01\n" +
+	"\x1bUpsertNoteFromNotionRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vnotion_uuid\x18\x02 \x01(\tR\n" +
+	"notionUuid\x12\x17\n" +
+	"\apage_id\x18\x03 \x01(\tR\x06pageId\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\tR\acontent\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\x12-\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x0e.etu.TimestampR\tcreatedAt\x12-\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x0e.etu.TimestampR\tupdatedAt\"T\n" +
+	"\x1cUpsertNoteFromNotionResponse\x12\x1d\n" +
+	"\x04note\x18\x01 \x01(\v2\t.etu.NoteR\x04note\x12\x15\n" +
+	"\x06is_new\x18\x02 \x01(\bR\x05isNew\"=\n" +
+	"\"GetNotesNeedingSyncToNotionRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"F\n" +
+	"#GetNotesNeedingSyncToNotionResponse\x12\x1f\n" +
+	"\x05notes\x18\x01 \x03(\v2\t.etu.NoteR\x05notes\"r\n" +
+	"\x1dMarkNoteSyncedToNotionRequest\x12\x17\n" +
+	"\anote_id\x18\x01 \x01(\tR\x06noteId\x12\x17\n" +
+	"\apage_id\x18\x02 \x01(\tR\x06pageId\x12\x1f\n" +
+	"\vnotion_uuid\x18\x03 \x01(\tR\n" +
+	"notionUuid\":\n" +
+	"\x1eMarkNoteSyncedToNotionResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"4\n" +
+	"\x19UpdateNoteSyncTimeRequest\x12\x17\n" +
+	"\anote_id\x18\x01 \x01(\tR\x06noteId\"6\n" +
+	"\x1aUpdateNoteSyncTimeResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\xb9\x04\n" +
 	"\fNotesService\x12:\n" +
 	"\tListNotes\x12\x15.etu.ListNotesRequest\x1a\x16.etu.ListNotesResponse\x12=\n" +
 	"\n" +
@@ -2378,15 +3537,20 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\n" +
 	"UpdateNote\x12\x16.etu.UpdateNoteRequest\x1a\x17.etu.UpdateNoteResponse\x12=\n" +
 	"\n" +
-	"DeleteNote\x12\x16.etu.DeleteNoteRequest\x1a\x17.etu.DeleteNoteResponse2F\n" +
+	"DeleteNote\x12\x16.etu.DeleteNoteRequest\x1a\x17.etu.DeleteNoteResponse\x12X\n" +
+	"\x13GetNotesWithFewTags\x12\x1f.etu.GetNotesWithFewTagsRequest\x1a .etu.GetNotesWithFewTagsResponse\x12F\n" +
+	"\rAddTagsToNote\x12\x19.etu.AddTagsToNoteRequest\x1a\x1a.etu.AddTagsToNoteResponse\x12X\n" +
+	"\x13GetNoteByNotionUUID\x12\x1f.etu.GetNoteByNotionUUIDRequest\x1a .etu.GetNoteByNotionUUIDResponse2F\n" +
 	"\vTagsService\x127\n" +
-	"\bListTags\x12\x14.etu.ListTagsRequest\x1a\x15.etu.ListTagsResponse2\x90\x03\n" +
+	"\bListTags\x12\x14.etu.ListTagsRequest\x1a\x15.etu.ListTagsResponse2\xbb\x04\n" +
 	"\vAuthService\x127\n" +
 	"\bRegister\x12\x14.etu.RegisterRequest\x1a\x15.etu.RegisterResponse\x12C\n" +
 	"\fAuthenticate\x12\x18.etu.AuthenticateRequest\x1a\x19.etu.AuthenticateResponse\x124\n" +
 	"\aGetUser\x12\x13.etu.GetUserRequest\x1a\x14.etu.GetUserResponse\x12j\n" +
 	"\x19GetUserByStripeCustomerId\x12%.etu.GetUserByStripeCustomerIdRequest\x1a&.etu.GetUserByStripeCustomerIdResponse\x12a\n" +
-	"\x16UpdateUserSubscription\x12\".etu.UpdateUserSubscriptionRequest\x1a#.etu.UpdateUserSubscriptionResponse2\xa1\x02\n" +
+	"\x16UpdateUserSubscription\x12\".etu.UpdateUserSubscriptionRequest\x1a#.etu.UpdateUserSubscriptionResponse\x12C\n" +
+	"\fListAllUsers\x12\x18.etu.ListAllUsersRequest\x1a\x19.etu.ListAllUsersResponse\x12d\n" +
+	"\x17ListUsersWithNotionKeys\x12#.etu.ListUsersWithNotionKeysRequest\x1a$.etu.ListUsersWithNotionKeysResponse2\xa1\x02\n" +
 	"\x0eApiKeysService\x12C\n" +
 	"\fCreateApiKey\x12\x18.etu.CreateApiKeyRequest\x1a\x19.etu.CreateApiKeyResponse\x12@\n" +
 	"\vListApiKeys\x12\x17.etu.ListApiKeysRequest\x1a\x18.etu.ListApiKeysResponse\x12C\n" +
@@ -2394,7 +3558,14 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\fVerifyApiKey\x12\x18.etu.VerifyApiKeyRequest\x1a\x19.etu.VerifyApiKeyResponse2\xba\x01\n" +
 	"\x13UserSettingsService\x12L\n" +
 	"\x0fGetUserSettings\x12\x1b.etu.GetUserSettingsRequest\x1a\x1c.etu.GetUserSettingsResponse\x12U\n" +
-	"\x12UpdateUserSettings\x12\x1e.etu.UpdateUserSettingsRequest\x1a\x1f.etu.UpdateUserSettingsResponseB#Z!github.com/icco/etu-backend/protob\x06proto3"
+	"\x12UpdateUserSettings\x12\x1e.etu.UpdateUserSettingsRequest\x1a\x1f.etu.UpdateUserSettingsResponse2\xa9\x04\n" +
+	"\vSyncService\x12C\n" +
+	"\fGetSyncState\x12\x18.etu.GetSyncStateRequest\x1a\x19.etu.GetSyncStateResponse\x12L\n" +
+	"\x0fUpdateSyncState\x12\x1b.etu.UpdateSyncStateRequest\x1a\x1c.etu.UpdateSyncStateResponse\x12[\n" +
+	"\x14UpsertNoteFromNotion\x12 .etu.UpsertNoteFromNotionRequest\x1a!.etu.UpsertNoteFromNotionResponse\x12p\n" +
+	"\x1bGetNotesNeedingSyncToNotion\x12'.etu.GetNotesNeedingSyncToNotionRequest\x1a(.etu.GetNotesNeedingSyncToNotionResponse\x12a\n" +
+	"\x16MarkNoteSyncedToNotion\x12\".etu.MarkNoteSyncedToNotionRequest\x1a#.etu.MarkNoteSyncedToNotionResponse\x12U\n" +
+	"\x12UpdateNoteSyncTime\x12\x1e.etu.UpdateNoteSyncTimeRequest\x1a\x1f.etu.UpdateNoteSyncTimeResponseB#Z!github.com/icco/etu-backend/protob\x06proto3"
 
 var (
 	file_proto_etu_proto_rawDescOnce sync.Once
@@ -2408,113 +3579,169 @@ func file_proto_etu_proto_rawDescGZIP() []byte {
 	return file_proto_etu_proto_rawDescData
 }
 
-var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 62)
 var file_proto_etu_proto_goTypes = []any{
-	(*Timestamp)(nil),                         // 0: etu.Timestamp
-	(*Note)(nil),                              // 1: etu.Note
-	(*Tag)(nil),                               // 2: etu.Tag
-	(*User)(nil),                              // 3: etu.User
-	(*ApiKey)(nil),                            // 4: etu.ApiKey
-	(*UserSettings)(nil),                      // 5: etu.UserSettings
-	(*ListNotesRequest)(nil),                  // 6: etu.ListNotesRequest
-	(*ListNotesResponse)(nil),                 // 7: etu.ListNotesResponse
-	(*CreateNoteRequest)(nil),                 // 8: etu.CreateNoteRequest
-	(*CreateNoteResponse)(nil),                // 9: etu.CreateNoteResponse
-	(*GetNoteRequest)(nil),                    // 10: etu.GetNoteRequest
-	(*GetNoteResponse)(nil),                   // 11: etu.GetNoteResponse
-	(*UpdateNoteRequest)(nil),                 // 12: etu.UpdateNoteRequest
-	(*UpdateNoteResponse)(nil),                // 13: etu.UpdateNoteResponse
-	(*DeleteNoteRequest)(nil),                 // 14: etu.DeleteNoteRequest
-	(*DeleteNoteResponse)(nil),                // 15: etu.DeleteNoteResponse
-	(*ListTagsRequest)(nil),                   // 16: etu.ListTagsRequest
-	(*ListTagsResponse)(nil),                  // 17: etu.ListTagsResponse
-	(*RegisterRequest)(nil),                   // 18: etu.RegisterRequest
-	(*RegisterResponse)(nil),                  // 19: etu.RegisterResponse
-	(*AuthenticateRequest)(nil),               // 20: etu.AuthenticateRequest
-	(*AuthenticateResponse)(nil),              // 21: etu.AuthenticateResponse
-	(*GetUserRequest)(nil),                    // 22: etu.GetUserRequest
-	(*GetUserResponse)(nil),                   // 23: etu.GetUserResponse
-	(*GetUserByStripeCustomerIdRequest)(nil),  // 24: etu.GetUserByStripeCustomerIdRequest
-	(*GetUserByStripeCustomerIdResponse)(nil), // 25: etu.GetUserByStripeCustomerIdResponse
-	(*UpdateUserSubscriptionRequest)(nil),     // 26: etu.UpdateUserSubscriptionRequest
-	(*UpdateUserSubscriptionResponse)(nil),    // 27: etu.UpdateUserSubscriptionResponse
-	(*CreateApiKeyRequest)(nil),               // 28: etu.CreateApiKeyRequest
-	(*CreateApiKeyResponse)(nil),              // 29: etu.CreateApiKeyResponse
-	(*ListApiKeysRequest)(nil),                // 30: etu.ListApiKeysRequest
-	(*ListApiKeysResponse)(nil),               // 31: etu.ListApiKeysResponse
-	(*DeleteApiKeyRequest)(nil),               // 32: etu.DeleteApiKeyRequest
-	(*DeleteApiKeyResponse)(nil),              // 33: etu.DeleteApiKeyResponse
-	(*VerifyApiKeyRequest)(nil),               // 34: etu.VerifyApiKeyRequest
-	(*VerifyApiKeyResponse)(nil),              // 35: etu.VerifyApiKeyResponse
-	(*GetUserSettingsRequest)(nil),            // 36: etu.GetUserSettingsRequest
-	(*GetUserSettingsResponse)(nil),           // 37: etu.GetUserSettingsResponse
-	(*UpdateUserSettingsRequest)(nil),         // 38: etu.UpdateUserSettingsRequest
-	(*UpdateUserSettingsResponse)(nil),        // 39: etu.UpdateUserSettingsResponse
+	(*Timestamp)(nil),                           // 0: etu.Timestamp
+	(*Note)(nil),                                // 1: etu.Note
+	(*Tag)(nil),                                 // 2: etu.Tag
+	(*User)(nil),                                // 3: etu.User
+	(*ApiKey)(nil),                              // 4: etu.ApiKey
+	(*UserSettings)(nil),                        // 5: etu.UserSettings
+	(*ListNotesRequest)(nil),                    // 6: etu.ListNotesRequest
+	(*ListNotesResponse)(nil),                   // 7: etu.ListNotesResponse
+	(*CreateNoteRequest)(nil),                   // 8: etu.CreateNoteRequest
+	(*CreateNoteResponse)(nil),                  // 9: etu.CreateNoteResponse
+	(*GetNoteRequest)(nil),                      // 10: etu.GetNoteRequest
+	(*GetNoteResponse)(nil),                     // 11: etu.GetNoteResponse
+	(*UpdateNoteRequest)(nil),                   // 12: etu.UpdateNoteRequest
+	(*UpdateNoteResponse)(nil),                  // 13: etu.UpdateNoteResponse
+	(*DeleteNoteRequest)(nil),                   // 14: etu.DeleteNoteRequest
+	(*DeleteNoteResponse)(nil),                  // 15: etu.DeleteNoteResponse
+	(*GetNotesWithFewTagsRequest)(nil),          // 16: etu.GetNotesWithFewTagsRequest
+	(*GetNotesWithFewTagsResponse)(nil),         // 17: etu.GetNotesWithFewTagsResponse
+	(*AddTagsToNoteRequest)(nil),                // 18: etu.AddTagsToNoteRequest
+	(*AddTagsToNoteResponse)(nil),               // 19: etu.AddTagsToNoteResponse
+	(*GetNoteByNotionUUIDRequest)(nil),          // 20: etu.GetNoteByNotionUUIDRequest
+	(*GetNoteByNotionUUIDResponse)(nil),         // 21: etu.GetNoteByNotionUUIDResponse
+	(*ListTagsRequest)(nil),                     // 22: etu.ListTagsRequest
+	(*ListTagsResponse)(nil),                    // 23: etu.ListTagsResponse
+	(*RegisterRequest)(nil),                     // 24: etu.RegisterRequest
+	(*RegisterResponse)(nil),                    // 25: etu.RegisterResponse
+	(*AuthenticateRequest)(nil),                 // 26: etu.AuthenticateRequest
+	(*AuthenticateResponse)(nil),                // 27: etu.AuthenticateResponse
+	(*GetUserRequest)(nil),                      // 28: etu.GetUserRequest
+	(*GetUserResponse)(nil),                     // 29: etu.GetUserResponse
+	(*GetUserByStripeCustomerIdRequest)(nil),    // 30: etu.GetUserByStripeCustomerIdRequest
+	(*GetUserByStripeCustomerIdResponse)(nil),   // 31: etu.GetUserByStripeCustomerIdResponse
+	(*UpdateUserSubscriptionRequest)(nil),       // 32: etu.UpdateUserSubscriptionRequest
+	(*UpdateUserSubscriptionResponse)(nil),      // 33: etu.UpdateUserSubscriptionResponse
+	(*ListAllUsersRequest)(nil),                 // 34: etu.ListAllUsersRequest
+	(*ListAllUsersResponse)(nil),                // 35: etu.ListAllUsersResponse
+	(*ListUsersWithNotionKeysRequest)(nil),      // 36: etu.ListUsersWithNotionKeysRequest
+	(*ListUsersWithNotionKeysResponse)(nil),     // 37: etu.ListUsersWithNotionKeysResponse
+	(*CreateApiKeyRequest)(nil),                 // 38: etu.CreateApiKeyRequest
+	(*CreateApiKeyResponse)(nil),                // 39: etu.CreateApiKeyResponse
+	(*ListApiKeysRequest)(nil),                  // 40: etu.ListApiKeysRequest
+	(*ListApiKeysResponse)(nil),                 // 41: etu.ListApiKeysResponse
+	(*DeleteApiKeyRequest)(nil),                 // 42: etu.DeleteApiKeyRequest
+	(*DeleteApiKeyResponse)(nil),                // 43: etu.DeleteApiKeyResponse
+	(*VerifyApiKeyRequest)(nil),                 // 44: etu.VerifyApiKeyRequest
+	(*VerifyApiKeyResponse)(nil),                // 45: etu.VerifyApiKeyResponse
+	(*GetUserSettingsRequest)(nil),              // 46: etu.GetUserSettingsRequest
+	(*GetUserSettingsResponse)(nil),             // 47: etu.GetUserSettingsResponse
+	(*UpdateUserSettingsRequest)(nil),           // 48: etu.UpdateUserSettingsRequest
+	(*UpdateUserSettingsResponse)(nil),          // 49: etu.UpdateUserSettingsResponse
+	(*GetSyncStateRequest)(nil),                 // 50: etu.GetSyncStateRequest
+	(*GetSyncStateResponse)(nil),                // 51: etu.GetSyncStateResponse
+	(*UpdateSyncStateRequest)(nil),              // 52: etu.UpdateSyncStateRequest
+	(*UpdateSyncStateResponse)(nil),             // 53: etu.UpdateSyncStateResponse
+	(*UpsertNoteFromNotionRequest)(nil),         // 54: etu.UpsertNoteFromNotionRequest
+	(*UpsertNoteFromNotionResponse)(nil),        // 55: etu.UpsertNoteFromNotionResponse
+	(*GetNotesNeedingSyncToNotionRequest)(nil),  // 56: etu.GetNotesNeedingSyncToNotionRequest
+	(*GetNotesNeedingSyncToNotionResponse)(nil), // 57: etu.GetNotesNeedingSyncToNotionResponse
+	(*MarkNoteSyncedToNotionRequest)(nil),       // 58: etu.MarkNoteSyncedToNotionRequest
+	(*MarkNoteSyncedToNotionResponse)(nil),      // 59: etu.MarkNoteSyncedToNotionResponse
+	(*UpdateNoteSyncTimeRequest)(nil),           // 60: etu.UpdateNoteSyncTimeRequest
+	(*UpdateNoteSyncTimeResponse)(nil),          // 61: etu.UpdateNoteSyncTimeResponse
 }
 var file_proto_etu_proto_depIdxs = []int32{
 	0,  // 0: etu.Note.created_at:type_name -> etu.Timestamp
 	0,  // 1: etu.Note.updated_at:type_name -> etu.Timestamp
-	0,  // 2: etu.Tag.created_at:type_name -> etu.Timestamp
-	0,  // 3: etu.User.subscription_end:type_name -> etu.Timestamp
-	0,  // 4: etu.User.created_at:type_name -> etu.Timestamp
-	0,  // 5: etu.ApiKey.created_at:type_name -> etu.Timestamp
-	0,  // 6: etu.ApiKey.last_used:type_name -> etu.Timestamp
-	0,  // 7: etu.UserSettings.created_at:type_name -> etu.Timestamp
-	0,  // 8: etu.UserSettings.updated_at:type_name -> etu.Timestamp
-	1,  // 9: etu.ListNotesResponse.notes:type_name -> etu.Note
-	1,  // 10: etu.CreateNoteResponse.note:type_name -> etu.Note
-	1,  // 11: etu.GetNoteResponse.note:type_name -> etu.Note
-	1,  // 12: etu.UpdateNoteResponse.note:type_name -> etu.Note
-	2,  // 13: etu.ListTagsResponse.tags:type_name -> etu.Tag
-	3,  // 14: etu.RegisterResponse.user:type_name -> etu.User
-	3,  // 15: etu.AuthenticateResponse.user:type_name -> etu.User
-	3,  // 16: etu.GetUserResponse.user:type_name -> etu.User
-	3,  // 17: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	0,  // 18: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> etu.Timestamp
-	3,  // 19: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
-	4,  // 20: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
-	4,  // 21: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
-	5,  // 22: etu.GetUserSettingsResponse.settings:type_name -> etu.UserSettings
-	5,  // 23: etu.UpdateUserSettingsResponse.settings:type_name -> etu.UserSettings
-	6,  // 24: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	8,  // 25: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	10, // 26: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	12, // 27: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	14, // 28: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	16, // 29: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	18, // 30: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	20, // 31: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	22, // 32: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	24, // 33: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	26, // 34: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	28, // 35: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	30, // 36: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	32, // 37: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	34, // 38: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	36, // 39: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	38, // 40: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	7,  // 41: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	9,  // 42: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	11, // 43: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	13, // 44: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	15, // 45: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	17, // 46: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	19, // 47: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	21, // 48: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	23, // 49: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	25, // 50: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	27, // 51: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	29, // 52: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	31, // 53: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	33, // 54: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	35, // 55: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	37, // 56: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	39, // 57: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	41, // [41:58] is the sub-list for method output_type
-	24, // [24:41] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	0,  // 2: etu.Note.last_synced_to_notion:type_name -> etu.Timestamp
+	0,  // 3: etu.Tag.created_at:type_name -> etu.Timestamp
+	0,  // 4: etu.User.subscription_end:type_name -> etu.Timestamp
+	0,  // 5: etu.User.created_at:type_name -> etu.Timestamp
+	0,  // 6: etu.ApiKey.created_at:type_name -> etu.Timestamp
+	0,  // 7: etu.ApiKey.last_used:type_name -> etu.Timestamp
+	0,  // 8: etu.UserSettings.created_at:type_name -> etu.Timestamp
+	0,  // 9: etu.UserSettings.updated_at:type_name -> etu.Timestamp
+	1,  // 10: etu.ListNotesResponse.notes:type_name -> etu.Note
+	1,  // 11: etu.CreateNoteResponse.note:type_name -> etu.Note
+	1,  // 12: etu.GetNoteResponse.note:type_name -> etu.Note
+	1,  // 13: etu.UpdateNoteResponse.note:type_name -> etu.Note
+	1,  // 14: etu.GetNotesWithFewTagsResponse.notes:type_name -> etu.Note
+	1,  // 15: etu.AddTagsToNoteResponse.note:type_name -> etu.Note
+	1,  // 16: etu.GetNoteByNotionUUIDResponse.note:type_name -> etu.Note
+	2,  // 17: etu.ListTagsResponse.tags:type_name -> etu.Tag
+	3,  // 18: etu.RegisterResponse.user:type_name -> etu.User
+	3,  // 19: etu.AuthenticateResponse.user:type_name -> etu.User
+	3,  // 20: etu.GetUserResponse.user:type_name -> etu.User
+	3,  // 21: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
+	0,  // 22: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> etu.Timestamp
+	3,  // 23: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
+	3,  // 24: etu.ListAllUsersResponse.users:type_name -> etu.User
+	3,  // 25: etu.ListUsersWithNotionKeysResponse.users:type_name -> etu.User
+	4,  // 26: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
+	4,  // 27: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
+	5,  // 28: etu.GetUserSettingsResponse.settings:type_name -> etu.UserSettings
+	5,  // 29: etu.UpdateUserSettingsResponse.settings:type_name -> etu.UserSettings
+	0,  // 30: etu.GetSyncStateResponse.last_synced_at:type_name -> etu.Timestamp
+	0,  // 31: etu.UpdateSyncStateRequest.last_synced_at:type_name -> etu.Timestamp
+	0,  // 32: etu.UpsertNoteFromNotionRequest.created_at:type_name -> etu.Timestamp
+	0,  // 33: etu.UpsertNoteFromNotionRequest.updated_at:type_name -> etu.Timestamp
+	1,  // 34: etu.UpsertNoteFromNotionResponse.note:type_name -> etu.Note
+	1,  // 35: etu.GetNotesNeedingSyncToNotionResponse.notes:type_name -> etu.Note
+	6,  // 36: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	8,  // 37: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	10, // 38: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	12, // 39: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	14, // 40: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	16, // 41: etu.NotesService.GetNotesWithFewTags:input_type -> etu.GetNotesWithFewTagsRequest
+	18, // 42: etu.NotesService.AddTagsToNote:input_type -> etu.AddTagsToNoteRequest
+	20, // 43: etu.NotesService.GetNoteByNotionUUID:input_type -> etu.GetNoteByNotionUUIDRequest
+	22, // 44: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	24, // 45: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	26, // 46: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	28, // 47: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	30, // 48: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	32, // 49: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	34, // 50: etu.AuthService.ListAllUsers:input_type -> etu.ListAllUsersRequest
+	36, // 51: etu.AuthService.ListUsersWithNotionKeys:input_type -> etu.ListUsersWithNotionKeysRequest
+	38, // 52: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	40, // 53: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	42, // 54: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	44, // 55: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	46, // 56: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	48, // 57: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	50, // 58: etu.SyncService.GetSyncState:input_type -> etu.GetSyncStateRequest
+	52, // 59: etu.SyncService.UpdateSyncState:input_type -> etu.UpdateSyncStateRequest
+	54, // 60: etu.SyncService.UpsertNoteFromNotion:input_type -> etu.UpsertNoteFromNotionRequest
+	56, // 61: etu.SyncService.GetNotesNeedingSyncToNotion:input_type -> etu.GetNotesNeedingSyncToNotionRequest
+	58, // 62: etu.SyncService.MarkNoteSyncedToNotion:input_type -> etu.MarkNoteSyncedToNotionRequest
+	60, // 63: etu.SyncService.UpdateNoteSyncTime:input_type -> etu.UpdateNoteSyncTimeRequest
+	7,  // 64: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	9,  // 65: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	11, // 66: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	13, // 67: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	15, // 68: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	17, // 69: etu.NotesService.GetNotesWithFewTags:output_type -> etu.GetNotesWithFewTagsResponse
+	19, // 70: etu.NotesService.AddTagsToNote:output_type -> etu.AddTagsToNoteResponse
+	21, // 71: etu.NotesService.GetNoteByNotionUUID:output_type -> etu.GetNoteByNotionUUIDResponse
+	23, // 72: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	25, // 73: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	27, // 74: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	29, // 75: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	31, // 76: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	33, // 77: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	35, // 78: etu.AuthService.ListAllUsers:output_type -> etu.ListAllUsersResponse
+	37, // 79: etu.AuthService.ListUsersWithNotionKeys:output_type -> etu.ListUsersWithNotionKeysResponse
+	39, // 80: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	41, // 81: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	43, // 82: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	45, // 83: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	47, // 84: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	49, // 85: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	51, // 86: etu.SyncService.GetSyncState:output_type -> etu.GetSyncStateResponse
+	53, // 87: etu.SyncService.UpdateSyncState:output_type -> etu.UpdateSyncStateResponse
+	55, // 88: etu.SyncService.UpsertNoteFromNotion:output_type -> etu.UpsertNoteFromNotionResponse
+	57, // 89: etu.SyncService.GetNotesNeedingSyncToNotion:output_type -> etu.GetNotesNeedingSyncToNotionResponse
+	59, // 90: etu.SyncService.MarkNoteSyncedToNotion:output_type -> etu.MarkNoteSyncedToNotionResponse
+	61, // 91: etu.SyncService.UpdateNoteSyncTime:output_type -> etu.UpdateNoteSyncTimeResponse
+	64, // [64:92] is the sub-list for method output_type
+	36, // [36:64] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }
@@ -2522,24 +3749,27 @@ func file_proto_etu_proto_init() {
 	if File_proto_etu_proto != nil {
 		return
 	}
+	file_proto_etu_proto_msgTypes[1].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[3].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[4].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[5].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[12].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[21].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[25].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[26].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[35].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[38].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[27].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[31].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[32].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[45].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[48].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[51].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_etu_proto_rawDesc), len(file_proto_etu_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   40,
+			NumMessages:   62,
 			NumExtensions: 0,
-			NumServices:   5,
+			NumServices:   6,
 		},
 		GoTypes:           file_proto_etu_proto_goTypes,
 		DependencyIndexes: file_proto_etu_proto_depIdxs,

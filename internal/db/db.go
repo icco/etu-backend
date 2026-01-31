@@ -624,3 +624,198 @@ func (db *DB) ListAllUsers(ctx context.Context) ([]User, error) {
 	}
 	return users, nil
 }
+
+// GetNoteByNotionUUID finds a note by its Notion UUID
+func (db *DB) GetNoteByNotionUUID(ctx context.Context, userID, notionUUID string) (*Note, error) {
+	var note Note
+	result := db.conn.WithContext(ctx).Where(`"userId" = ? AND "notionUuid" = ?`, userID, notionUUID).First(&note)
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get note by Notion UUID: %w", result.Error)
+	}
+
+	tags, err := db.getNoteTags(ctx, note.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags for note: %w", err)
+	}
+	note.Tags = tags
+
+	return &note, nil
+}
+
+// UpsertNoteFromNotion creates or updates a note from Notion data
+func (db *DB) UpsertNoteFromNotion(ctx context.Context, userID, notionUUID, pageID, content string, tagNames []string, createdAt, updatedAt time.Time) (*Note, bool, error) {
+	var note Note
+	var isNew bool
+
+	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Try to find existing note by Notion UUID first, then by page ID
+		result := tx.Where(`"userId" = ? AND "notionUuid" = ?`, userID, notionUUID).First(&note)
+		if result.Error == gorm.ErrRecordNotFound {
+			// Try by page ID (for backwards compatibility)
+			result = tx.Where(`"userId" = ? AND "externalId" = ?`, userID, pageID).First(&note)
+		}
+
+		if result.Error == gorm.ErrRecordNotFound {
+			// Create new note
+			isNew = true
+			note = Note{
+				ID:         models.GenerateCUID(),
+				Content:    content,
+				CreatedAt:  createdAt,
+				UpdatedAt:  updatedAt,
+				UserID:     userID,
+				ExternalID: &pageID,
+				NotionUUID: &notionUUID,
+			}
+			if err := tx.Create(&note).Error; err != nil {
+				return fmt.Errorf("failed to create note: %w", err)
+			}
+		} else if result.Error != nil {
+			return result.Error
+		} else {
+			// Update existing note
+			isNew = false
+			note.Content = content
+			note.UpdatedAt = updatedAt
+			note.ExternalID = &pageID
+			note.NotionUUID = &notionUUID
+			if err := tx.Save(&note).Error; err != nil {
+				return fmt.Errorf("failed to update note: %w", err)
+			}
+		}
+
+		// Clear existing tag associations
+		if err := tx.Where(`"noteId" = ?`, note.ID).Delete(&models.NoteTag{}).Error; err != nil {
+			return fmt.Errorf("failed to clear tag associations: %w", err)
+		}
+
+		// Create/find tags and associate them
+		for _, tagName := range tagNames {
+			if tagName == "" {
+				continue
+			}
+
+			var tag models.Tag
+			result := tx.Where(`"userId" = ? AND name = ?`, userID, tagName).First(&tag)
+			if result.Error == gorm.ErrRecordNotFound {
+				// Create new tag
+				tag = models.Tag{
+					ID:        models.GenerateCUID(),
+					Name:      tagName,
+					CreatedAt: time.Now(),
+					UserID:    userID,
+				}
+				if err := tx.Create(&tag).Error; err != nil {
+					return fmt.Errorf("failed to create tag: %w", err)
+				}
+			} else if result.Error != nil {
+				return result.Error
+			}
+
+			// Create association
+			noteTag := models.NoteTag{NoteID: note.ID, TagID: tag.ID}
+			if err := tx.Create(&noteTag).Error; err != nil {
+				// Ignore duplicate key errors
+				if err.Error() != "ERROR: duplicate key value violates unique constraint" {
+					return fmt.Errorf("failed to associate tag: %w", err)
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Reload tags
+	tags, err := db.getNoteTags(ctx, note.ID)
+	if err != nil {
+		return nil, isNew, fmt.Errorf("failed to get tags for note: %w", err)
+	}
+	note.Tags = tags
+
+	return &note, isNew, nil
+}
+
+// GetLastSyncTime returns the last sync time for a user
+func (db *DB) GetLastSyncTime(ctx context.Context, userID string) (*time.Time, error) {
+	var state models.SyncState
+	result := db.conn.WithContext(ctx).Where(`"userId" = ?`, userID).First(&state)
+	if result.Error == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get sync state: %w", result.Error)
+	}
+	return &state.LastSyncedAt, nil
+}
+
+// UpdateLastSyncTime updates the last sync time for a user
+func (db *DB) UpdateLastSyncTime(ctx context.Context, userID string, syncTime time.Time) error {
+	state := models.SyncState{
+		UserID:       userID,
+		LastSyncedAt: syncTime,
+	}
+	return db.conn.WithContext(ctx).Save(&state).Error
+}
+
+// GetNotesNeedingSyncToNotion returns notes that have been modified locally
+// and need to be synced back to Notion.
+func (db *DB) GetNotesNeedingSyncToNotion(ctx context.Context, userID string) ([]Note, error) {
+	var notes []Note
+	err := db.conn.WithContext(ctx).
+		Where(`"userId" = ? AND ("externalId" IS NULL OR "lastSyncedToNotion" IS NULL OR "updatedAt" > "lastSyncedToNotion")`, userID).
+		Find(&notes).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get notes needing sync: %w", err)
+	}
+
+	// Fetch tags for each note
+	for i := range notes {
+		tags, err := db.getNoteTags(ctx, notes[i].ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get tags for note %s: %w", notes[i].ID, err)
+		}
+		notes[i].Tags = tags
+	}
+
+	return notes, nil
+}
+
+// MarkNoteSyncedToNotion updates the note's Notion sync status
+func (db *DB) MarkNoteSyncedToNotion(ctx context.Context, noteID, pageID, notionUUID string) error {
+	now := time.Now()
+	return db.conn.WithContext(ctx).Model(&Note{}).
+		Where(`id = ?`, noteID).
+		Updates(map[string]interface{}{
+			"externalId":         pageID,
+			"notionUuid":         notionUUID,
+			"lastSyncedToNotion": now,
+		}).Error
+}
+
+// UpdateNoteSyncTime updates just the lastSyncedToNotion timestamp
+func (db *DB) UpdateNoteSyncTime(ctx context.Context, noteID string) error {
+	now := time.Now()
+	return db.conn.WithContext(ctx).Model(&Note{}).
+		Where(`id = ?`, noteID).
+		Update("lastSyncedToNotion", now).Error
+}
+
+// GetNoteTagNames returns the tag names for a note as strings
+func (db *DB) GetNoteTagNames(ctx context.Context, noteID string) ([]string, error) {
+	tags, err := db.getNoteTags(ctx, noteID)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(tags))
+	for i, tag := range tags {
+		names[i] = tag.Name
+	}
+	return names, nil
+}

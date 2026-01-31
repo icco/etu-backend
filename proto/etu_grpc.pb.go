@@ -19,11 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	NotesService_ListNotes_FullMethodName  = "/etu.NotesService/ListNotes"
-	NotesService_CreateNote_FullMethodName = "/etu.NotesService/CreateNote"
-	NotesService_GetNote_FullMethodName    = "/etu.NotesService/GetNote"
-	NotesService_UpdateNote_FullMethodName = "/etu.NotesService/UpdateNote"
-	NotesService_DeleteNote_FullMethodName = "/etu.NotesService/DeleteNote"
+	NotesService_ListNotes_FullMethodName           = "/etu.NotesService/ListNotes"
+	NotesService_CreateNote_FullMethodName          = "/etu.NotesService/CreateNote"
+	NotesService_GetNote_FullMethodName             = "/etu.NotesService/GetNote"
+	NotesService_UpdateNote_FullMethodName          = "/etu.NotesService/UpdateNote"
+	NotesService_DeleteNote_FullMethodName          = "/etu.NotesService/DeleteNote"
+	NotesService_GetNotesWithFewTags_FullMethodName = "/etu.NotesService/GetNotesWithFewTags"
+	NotesService_AddTagsToNote_FullMethodName       = "/etu.NotesService/AddTagsToNote"
+	NotesService_GetNoteByNotionUUID_FullMethodName = "/etu.NotesService/GetNoteByNotionUUID"
 )
 
 // NotesServiceClient is the client API for NotesService service.
@@ -35,6 +38,9 @@ type NotesServiceClient interface {
 	GetNote(ctx context.Context, in *GetNoteRequest, opts ...grpc.CallOption) (*GetNoteResponse, error)
 	UpdateNote(ctx context.Context, in *UpdateNoteRequest, opts ...grpc.CallOption) (*UpdateNoteResponse, error)
 	DeleteNote(ctx context.Context, in *DeleteNoteRequest, opts ...grpc.CallOption) (*DeleteNoteResponse, error)
+	GetNotesWithFewTags(ctx context.Context, in *GetNotesWithFewTagsRequest, opts ...grpc.CallOption) (*GetNotesWithFewTagsResponse, error)
+	AddTagsToNote(ctx context.Context, in *AddTagsToNoteRequest, opts ...grpc.CallOption) (*AddTagsToNoteResponse, error)
+	GetNoteByNotionUUID(ctx context.Context, in *GetNoteByNotionUUIDRequest, opts ...grpc.CallOption) (*GetNoteByNotionUUIDResponse, error)
 }
 
 type notesServiceClient struct {
@@ -95,6 +101,36 @@ func (c *notesServiceClient) DeleteNote(ctx context.Context, in *DeleteNoteReque
 	return out, nil
 }
 
+func (c *notesServiceClient) GetNotesWithFewTags(ctx context.Context, in *GetNotesWithFewTagsRequest, opts ...grpc.CallOption) (*GetNotesWithFewTagsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetNotesWithFewTagsResponse)
+	err := c.cc.Invoke(ctx, NotesService_GetNotesWithFewTags_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notesServiceClient) AddTagsToNote(ctx context.Context, in *AddTagsToNoteRequest, opts ...grpc.CallOption) (*AddTagsToNoteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddTagsToNoteResponse)
+	err := c.cc.Invoke(ctx, NotesService_AddTagsToNote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *notesServiceClient) GetNoteByNotionUUID(ctx context.Context, in *GetNoteByNotionUUIDRequest, opts ...grpc.CallOption) (*GetNoteByNotionUUIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetNoteByNotionUUIDResponse)
+	err := c.cc.Invoke(ctx, NotesService_GetNoteByNotionUUID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NotesServiceServer is the server API for NotesService service.
 // All implementations must embed UnimplementedNotesServiceServer
 // for forward compatibility.
@@ -104,6 +140,9 @@ type NotesServiceServer interface {
 	GetNote(context.Context, *GetNoteRequest) (*GetNoteResponse, error)
 	UpdateNote(context.Context, *UpdateNoteRequest) (*UpdateNoteResponse, error)
 	DeleteNote(context.Context, *DeleteNoteRequest) (*DeleteNoteResponse, error)
+	GetNotesWithFewTags(context.Context, *GetNotesWithFewTagsRequest) (*GetNotesWithFewTagsResponse, error)
+	AddTagsToNote(context.Context, *AddTagsToNoteRequest) (*AddTagsToNoteResponse, error)
+	GetNoteByNotionUUID(context.Context, *GetNoteByNotionUUIDRequest) (*GetNoteByNotionUUIDResponse, error)
 	mustEmbedUnimplementedNotesServiceServer()
 }
 
@@ -128,6 +167,15 @@ func (UnimplementedNotesServiceServer) UpdateNote(context.Context, *UpdateNoteRe
 }
 func (UnimplementedNotesServiceServer) DeleteNote(context.Context, *DeleteNoteRequest) (*DeleteNoteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteNote not implemented")
+}
+func (UnimplementedNotesServiceServer) GetNotesWithFewTags(context.Context, *GetNotesWithFewTagsRequest) (*GetNotesWithFewTagsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNotesWithFewTags not implemented")
+}
+func (UnimplementedNotesServiceServer) AddTagsToNote(context.Context, *AddTagsToNoteRequest) (*AddTagsToNoteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddTagsToNote not implemented")
+}
+func (UnimplementedNotesServiceServer) GetNoteByNotionUUID(context.Context, *GetNoteByNotionUUIDRequest) (*GetNoteByNotionUUIDResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNoteByNotionUUID not implemented")
 }
 func (UnimplementedNotesServiceServer) mustEmbedUnimplementedNotesServiceServer() {}
 func (UnimplementedNotesServiceServer) testEmbeddedByValue()                      {}
@@ -240,6 +288,60 @@ func _NotesService_DeleteNote_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NotesService_GetNotesWithFewTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNotesWithFewTagsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotesServiceServer).GetNotesWithFewTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotesService_GetNotesWithFewTags_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotesServiceServer).GetNotesWithFewTags(ctx, req.(*GetNotesWithFewTagsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotesService_AddTagsToNote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddTagsToNoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotesServiceServer).AddTagsToNote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotesService_AddTagsToNote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotesServiceServer).AddTagsToNote(ctx, req.(*AddTagsToNoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _NotesService_GetNoteByNotionUUID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNoteByNotionUUIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NotesServiceServer).GetNoteByNotionUUID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NotesService_GetNoteByNotionUUID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NotesServiceServer).GetNoteByNotionUUID(ctx, req.(*GetNoteByNotionUUIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NotesService_ServiceDesc is the grpc.ServiceDesc for NotesService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -266,6 +368,18 @@ var NotesService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteNote",
 			Handler:    _NotesService_DeleteNote_Handler,
+		},
+		{
+			MethodName: "GetNotesWithFewTags",
+			Handler:    _NotesService_GetNotesWithFewTags_Handler,
+		},
+		{
+			MethodName: "AddTagsToNote",
+			Handler:    _NotesService_AddTagsToNote_Handler,
+		},
+		{
+			MethodName: "GetNoteByNotionUUID",
+			Handler:    _NotesService_GetNoteByNotionUUID_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -380,6 +494,8 @@ const (
 	AuthService_GetUser_FullMethodName                   = "/etu.AuthService/GetUser"
 	AuthService_GetUserByStripeCustomerId_FullMethodName = "/etu.AuthService/GetUserByStripeCustomerId"
 	AuthService_UpdateUserSubscription_FullMethodName    = "/etu.AuthService/UpdateUserSubscription"
+	AuthService_ListAllUsers_FullMethodName              = "/etu.AuthService/ListAllUsers"
+	AuthService_ListUsersWithNotionKeys_FullMethodName   = "/etu.AuthService/ListUsersWithNotionKeys"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -391,6 +507,8 @@ type AuthServiceClient interface {
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*GetUserResponse, error)
 	GetUserByStripeCustomerId(ctx context.Context, in *GetUserByStripeCustomerIdRequest, opts ...grpc.CallOption) (*GetUserByStripeCustomerIdResponse, error)
 	UpdateUserSubscription(ctx context.Context, in *UpdateUserSubscriptionRequest, opts ...grpc.CallOption) (*UpdateUserSubscriptionResponse, error)
+	ListAllUsers(ctx context.Context, in *ListAllUsersRequest, opts ...grpc.CallOption) (*ListAllUsersResponse, error)
+	ListUsersWithNotionKeys(ctx context.Context, in *ListUsersWithNotionKeysRequest, opts ...grpc.CallOption) (*ListUsersWithNotionKeysResponse, error)
 }
 
 type authServiceClient struct {
@@ -451,6 +569,26 @@ func (c *authServiceClient) UpdateUserSubscription(ctx context.Context, in *Upda
 	return out, nil
 }
 
+func (c *authServiceClient) ListAllUsers(ctx context.Context, in *ListAllUsersRequest, opts ...grpc.CallOption) (*ListAllUsersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAllUsersResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListAllUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListUsersWithNotionKeys(ctx context.Context, in *ListUsersWithNotionKeysRequest, opts ...grpc.CallOption) (*ListUsersWithNotionKeysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListUsersWithNotionKeysResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListUsersWithNotionKeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -460,6 +598,8 @@ type AuthServiceServer interface {
 	GetUser(context.Context, *GetUserRequest) (*GetUserResponse, error)
 	GetUserByStripeCustomerId(context.Context, *GetUserByStripeCustomerIdRequest) (*GetUserByStripeCustomerIdResponse, error)
 	UpdateUserSubscription(context.Context, *UpdateUserSubscriptionRequest) (*UpdateUserSubscriptionResponse, error)
+	ListAllUsers(context.Context, *ListAllUsersRequest) (*ListAllUsersResponse, error)
+	ListUsersWithNotionKeys(context.Context, *ListUsersWithNotionKeysRequest) (*ListUsersWithNotionKeysResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -484,6 +624,12 @@ func (UnimplementedAuthServiceServer) GetUserByStripeCustomerId(context.Context,
 }
 func (UnimplementedAuthServiceServer) UpdateUserSubscription(context.Context, *UpdateUserSubscriptionRequest) (*UpdateUserSubscriptionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUserSubscription not implemented")
+}
+func (UnimplementedAuthServiceServer) ListAllUsers(context.Context, *ListAllUsersRequest) (*ListAllUsersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAllUsers not implemented")
+}
+func (UnimplementedAuthServiceServer) ListUsersWithNotionKeys(context.Context, *ListUsersWithNotionKeysRequest) (*ListUsersWithNotionKeysResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListUsersWithNotionKeys not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -596,6 +742,42 @@ func _AuthService_UpdateUserSubscription_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_ListAllUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAllUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListAllUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListAllUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListAllUsers(ctx, req.(*ListAllUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListUsersWithNotionKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUsersWithNotionKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListUsersWithNotionKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListUsersWithNotionKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListUsersWithNotionKeys(ctx, req.(*ListUsersWithNotionKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -622,6 +804,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateUserSubscription",
 			Handler:    _AuthService_UpdateUserSubscription_Handler,
+		},
+		{
+			MethodName: "ListAllUsers",
+			Handler:    _AuthService_ListAllUsers_Handler,
+		},
+		{
+			MethodName: "ListUsersWithNotionKeys",
+			Handler:    _AuthService_ListUsersWithNotionKeys_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -978,6 +1168,298 @@ var UserSettingsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateUserSettings",
 			Handler:    _UserSettingsService_UpdateUserSettings_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "proto/etu.proto",
+}
+
+const (
+	SyncService_GetSyncState_FullMethodName                = "/etu.SyncService/GetSyncState"
+	SyncService_UpdateSyncState_FullMethodName             = "/etu.SyncService/UpdateSyncState"
+	SyncService_UpsertNoteFromNotion_FullMethodName        = "/etu.SyncService/UpsertNoteFromNotion"
+	SyncService_GetNotesNeedingSyncToNotion_FullMethodName = "/etu.SyncService/GetNotesNeedingSyncToNotion"
+	SyncService_MarkNoteSyncedToNotion_FullMethodName      = "/etu.SyncService/MarkNoteSyncedToNotion"
+	SyncService_UpdateNoteSyncTime_FullMethodName          = "/etu.SyncService/UpdateNoteSyncTime"
+)
+
+// SyncServiceClient is the client API for SyncService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type SyncServiceClient interface {
+	GetSyncState(ctx context.Context, in *GetSyncStateRequest, opts ...grpc.CallOption) (*GetSyncStateResponse, error)
+	UpdateSyncState(ctx context.Context, in *UpdateSyncStateRequest, opts ...grpc.CallOption) (*UpdateSyncStateResponse, error)
+	UpsertNoteFromNotion(ctx context.Context, in *UpsertNoteFromNotionRequest, opts ...grpc.CallOption) (*UpsertNoteFromNotionResponse, error)
+	GetNotesNeedingSyncToNotion(ctx context.Context, in *GetNotesNeedingSyncToNotionRequest, opts ...grpc.CallOption) (*GetNotesNeedingSyncToNotionResponse, error)
+	MarkNoteSyncedToNotion(ctx context.Context, in *MarkNoteSyncedToNotionRequest, opts ...grpc.CallOption) (*MarkNoteSyncedToNotionResponse, error)
+	UpdateNoteSyncTime(ctx context.Context, in *UpdateNoteSyncTimeRequest, opts ...grpc.CallOption) (*UpdateNoteSyncTimeResponse, error)
+}
+
+type syncServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSyncServiceClient(cc grpc.ClientConnInterface) SyncServiceClient {
+	return &syncServiceClient{cc}
+}
+
+func (c *syncServiceClient) GetSyncState(ctx context.Context, in *GetSyncStateRequest, opts ...grpc.CallOption) (*GetSyncStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSyncStateResponse)
+	err := c.cc.Invoke(ctx, SyncService_GetSyncState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncServiceClient) UpdateSyncState(ctx context.Context, in *UpdateSyncStateRequest, opts ...grpc.CallOption) (*UpdateSyncStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSyncStateResponse)
+	err := c.cc.Invoke(ctx, SyncService_UpdateSyncState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncServiceClient) UpsertNoteFromNotion(ctx context.Context, in *UpsertNoteFromNotionRequest, opts ...grpc.CallOption) (*UpsertNoteFromNotionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpsertNoteFromNotionResponse)
+	err := c.cc.Invoke(ctx, SyncService_UpsertNoteFromNotion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncServiceClient) GetNotesNeedingSyncToNotion(ctx context.Context, in *GetNotesNeedingSyncToNotionRequest, opts ...grpc.CallOption) (*GetNotesNeedingSyncToNotionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetNotesNeedingSyncToNotionResponse)
+	err := c.cc.Invoke(ctx, SyncService_GetNotesNeedingSyncToNotion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncServiceClient) MarkNoteSyncedToNotion(ctx context.Context, in *MarkNoteSyncedToNotionRequest, opts ...grpc.CallOption) (*MarkNoteSyncedToNotionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkNoteSyncedToNotionResponse)
+	err := c.cc.Invoke(ctx, SyncService_MarkNoteSyncedToNotion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *syncServiceClient) UpdateNoteSyncTime(ctx context.Context, in *UpdateNoteSyncTimeRequest, opts ...grpc.CallOption) (*UpdateNoteSyncTimeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateNoteSyncTimeResponse)
+	err := c.cc.Invoke(ctx, SyncService_UpdateNoteSyncTime_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SyncServiceServer is the server API for SyncService service.
+// All implementations must embed UnimplementedSyncServiceServer
+// for forward compatibility.
+type SyncServiceServer interface {
+	GetSyncState(context.Context, *GetSyncStateRequest) (*GetSyncStateResponse, error)
+	UpdateSyncState(context.Context, *UpdateSyncStateRequest) (*UpdateSyncStateResponse, error)
+	UpsertNoteFromNotion(context.Context, *UpsertNoteFromNotionRequest) (*UpsertNoteFromNotionResponse, error)
+	GetNotesNeedingSyncToNotion(context.Context, *GetNotesNeedingSyncToNotionRequest) (*GetNotesNeedingSyncToNotionResponse, error)
+	MarkNoteSyncedToNotion(context.Context, *MarkNoteSyncedToNotionRequest) (*MarkNoteSyncedToNotionResponse, error)
+	UpdateNoteSyncTime(context.Context, *UpdateNoteSyncTimeRequest) (*UpdateNoteSyncTimeResponse, error)
+	mustEmbedUnimplementedSyncServiceServer()
+}
+
+// UnimplementedSyncServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSyncServiceServer struct{}
+
+func (UnimplementedSyncServiceServer) GetSyncState(context.Context, *GetSyncStateRequest) (*GetSyncStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSyncState not implemented")
+}
+func (UnimplementedSyncServiceServer) UpdateSyncState(context.Context, *UpdateSyncStateRequest) (*UpdateSyncStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateSyncState not implemented")
+}
+func (UnimplementedSyncServiceServer) UpsertNoteFromNotion(context.Context, *UpsertNoteFromNotionRequest) (*UpsertNoteFromNotionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpsertNoteFromNotion not implemented")
+}
+func (UnimplementedSyncServiceServer) GetNotesNeedingSyncToNotion(context.Context, *GetNotesNeedingSyncToNotionRequest) (*GetNotesNeedingSyncToNotionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetNotesNeedingSyncToNotion not implemented")
+}
+func (UnimplementedSyncServiceServer) MarkNoteSyncedToNotion(context.Context, *MarkNoteSyncedToNotionRequest) (*MarkNoteSyncedToNotionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkNoteSyncedToNotion not implemented")
+}
+func (UnimplementedSyncServiceServer) UpdateNoteSyncTime(context.Context, *UpdateNoteSyncTimeRequest) (*UpdateNoteSyncTimeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateNoteSyncTime not implemented")
+}
+func (UnimplementedSyncServiceServer) mustEmbedUnimplementedSyncServiceServer() {}
+func (UnimplementedSyncServiceServer) testEmbeddedByValue()                     {}
+
+// UnsafeSyncServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SyncServiceServer will
+// result in compilation errors.
+type UnsafeSyncServiceServer interface {
+	mustEmbedUnimplementedSyncServiceServer()
+}
+
+func RegisterSyncServiceServer(s grpc.ServiceRegistrar, srv SyncServiceServer) {
+	// If the following call panics, it indicates UnimplementedSyncServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&SyncService_ServiceDesc, srv)
+}
+
+func _SyncService_GetSyncState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSyncStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncServiceServer).GetSyncState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncService_GetSyncState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncServiceServer).GetSyncState(ctx, req.(*GetSyncStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncService_UpdateSyncState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSyncStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncServiceServer).UpdateSyncState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncService_UpdateSyncState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncServiceServer).UpdateSyncState(ctx, req.(*UpdateSyncStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncService_UpsertNoteFromNotion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpsertNoteFromNotionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncServiceServer).UpsertNoteFromNotion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncService_UpsertNoteFromNotion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncServiceServer).UpsertNoteFromNotion(ctx, req.(*UpsertNoteFromNotionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncService_GetNotesNeedingSyncToNotion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetNotesNeedingSyncToNotionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncServiceServer).GetNotesNeedingSyncToNotion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncService_GetNotesNeedingSyncToNotion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncServiceServer).GetNotesNeedingSyncToNotion(ctx, req.(*GetNotesNeedingSyncToNotionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncService_MarkNoteSyncedToNotion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkNoteSyncedToNotionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncServiceServer).MarkNoteSyncedToNotion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncService_MarkNoteSyncedToNotion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncServiceServer).MarkNoteSyncedToNotion(ctx, req.(*MarkNoteSyncedToNotionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SyncService_UpdateNoteSyncTime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateNoteSyncTimeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SyncServiceServer).UpdateNoteSyncTime(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SyncService_UpdateNoteSyncTime_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SyncServiceServer).UpdateNoteSyncTime(ctx, req.(*UpdateNoteSyncTimeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// SyncService_ServiceDesc is the grpc.ServiceDesc for SyncService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var SyncService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "etu.SyncService",
+	HandlerType: (*SyncServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetSyncState",
+			Handler:    _SyncService_GetSyncState_Handler,
+		},
+		{
+			MethodName: "UpdateSyncState",
+			Handler:    _SyncService_UpdateSyncState_Handler,
+		},
+		{
+			MethodName: "UpsertNoteFromNotion",
+			Handler:    _SyncService_UpsertNoteFromNotion_Handler,
+		},
+		{
+			MethodName: "GetNotesNeedingSyncToNotion",
+			Handler:    _SyncService_GetNotesNeedingSyncToNotion_Handler,
+		},
+		{
+			MethodName: "MarkNoteSyncedToNotion",
+			Handler:    _SyncService_MarkNoteSyncedToNotion_Handler,
+		},
+		{
+			MethodName: "UpdateNoteSyncTime",
+			Handler:    _SyncService_UpdateNoteSyncTime_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

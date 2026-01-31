@@ -164,6 +164,44 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	}, nil
 }
 
+// ListAllUsers returns all users (M2M auth required)
+func (s *AuthService) ListAllUsers(ctx context.Context, req *pb.ListAllUsersRequest) (*pb.ListAllUsersResponse, error) {
+	// This endpoint requires M2M auth - verified by interceptor
+
+	users, err := s.db.ListAllUsers(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list users: %v", err)
+	}
+
+	protoUsers := make([]*pb.User, len(users))
+	for i := range users {
+		protoUsers[i] = userToProto(&users[i])
+	}
+
+	return &pb.ListAllUsersResponse{
+		Users: protoUsers,
+	}, nil
+}
+
+// ListUsersWithNotionKeys returns users with Notion keys configured (M2M auth required)
+func (s *AuthService) ListUsersWithNotionKeys(ctx context.Context, req *pb.ListUsersWithNotionKeysRequest) (*pb.ListUsersWithNotionKeysResponse, error) {
+	// This endpoint requires M2M auth - verified by interceptor
+
+	users, err := s.db.GetUsersWithNotionKeys(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list users with Notion keys: %v", err)
+	}
+
+	protoUsers := make([]*pb.User, len(users))
+	for i := range users {
+		protoUsers[i] = userToProto(&users[i])
+	}
+
+	return &pb.ListUsersWithNotionKeysResponse{
+		Users: protoUsers,
+	}, nil
+}
+
 // userToProto converts a db.User to a protobuf User
 func userToProto(u *db.User) *pb.User {
 	pbUser := &pb.User{

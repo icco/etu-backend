@@ -17,6 +17,9 @@ message Note {
   repeated string tags = 3;
   Timestamp created_at = 4;
   Timestamp updated_at = 5;
+  optional string notion_uuid = 6;
+  optional string external_id = 7;  // Notion page ID
+  optional Timestamp last_synced_to_notion = 8;
 }
 
 // Tag message
@@ -116,6 +119,34 @@ message DeleteNoteResponse {
   bool success = 1;
 }
 
+message GetNotesWithFewTagsRequest {
+  string user_id = 1;
+  int32 max_tags = 2;  // Get notes with fewer than this many tags
+}
+
+message GetNotesWithFewTagsResponse {
+  repeated Note notes = 1;
+}
+
+message AddTagsToNoteRequest {
+  string user_id = 1;
+  string note_id = 2;
+  repeated string tags = 3;  // Tags to add (without removing existing)
+}
+
+message AddTagsToNoteResponse {
+  Note note = 1;
+}
+
+message GetNoteByNotionUUIDRequest {
+  string user_id = 1;
+  string notion_uuid = 2;
+}
+
+message GetNoteByNotionUUIDResponse {
+  optional Note note = 1;  // Optional because note may not exist
+}
+
 // Request/Response messages for Tags
 
 message ListTagsRequest {
@@ -172,6 +203,22 @@ message UpdateUserSubscriptionRequest {
 
 message UpdateUserSubscriptionResponse {
   User user = 1;
+}
+
+message ListAllUsersRequest {
+  // No parameters - returns all users (M2M auth required)
+}
+
+message ListAllUsersResponse {
+  repeated User users = 1;
+}
+
+message ListUsersWithNotionKeysRequest {
+  // No parameters - returns users with Notion keys (M2M auth required)
+}
+
+message ListUsersWithNotionKeysResponse {
+  repeated User users = 1;
 }
 
 // API Keys request/response messages
@@ -232,6 +279,66 @@ message UpdateUserSettingsResponse {
   UserSettings settings = 1;
 }
 
+// Sync request/response messages
+
+message GetSyncStateRequest {
+  string user_id = 1;
+}
+
+message GetSyncStateResponse {
+  optional Timestamp last_synced_at = 1;
+}
+
+message UpdateSyncStateRequest {
+  string user_id = 1;
+  Timestamp last_synced_at = 2;
+}
+
+message UpdateSyncStateResponse {
+  bool success = 1;
+}
+
+message UpsertNoteFromNotionRequest {
+  string user_id = 1;
+  string notion_uuid = 2;
+  string page_id = 3;
+  string content = 4;
+  repeated string tags = 5;
+  Timestamp created_at = 6;
+  Timestamp updated_at = 7;
+}
+
+message UpsertNoteFromNotionResponse {
+  Note note = 1;
+  bool is_new = 2;
+}
+
+message GetNotesNeedingSyncToNotionRequest {
+  string user_id = 1;
+}
+
+message GetNotesNeedingSyncToNotionResponse {
+  repeated Note notes = 1;
+}
+
+message MarkNoteSyncedToNotionRequest {
+  string note_id = 1;
+  string page_id = 2;
+  string notion_uuid = 3;
+}
+
+message MarkNoteSyncedToNotionResponse {
+  bool success = 1;
+}
+
+message UpdateNoteSyncTimeRequest {
+  string note_id = 1;
+}
+
+message UpdateNoteSyncTimeResponse {
+  bool success = 1;
+}
+
 // Service definitions
 
 service NotesService {
@@ -240,6 +347,9 @@ service NotesService {
   rpc GetNote(GetNoteRequest) returns (GetNoteResponse);
   rpc UpdateNote(UpdateNoteRequest) returns (UpdateNoteResponse);
   rpc DeleteNote(DeleteNoteRequest) returns (DeleteNoteResponse);
+  rpc GetNotesWithFewTags(GetNotesWithFewTagsRequest) returns (GetNotesWithFewTagsResponse);
+  rpc AddTagsToNote(AddTagsToNoteRequest) returns (AddTagsToNoteResponse);
+  rpc GetNoteByNotionUUID(GetNoteByNotionUUIDRequest) returns (GetNoteByNotionUUIDResponse);
 }
 
 service TagsService {
@@ -252,6 +362,8 @@ service AuthService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
   rpc GetUserByStripeCustomerId(GetUserByStripeCustomerIdRequest) returns (GetUserByStripeCustomerIdResponse);
   rpc UpdateUserSubscription(UpdateUserSubscriptionRequest) returns (UpdateUserSubscriptionResponse);
+  rpc ListAllUsers(ListAllUsersRequest) returns (ListAllUsersResponse);
+  rpc ListUsersWithNotionKeys(ListUsersWithNotionKeysRequest) returns (ListUsersWithNotionKeysResponse);
 }
 
 service ApiKeysService {
@@ -264,4 +376,13 @@ service ApiKeysService {
 service UserSettingsService {
   rpc GetUserSettings(GetUserSettingsRequest) returns (GetUserSettingsResponse);
   rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (UpdateUserSettingsResponse);
+}
+
+service SyncService {
+  rpc GetSyncState(GetSyncStateRequest) returns (GetSyncStateResponse);
+  rpc UpdateSyncState(UpdateSyncStateRequest) returns (UpdateSyncStateResponse);
+  rpc UpsertNoteFromNotion(UpsertNoteFromNotionRequest) returns (UpsertNoteFromNotionResponse);
+  rpc GetNotesNeedingSyncToNotion(GetNotesNeedingSyncToNotionRequest) returns (GetNotesNeedingSyncToNotionResponse);
+  rpc MarkNoteSyncedToNotion(MarkNoteSyncedToNotionRequest) returns (MarkNoteSyncedToNotionResponse);
+  rpc UpdateNoteSyncTime(UpdateNoteSyncTimeRequest) returns (UpdateNoteSyncTimeResponse);
 }
