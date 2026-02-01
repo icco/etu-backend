@@ -854,3 +854,51 @@ func (db *DB) ListAllUsers(ctx context.Context) ([]User, error) {
 	}
 	return users, nil
 }
+
+// GetRandomNotes retrieves a random set of notes for a user
+func (db *DB) GetRandomNotes(ctx context.Context, userID string, count int) ([]Note, error) {
+	if count <= 0 {
+		count = 5 // Default to 5 notes
+	}
+
+	var notes []Note
+	// Use ORDER BY RANDOM() to get random notes from PostgreSQL
+	err := db.conn.WithContext(ctx).
+		Where(`"userId" = ?`, userID).
+		Order("RANDOM()").
+		Limit(count).
+		Find(&notes).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to query random notes: %w", err)
+	}
+
+	if len(notes) == 0 {
+		return notes, nil
+	}
+
+	// Collect note IDs for batch fetching
+	noteIDs := make([]string, len(notes))
+	for i, n := range notes {
+		noteIDs[i] = n.ID
+	}
+
+	// Batch fetch tags for all notes
+	tagsByNoteID, err := db.getTagsForNotes(ctx, noteIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to batch fetch tags: %w", err)
+	}
+
+	// Batch fetch images for all notes
+	imagesByNoteID, err := db.getImagesForNotes(ctx, noteIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to batch fetch images: %w", err)
+	}
+
+	// Assign tags and images to notes
+	for i := range notes {
+		notes[i].Tags = tagsByNoteID[notes[i].ID]
+		notes[i].Images = imagesByNoteID[notes[i].ID]
+	}
+
+	return notes, nil
+}
