@@ -37,14 +37,16 @@ type NotesService struct {
 	db           *db.DB
 	storage      *storage.Client
 	geminiAPIKey string
+	imgixDomain  string
 }
 
 // NewNotesService creates a new NotesService
-func NewNotesService(database *db.DB, storageClient *storage.Client, geminiAPIKey string) *NotesService {
+func NewNotesService(database *db.DB, storageClient *storage.Client, geminiAPIKey, imgixDomain string) *NotesService {
 	return &NotesService{
 		db:           database,
 		storage:      storageClient,
 		geminiAPIKey: geminiAPIKey,
+		imgixDomain:  imgixDomain,
 	}
 }
 
@@ -79,7 +81,7 @@ func (s *NotesService) ListNotes(ctx context.Context, req *pb.ListNotesRequest) 
 
 	pbNotes := make([]*pb.Note, len(notes))
 	for i, n := range notes {
-		pbNotes[i] = noteToProto(&n)
+		pbNotes[i] = s.noteToProto(&n)
 	}
 
 	return &pb.ListNotesResponse{
@@ -139,7 +141,7 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 	}
 
 	return &pb.CreateNoteResponse{
-		Note: noteToProto(note),
+		Note: s.noteToProto(note),
 	}, nil
 }
 
@@ -222,7 +224,7 @@ func (s *NotesService) GetNote(ctx context.Context, req *pb.GetNoteRequest) (*pb
 	}
 
 	return &pb.GetNoteResponse{
-		Note: noteToProto(note),
+		Note: s.noteToProto(note),
 	}, nil
 }
 
@@ -281,7 +283,7 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 	}
 
 	return &pb.UpdateNoteResponse{
-		Note: noteToProto(note),
+		Note: s.noteToProto(note),
 	}, nil
 }
 
@@ -324,8 +326,18 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 	}, nil
 }
 
+// getImageURL returns the appropriate URL for an image.
+// If imgix is configured, it returns an imgix URL using the GCS object name.
+// Otherwise, it returns the original GCS signed URL.
+func (s *NotesService) getImageURL(img *models.NoteImage) string {
+	if s.imgixDomain != "" && img.GCSObjectName != "" {
+		return fmt.Sprintf("https://%s/%s", s.imgixDomain, img.GCSObjectName)
+	}
+	return img.URL
+}
+
 // noteToProto converts a db.Note to a protobuf Note
-func noteToProto(n *db.Note) *pb.Note {
+func (s *NotesService) noteToProto(n *db.Note) *pb.Note {
 	// Convert []Tag to []string
 	tagNames := make([]string, len(n.Tags))
 	for i, t := range n.Tags {
@@ -337,7 +349,7 @@ func noteToProto(n *db.Note) *pb.Note {
 	for i, img := range n.Images {
 		pbImages[i] = &pb.NoteImage{
 			Id:            img.ID,
-			Url:           img.URL,
+			Url:           s.getImageURL(&img),
 			ExtractedText: img.ExtractedText,
 			MimeType:      img.MimeType,
 			CreatedAt:     timestamppb.New(img.CreatedAt),

@@ -24,6 +24,31 @@ func newMockNotesService() *mockNotesService {
 	}
 }
 
+// mockNoteToProto converts a db.Note to a protobuf Note for testing
+func mockNoteToProto(n *db.Note) *pb.Note {
+	tagNames := make([]string, len(n.Tags))
+	for i, t := range n.Tags {
+		tagNames[i] = t.Name
+	}
+
+	pbImages := make([]*pb.NoteImage, len(n.Images))
+	for i, img := range n.Images {
+		pbImages[i] = &pb.NoteImage{
+			Id:            img.ID,
+			Url:           img.URL,
+			ExtractedText: img.ExtractedText,
+			MimeType:      img.MimeType,
+		}
+	}
+
+	return &pb.Note{
+		Id:      n.ID,
+		Content: n.Content,
+		Tags:    tagNames,
+		Images:  pbImages,
+	}
+}
+
 func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest) (*pb.CreateNoteResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
@@ -55,7 +80,7 @@ func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteReq
 	s.notes[note.ID] = note
 
 	return &pb.CreateNoteResponse{
-		Note: noteToProto(note),
+		Note: mockNoteToProto(note),
 	}, nil
 }
 
@@ -73,7 +98,7 @@ func (s *mockNotesService) GetNote(ctx context.Context, req *pb.GetNoteRequest) 
 	}
 
 	return &pb.GetNoteResponse{
-		Note: noteToProto(note),
+		Note: mockNoteToProto(note),
 	}, nil
 }
 
@@ -85,7 +110,7 @@ func (s *mockNotesService) ListNotes(ctx context.Context, req *pb.ListNotesReque
 	var notes []*pb.Note
 	for _, n := range s.notes {
 		if n.UserID == req.UserId {
-			notes = append(notes, noteToProto(n))
+			notes = append(notes, mockNoteToProto(n))
 		}
 	}
 

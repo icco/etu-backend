@@ -99,13 +99,21 @@ func main() {
 		log.Println("GEMINI_API_KEY not set - image OCR will be disabled")
 	}
 
+	// Get imgix domain for image URLs (optional)
+	imgixDomain := os.Getenv("IMGIX_DOMAIN")
+	if imgixDomain != "" {
+		log.Printf("Imgix configured with domain: %s", imgixDomain)
+	} else {
+		log.Println("IMGIX_DOMAIN not set - using GCS signed URLs for images")
+	}
+
 	// Create gRPC server with authentication interceptor
 	server := grpc.NewServer(
 		grpc.UnaryInterceptor(authInterceptor(authenticator)),
 	)
 
 	// Register services
-	notesService := service.NewNotesService(database, storageClient, geminiAPIKey)
+	notesService := service.NewNotesService(database, storageClient, geminiAPIKey, imgixDomain)
 	tagsService := service.NewTagsService(database)
 	authService := service.NewAuthService(database)
 	apiKeysService := service.NewApiKeysService(database)
