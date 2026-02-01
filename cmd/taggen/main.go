@@ -30,11 +30,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	intervalStr := "once"
+	if *interval > 0 {
+		intervalStr = interval.String()
+	}
+
 	log.Info("starting Gemini tag generation job",
 		"dry_run", *dryRun,
 		"delay", delay.String(),
 		"continuous", *interval > 0,
-		"interval", interval.String())
+		"interval", intervalStr)
 
 	// Initialize database
 	database, err := db.New()

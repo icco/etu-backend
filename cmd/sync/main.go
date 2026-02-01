@@ -35,11 +35,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	intervalStr := "once"
+	if *interval > 0 {
+		intervalStr = interval.String()
+	}
+
 	log.Info("starting Notion sync job", 
 		"direction", *direction,
 		"full_sync", *fullSync,
 		"continuous", *interval > 0,
-		"interval", interval.String())
+		"interval", intervalStr)
 
 	// Initialize database with GORM
 	database, err := syncdb.New()
