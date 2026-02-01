@@ -119,7 +119,9 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 				log.Printf("Failed to save image %d for note %s: %v", i, note.ID, err)
 				// Try to clean up the uploaded image
 				if s.storage != nil {
-					_ = s.storage.DeleteImage(ctx, noteImage.GCSObjectName)
+					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
+						log.Printf("Failed to clean up image %s from GCS after DB error: %v", noteImage.GCSObjectName, deleteErr)
+					}
 				}
 				continue
 			}
@@ -257,7 +259,9 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
 				log.Printf("Failed to save image %d for note %s: %v", i, note.ID, err)
 				if s.storage != nil {
-					_ = s.storage.DeleteImage(ctx, noteImage.GCSObjectName)
+					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
+						log.Printf("Failed to clean up image %s from GCS after DB error: %v", noteImage.GCSObjectName, deleteErr)
+					}
 				}
 				continue
 			}

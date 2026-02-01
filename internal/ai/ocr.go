@@ -20,10 +20,9 @@ func ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string
 		return "", fmt.Errorf("image data is empty")
 	}
 
-	// Basic validation - must be an image type. Let Gemini return specific errors
-	// for unsupported image formats rather than maintaining our own allowlist.
-	if !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
-		return "", fmt.Errorf("not an image MIME type: %s", mimeType)
+	// Validate mime type
+	if !isValidImageMimeType(mimeType) {
+		return "", fmt.Errorf("unsupported image MIME type: %s", mimeType)
 	}
 
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
@@ -72,4 +71,18 @@ func ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string
 	}
 
 	return strings.TrimSpace(extractedText.String()), nil
+}
+
+// isValidImageMimeType checks if the MIME type is a supported image format.
+func isValidImageMimeType(mimeType string) bool {
+	supportedTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/jpg":  true,
+		"image/png":  true,
+		"image/gif":  true,
+		"image/webp": true,
+		"image/heic": true,
+		"image/heif": true,
+	}
+	return supportedTypes[strings.ToLower(mimeType)]
 }
