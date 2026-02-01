@@ -44,13 +44,13 @@ func (NoteImage) TableName() string {
 
 // NoteAudio represents an audio file attached to a note
 type NoteAudio struct {
-	ID             string    `gorm:"column:id;primaryKey"`
-	NoteID         string    `gorm:"column:noteId;index;not null"`
-	URL            string    `gorm:"column:url;not null"`
-	GCSObjectName  string    `gorm:"column:gcsObjectName;not null"` // Object name in GCS for deletion
-	TranscribedText string   `gorm:"column:transcribedText;type:text"`
-	MimeType       string    `gorm:"column:mimeType"`
-	CreatedAt      time.Time `gorm:"column:createdAt"`
+	ID              string    `gorm:"column:id;primaryKey"`
+	NoteID          string    `gorm:"column:noteId;index;not null"`
+	URL             string    `gorm:"column:url;not null"`
+	GCSObjectName   string    `gorm:"column:gcsObjectName;not null"` // Object name in GCS for deletion
+	TranscribedText string    `gorm:"column:transcribedText;type:text"`
+	MimeType        string    `gorm:"column:mimeType"`
+	CreatedAt       time.Time `gorm:"column:createdAt"`
 }
 
 // TableName specifies the table name for NoteAudio
