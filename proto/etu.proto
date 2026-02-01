@@ -10,7 +10,13 @@ message Timestamp {
   int32 nanos = 2;
 }
 
-// NoteImage message for images attached to notes
+// ImageUpload message for uploading images (client -> server)
+message ImageUpload {
+  bytes data = 1;
+  string mime_type = 2;
+}
+
+// NoteImage message for images attached to notes (server -> client)
 message NoteImage {
   string id = 1;
   string url = 2;
@@ -84,8 +90,7 @@ message CreateNoteRequest {
   string user_id = 1;      // Required for auth context
   string content = 2;
   repeated string tags = 3;
-  repeated bytes images = 4;              // Raw image bytes
-  repeated string image_mime_types = 5;   // MIME types for each image (must match images length)
+  repeated ImageUpload images = 4;
 }
 
 message CreateNoteResponse {
@@ -107,9 +112,8 @@ message UpdateNoteRequest {
   optional string content = 3;
   repeated string tags = 4;
   bool update_tags = 5;    // Flag to indicate if tags should be updated
-  repeated bytes add_images = 6;              // New images to add (raw bytes)
-  repeated string add_image_mime_types = 7;   // MIME types for new images
-  repeated string remove_image_ids = 8;       // IDs of images to remove
+  repeated ImageUpload add_images = 6;
+  repeated string remove_image_ids = 7;
 }
 
 message UpdateNoteResponse {

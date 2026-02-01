@@ -74,7 +74,60 @@ func (x *Timestamp) GetNanos() int32 {
 	return 0
 }
 
-// NoteImage message for images attached to notes
+// ImageUpload message for uploading images (client -> server)
+type ImageUpload struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	MimeType      string                 `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImageUpload) Reset() {
+	*x = ImageUpload{}
+	mi := &file_proto_etu_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImageUpload) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImageUpload) ProtoMessage() {}
+
+func (x *ImageUpload) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImageUpload.ProtoReflect.Descriptor instead.
+func (*ImageUpload) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ImageUpload) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ImageUpload) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
+// NoteImage message for images attached to notes (server -> client)
 type NoteImage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -88,7 +141,7 @@ type NoteImage struct {
 
 func (x *NoteImage) Reset() {
 	*x = NoteImage{}
-	mi := &file_proto_etu_proto_msgTypes[1]
+	mi := &file_proto_etu_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -100,7 +153,7 @@ func (x *NoteImage) String() string {
 func (*NoteImage) ProtoMessage() {}
 
 func (x *NoteImage) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[1]
+	mi := &file_proto_etu_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -113,7 +166,7 @@ func (x *NoteImage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NoteImage.ProtoReflect.Descriptor instead.
 func (*NoteImage) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{1}
+	return file_proto_etu_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *NoteImage) GetId() string {
@@ -166,7 +219,7 @@ type Note struct {
 
 func (x *Note) Reset() {
 	*x = Note{}
-	mi := &file_proto_etu_proto_msgTypes[2]
+	mi := &file_proto_etu_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -178,7 +231,7 @@ func (x *Note) String() string {
 func (*Note) ProtoMessage() {}
 
 func (x *Note) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[2]
+	mi := &file_proto_etu_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -191,7 +244,7 @@ func (x *Note) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Note.ProtoReflect.Descriptor instead.
 func (*Note) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{2}
+	return file_proto_etu_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Note) GetId() string {
@@ -249,7 +302,7 @@ type Tag struct {
 
 func (x *Tag) Reset() {
 	*x = Tag{}
-	mi := &file_proto_etu_proto_msgTypes[3]
+	mi := &file_proto_etu_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -261,7 +314,7 @@ func (x *Tag) String() string {
 func (*Tag) ProtoMessage() {}
 
 func (x *Tag) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[3]
+	mi := &file_proto_etu_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -274,7 +327,7 @@ func (x *Tag) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tag.ProtoReflect.Descriptor instead.
 func (*Tag) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{3}
+	return file_proto_etu_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Tag) GetId() string {
@@ -324,7 +377,7 @@ type User struct {
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_proto_etu_proto_msgTypes[4]
+	mi := &file_proto_etu_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -336,7 +389,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[4]
+	mi := &file_proto_etu_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -349,7 +402,7 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{4}
+	return file_proto_etu_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *User) GetId() string {
@@ -436,7 +489,7 @@ type ApiKey struct {
 
 func (x *ApiKey) Reset() {
 	*x = ApiKey{}
-	mi := &file_proto_etu_proto_msgTypes[5]
+	mi := &file_proto_etu_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -448,7 +501,7 @@ func (x *ApiKey) String() string {
 func (*ApiKey) ProtoMessage() {}
 
 func (x *ApiKey) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[5]
+	mi := &file_proto_etu_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -461,7 +514,7 @@ func (x *ApiKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApiKey.ProtoReflect.Descriptor instead.
 func (*ApiKey) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{5}
+	return file_proto_etu_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ApiKey) GetId() string {
@@ -514,7 +567,7 @@ type ListNotesRequest struct {
 
 func (x *ListNotesRequest) Reset() {
 	*x = ListNotesRequest{}
-	mi := &file_proto_etu_proto_msgTypes[6]
+	mi := &file_proto_etu_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -526,7 +579,7 @@ func (x *ListNotesRequest) String() string {
 func (*ListNotesRequest) ProtoMessage() {}
 
 func (x *ListNotesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[6]
+	mi := &file_proto_etu_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -539,7 +592,7 @@ func (x *ListNotesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListNotesRequest.ProtoReflect.Descriptor instead.
 func (*ListNotesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{6}
+	return file_proto_etu_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListNotesRequest) GetUserId() string {
@@ -603,7 +656,7 @@ type ListNotesResponse struct {
 
 func (x *ListNotesResponse) Reset() {
 	*x = ListNotesResponse{}
-	mi := &file_proto_etu_proto_msgTypes[7]
+	mi := &file_proto_etu_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -615,7 +668,7 @@ func (x *ListNotesResponse) String() string {
 func (*ListNotesResponse) ProtoMessage() {}
 
 func (x *ListNotesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[7]
+	mi := &file_proto_etu_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -628,7 +681,7 @@ func (x *ListNotesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListNotesResponse.ProtoReflect.Descriptor instead.
 func (*ListNotesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{7}
+	return file_proto_etu_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListNotesResponse) GetNotes() []*Note {
@@ -660,19 +713,18 @@ func (x *ListNotesResponse) GetOffset() int32 {
 }
 
 type CreateNoteRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Required for auth context
-	Content        string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
-	Tags           []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"`
-	Images         [][]byte               `protobuf:"bytes,4,rep,name=images,proto3" json:"images,omitempty"`                                         // Raw image bytes
-	ImageMimeTypes []string               `protobuf:"bytes,5,rep,name=image_mime_types,json=imageMimeTypes,proto3" json:"image_mime_types,omitempty"` // MIME types for each image (must match images length)
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Required for auth context
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	Tags          []string               `protobuf:"bytes,3,rep,name=tags,proto3" json:"tags,omitempty"`
+	Images        []*ImageUpload         `protobuf:"bytes,4,rep,name=images,proto3" json:"images,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateNoteRequest) Reset() {
 	*x = CreateNoteRequest{}
-	mi := &file_proto_etu_proto_msgTypes[8]
+	mi := &file_proto_etu_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -684,7 +736,7 @@ func (x *CreateNoteRequest) String() string {
 func (*CreateNoteRequest) ProtoMessage() {}
 
 func (x *CreateNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[8]
+	mi := &file_proto_etu_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -697,7 +749,7 @@ func (x *CreateNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNoteRequest.ProtoReflect.Descriptor instead.
 func (*CreateNoteRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{8}
+	return file_proto_etu_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CreateNoteRequest) GetUserId() string {
@@ -721,16 +773,9 @@ func (x *CreateNoteRequest) GetTags() []string {
 	return nil
 }
 
-func (x *CreateNoteRequest) GetImages() [][]byte {
+func (x *CreateNoteRequest) GetImages() []*ImageUpload {
 	if x != nil {
 		return x.Images
-	}
-	return nil
-}
-
-func (x *CreateNoteRequest) GetImageMimeTypes() []string {
-	if x != nil {
-		return x.ImageMimeTypes
 	}
 	return nil
 }
@@ -744,7 +789,7 @@ type CreateNoteResponse struct {
 
 func (x *CreateNoteResponse) Reset() {
 	*x = CreateNoteResponse{}
-	mi := &file_proto_etu_proto_msgTypes[9]
+	mi := &file_proto_etu_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -756,7 +801,7 @@ func (x *CreateNoteResponse) String() string {
 func (*CreateNoteResponse) ProtoMessage() {}
 
 func (x *CreateNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[9]
+	mi := &file_proto_etu_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -769,7 +814,7 @@ func (x *CreateNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateNoteResponse.ProtoReflect.Descriptor instead.
 func (*CreateNoteResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{9}
+	return file_proto_etu_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateNoteResponse) GetNote() *Note {
@@ -789,7 +834,7 @@ type GetNoteRequest struct {
 
 func (x *GetNoteRequest) Reset() {
 	*x = GetNoteRequest{}
-	mi := &file_proto_etu_proto_msgTypes[10]
+	mi := &file_proto_etu_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -801,7 +846,7 @@ func (x *GetNoteRequest) String() string {
 func (*GetNoteRequest) ProtoMessage() {}
 
 func (x *GetNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[10]
+	mi := &file_proto_etu_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -814,7 +859,7 @@ func (x *GetNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNoteRequest.ProtoReflect.Descriptor instead.
 func (*GetNoteRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{10}
+	return file_proto_etu_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetNoteRequest) GetUserId() string {
@@ -840,7 +885,7 @@ type GetNoteResponse struct {
 
 func (x *GetNoteResponse) Reset() {
 	*x = GetNoteResponse{}
-	mi := &file_proto_etu_proto_msgTypes[11]
+	mi := &file_proto_etu_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -852,7 +897,7 @@ func (x *GetNoteResponse) String() string {
 func (*GetNoteResponse) ProtoMessage() {}
 
 func (x *GetNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[11]
+	mi := &file_proto_etu_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -865,7 +910,7 @@ func (x *GetNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNoteResponse.ProtoReflect.Descriptor instead.
 func (*GetNoteResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{11}
+	return file_proto_etu_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetNoteResponse) GetNote() *Note {
@@ -876,22 +921,21 @@ func (x *GetNoteResponse) GetNote() *Note {
 }
 
 type UpdateNoteRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	UserId            string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Required for auth context
-	Id                string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
-	Content           *string                `protobuf:"bytes,3,opt,name=content,proto3,oneof" json:"content,omitempty"`
-	Tags              []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
-	UpdateTags        bool                   `protobuf:"varint,5,opt,name=update_tags,json=updateTags,proto3" json:"update_tags,omitempty"`                         // Flag to indicate if tags should be updated
-	AddImages         [][]byte               `protobuf:"bytes,6,rep,name=add_images,json=addImages,proto3" json:"add_images,omitempty"`                             // New images to add (raw bytes)
-	AddImageMimeTypes []string               `protobuf:"bytes,7,rep,name=add_image_mime_types,json=addImageMimeTypes,proto3" json:"add_image_mime_types,omitempty"` // MIME types for new images
-	RemoveImageIds    []string               `protobuf:"bytes,8,rep,name=remove_image_ids,json=removeImageIds,proto3" json:"remove_image_ids,omitempty"`            // IDs of images to remove
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Required for auth context
+	Id             string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	Content        *string                `protobuf:"bytes,3,opt,name=content,proto3,oneof" json:"content,omitempty"`
+	Tags           []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
+	UpdateTags     bool                   `protobuf:"varint,5,opt,name=update_tags,json=updateTags,proto3" json:"update_tags,omitempty"` // Flag to indicate if tags should be updated
+	AddImages      []*ImageUpload         `protobuf:"bytes,6,rep,name=add_images,json=addImages,proto3" json:"add_images,omitempty"`
+	RemoveImageIds []string               `protobuf:"bytes,7,rep,name=remove_image_ids,json=removeImageIds,proto3" json:"remove_image_ids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateNoteRequest) Reset() {
 	*x = UpdateNoteRequest{}
-	mi := &file_proto_etu_proto_msgTypes[12]
+	mi := &file_proto_etu_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -903,7 +947,7 @@ func (x *UpdateNoteRequest) String() string {
 func (*UpdateNoteRequest) ProtoMessage() {}
 
 func (x *UpdateNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[12]
+	mi := &file_proto_etu_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -916,7 +960,7 @@ func (x *UpdateNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateNoteRequest.ProtoReflect.Descriptor instead.
 func (*UpdateNoteRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{12}
+	return file_proto_etu_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UpdateNoteRequest) GetUserId() string {
@@ -954,16 +998,9 @@ func (x *UpdateNoteRequest) GetUpdateTags() bool {
 	return false
 }
 
-func (x *UpdateNoteRequest) GetAddImages() [][]byte {
+func (x *UpdateNoteRequest) GetAddImages() []*ImageUpload {
 	if x != nil {
 		return x.AddImages
-	}
-	return nil
-}
-
-func (x *UpdateNoteRequest) GetAddImageMimeTypes() []string {
-	if x != nil {
-		return x.AddImageMimeTypes
 	}
 	return nil
 }
@@ -984,7 +1021,7 @@ type UpdateNoteResponse struct {
 
 func (x *UpdateNoteResponse) Reset() {
 	*x = UpdateNoteResponse{}
-	mi := &file_proto_etu_proto_msgTypes[13]
+	mi := &file_proto_etu_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -996,7 +1033,7 @@ func (x *UpdateNoteResponse) String() string {
 func (*UpdateNoteResponse) ProtoMessage() {}
 
 func (x *UpdateNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[13]
+	mi := &file_proto_etu_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1009,7 +1046,7 @@ func (x *UpdateNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateNoteResponse.ProtoReflect.Descriptor instead.
 func (*UpdateNoteResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{13}
+	return file_proto_etu_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UpdateNoteResponse) GetNote() *Note {
@@ -1029,7 +1066,7 @@ type DeleteNoteRequest struct {
 
 func (x *DeleteNoteRequest) Reset() {
 	*x = DeleteNoteRequest{}
-	mi := &file_proto_etu_proto_msgTypes[14]
+	mi := &file_proto_etu_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1041,7 +1078,7 @@ func (x *DeleteNoteRequest) String() string {
 func (*DeleteNoteRequest) ProtoMessage() {}
 
 func (x *DeleteNoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[14]
+	mi := &file_proto_etu_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1054,7 +1091,7 @@ func (x *DeleteNoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteNoteRequest.ProtoReflect.Descriptor instead.
 func (*DeleteNoteRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{14}
+	return file_proto_etu_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *DeleteNoteRequest) GetUserId() string {
@@ -1080,7 +1117,7 @@ type DeleteNoteResponse struct {
 
 func (x *DeleteNoteResponse) Reset() {
 	*x = DeleteNoteResponse{}
-	mi := &file_proto_etu_proto_msgTypes[15]
+	mi := &file_proto_etu_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1092,7 +1129,7 @@ func (x *DeleteNoteResponse) String() string {
 func (*DeleteNoteResponse) ProtoMessage() {}
 
 func (x *DeleteNoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[15]
+	mi := &file_proto_etu_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1105,7 +1142,7 @@ func (x *DeleteNoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteNoteResponse.ProtoReflect.Descriptor instead.
 func (*DeleteNoteResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{15}
+	return file_proto_etu_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DeleteNoteResponse) GetSuccess() bool {
@@ -1124,7 +1161,7 @@ type ListTagsRequest struct {
 
 func (x *ListTagsRequest) Reset() {
 	*x = ListTagsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[16]
+	mi := &file_proto_etu_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1136,7 +1173,7 @@ func (x *ListTagsRequest) String() string {
 func (*ListTagsRequest) ProtoMessage() {}
 
 func (x *ListTagsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[16]
+	mi := &file_proto_etu_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1149,7 +1186,7 @@ func (x *ListTagsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTagsRequest.ProtoReflect.Descriptor instead.
 func (*ListTagsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{16}
+	return file_proto_etu_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListTagsRequest) GetUserId() string {
@@ -1168,7 +1205,7 @@ type ListTagsResponse struct {
 
 func (x *ListTagsResponse) Reset() {
 	*x = ListTagsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[17]
+	mi := &file_proto_etu_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1180,7 +1217,7 @@ func (x *ListTagsResponse) String() string {
 func (*ListTagsResponse) ProtoMessage() {}
 
 func (x *ListTagsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[17]
+	mi := &file_proto_etu_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1193,7 +1230,7 @@ func (x *ListTagsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTagsResponse.ProtoReflect.Descriptor instead.
 func (*ListTagsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{17}
+	return file_proto_etu_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListTagsResponse) GetTags() []*Tag {
@@ -1213,7 +1250,7 @@ type RegisterRequest struct {
 
 func (x *RegisterRequest) Reset() {
 	*x = RegisterRequest{}
-	mi := &file_proto_etu_proto_msgTypes[18]
+	mi := &file_proto_etu_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1225,7 +1262,7 @@ func (x *RegisterRequest) String() string {
 func (*RegisterRequest) ProtoMessage() {}
 
 func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[18]
+	mi := &file_proto_etu_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1238,7 +1275,7 @@ func (x *RegisterRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterRequest.ProtoReflect.Descriptor instead.
 func (*RegisterRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{18}
+	return file_proto_etu_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RegisterRequest) GetEmail() string {
@@ -1264,7 +1301,7 @@ type RegisterResponse struct {
 
 func (x *RegisterResponse) Reset() {
 	*x = RegisterResponse{}
-	mi := &file_proto_etu_proto_msgTypes[19]
+	mi := &file_proto_etu_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1276,7 +1313,7 @@ func (x *RegisterResponse) String() string {
 func (*RegisterResponse) ProtoMessage() {}
 
 func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[19]
+	mi := &file_proto_etu_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1289,7 +1326,7 @@ func (x *RegisterResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterResponse.ProtoReflect.Descriptor instead.
 func (*RegisterResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{19}
+	return file_proto_etu_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RegisterResponse) GetUser() *User {
@@ -1309,7 +1346,7 @@ type AuthenticateRequest struct {
 
 func (x *AuthenticateRequest) Reset() {
 	*x = AuthenticateRequest{}
-	mi := &file_proto_etu_proto_msgTypes[20]
+	mi := &file_proto_etu_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1321,7 +1358,7 @@ func (x *AuthenticateRequest) String() string {
 func (*AuthenticateRequest) ProtoMessage() {}
 
 func (x *AuthenticateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[20]
+	mi := &file_proto_etu_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1334,7 +1371,7 @@ func (x *AuthenticateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthenticateRequest.ProtoReflect.Descriptor instead.
 func (*AuthenticateRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{20}
+	return file_proto_etu_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *AuthenticateRequest) GetEmail() string {
@@ -1361,7 +1398,7 @@ type AuthenticateResponse struct {
 
 func (x *AuthenticateResponse) Reset() {
 	*x = AuthenticateResponse{}
-	mi := &file_proto_etu_proto_msgTypes[21]
+	mi := &file_proto_etu_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1373,7 +1410,7 @@ func (x *AuthenticateResponse) String() string {
 func (*AuthenticateResponse) ProtoMessage() {}
 
 func (x *AuthenticateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[21]
+	mi := &file_proto_etu_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1386,7 +1423,7 @@ func (x *AuthenticateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthenticateResponse.ProtoReflect.Descriptor instead.
 func (*AuthenticateResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{21}
+	return file_proto_etu_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *AuthenticateResponse) GetSuccess() bool {
@@ -1412,7 +1449,7 @@ type GetUserRequest struct {
 
 func (x *GetUserRequest) Reset() {
 	*x = GetUserRequest{}
-	mi := &file_proto_etu_proto_msgTypes[22]
+	mi := &file_proto_etu_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1424,7 +1461,7 @@ func (x *GetUserRequest) String() string {
 func (*GetUserRequest) ProtoMessage() {}
 
 func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[22]
+	mi := &file_proto_etu_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1437,7 +1474,7 @@ func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
 func (*GetUserRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{22}
+	return file_proto_etu_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetUserRequest) GetUserId() string {
@@ -1456,7 +1493,7 @@ type GetUserResponse struct {
 
 func (x *GetUserResponse) Reset() {
 	*x = GetUserResponse{}
-	mi := &file_proto_etu_proto_msgTypes[23]
+	mi := &file_proto_etu_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1468,7 +1505,7 @@ func (x *GetUserResponse) String() string {
 func (*GetUserResponse) ProtoMessage() {}
 
 func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[23]
+	mi := &file_proto_etu_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1481,7 +1518,7 @@ func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserResponse.ProtoReflect.Descriptor instead.
 func (*GetUserResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{23}
+	return file_proto_etu_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetUserResponse) GetUser() *User {
@@ -1500,7 +1537,7 @@ type GetUserByStripeCustomerIdRequest struct {
 
 func (x *GetUserByStripeCustomerIdRequest) Reset() {
 	*x = GetUserByStripeCustomerIdRequest{}
-	mi := &file_proto_etu_proto_msgTypes[24]
+	mi := &file_proto_etu_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1512,7 +1549,7 @@ func (x *GetUserByStripeCustomerIdRequest) String() string {
 func (*GetUserByStripeCustomerIdRequest) ProtoMessage() {}
 
 func (x *GetUserByStripeCustomerIdRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[24]
+	mi := &file_proto_etu_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1525,7 +1562,7 @@ func (x *GetUserByStripeCustomerIdRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserByStripeCustomerIdRequest.ProtoReflect.Descriptor instead.
 func (*GetUserByStripeCustomerIdRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{24}
+	return file_proto_etu_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetUserByStripeCustomerIdRequest) GetStripeCustomerId() string {
@@ -1544,7 +1581,7 @@ type GetUserByStripeCustomerIdResponse struct {
 
 func (x *GetUserByStripeCustomerIdResponse) Reset() {
 	*x = GetUserByStripeCustomerIdResponse{}
-	mi := &file_proto_etu_proto_msgTypes[25]
+	mi := &file_proto_etu_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1556,7 +1593,7 @@ func (x *GetUserByStripeCustomerIdResponse) String() string {
 func (*GetUserByStripeCustomerIdResponse) ProtoMessage() {}
 
 func (x *GetUserByStripeCustomerIdResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[25]
+	mi := &file_proto_etu_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1569,7 +1606,7 @@ func (x *GetUserByStripeCustomerIdResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetUserByStripeCustomerIdResponse.ProtoReflect.Descriptor instead.
 func (*GetUserByStripeCustomerIdResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{25}
+	return file_proto_etu_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetUserByStripeCustomerIdResponse) GetUser() *User {
@@ -1591,7 +1628,7 @@ type UpdateUserSubscriptionRequest struct {
 
 func (x *UpdateUserSubscriptionRequest) Reset() {
 	*x = UpdateUserSubscriptionRequest{}
-	mi := &file_proto_etu_proto_msgTypes[26]
+	mi := &file_proto_etu_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1603,7 +1640,7 @@ func (x *UpdateUserSubscriptionRequest) String() string {
 func (*UpdateUserSubscriptionRequest) ProtoMessage() {}
 
 func (x *UpdateUserSubscriptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[26]
+	mi := &file_proto_etu_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1616,7 +1653,7 @@ func (x *UpdateUserSubscriptionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSubscriptionRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserSubscriptionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{26}
+	return file_proto_etu_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *UpdateUserSubscriptionRequest) GetUserId() string {
@@ -1656,7 +1693,7 @@ type UpdateUserSubscriptionResponse struct {
 
 func (x *UpdateUserSubscriptionResponse) Reset() {
 	*x = UpdateUserSubscriptionResponse{}
-	mi := &file_proto_etu_proto_msgTypes[27]
+	mi := &file_proto_etu_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1668,7 +1705,7 @@ func (x *UpdateUserSubscriptionResponse) String() string {
 func (*UpdateUserSubscriptionResponse) ProtoMessage() {}
 
 func (x *UpdateUserSubscriptionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[27]
+	mi := &file_proto_etu_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1681,7 +1718,7 @@ func (x *UpdateUserSubscriptionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSubscriptionResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserSubscriptionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{27}
+	return file_proto_etu_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *UpdateUserSubscriptionResponse) GetUser() *User {
@@ -1701,7 +1738,7 @@ type CreateApiKeyRequest struct {
 
 func (x *CreateApiKeyRequest) Reset() {
 	*x = CreateApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[28]
+	mi := &file_proto_etu_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1713,7 +1750,7 @@ func (x *CreateApiKeyRequest) String() string {
 func (*CreateApiKeyRequest) ProtoMessage() {}
 
 func (x *CreateApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[28]
+	mi := &file_proto_etu_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1726,7 +1763,7 @@ func (x *CreateApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*CreateApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{28}
+	return file_proto_etu_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *CreateApiKeyRequest) GetUserId() string {
@@ -1753,7 +1790,7 @@ type CreateApiKeyResponse struct {
 
 func (x *CreateApiKeyResponse) Reset() {
 	*x = CreateApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[29]
+	mi := &file_proto_etu_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1765,7 +1802,7 @@ func (x *CreateApiKeyResponse) String() string {
 func (*CreateApiKeyResponse) ProtoMessage() {}
 
 func (x *CreateApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[29]
+	mi := &file_proto_etu_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1778,7 +1815,7 @@ func (x *CreateApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*CreateApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{29}
+	return file_proto_etu_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *CreateApiKeyResponse) GetApiKey() *ApiKey {
@@ -1804,7 +1841,7 @@ type ListApiKeysRequest struct {
 
 func (x *ListApiKeysRequest) Reset() {
 	*x = ListApiKeysRequest{}
-	mi := &file_proto_etu_proto_msgTypes[30]
+	mi := &file_proto_etu_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1816,7 +1853,7 @@ func (x *ListApiKeysRequest) String() string {
 func (*ListApiKeysRequest) ProtoMessage() {}
 
 func (x *ListApiKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[30]
+	mi := &file_proto_etu_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1829,7 +1866,7 @@ func (x *ListApiKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiKeysRequest.ProtoReflect.Descriptor instead.
 func (*ListApiKeysRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{30}
+	return file_proto_etu_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListApiKeysRequest) GetUserId() string {
@@ -1848,7 +1885,7 @@ type ListApiKeysResponse struct {
 
 func (x *ListApiKeysResponse) Reset() {
 	*x = ListApiKeysResponse{}
-	mi := &file_proto_etu_proto_msgTypes[31]
+	mi := &file_proto_etu_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1860,7 +1897,7 @@ func (x *ListApiKeysResponse) String() string {
 func (*ListApiKeysResponse) ProtoMessage() {}
 
 func (x *ListApiKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[31]
+	mi := &file_proto_etu_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1873,7 +1910,7 @@ func (x *ListApiKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiKeysResponse.ProtoReflect.Descriptor instead.
 func (*ListApiKeysResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{31}
+	return file_proto_etu_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListApiKeysResponse) GetApiKeys() []*ApiKey {
@@ -1893,7 +1930,7 @@ type DeleteApiKeyRequest struct {
 
 func (x *DeleteApiKeyRequest) Reset() {
 	*x = DeleteApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[32]
+	mi := &file_proto_etu_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1905,7 +1942,7 @@ func (x *DeleteApiKeyRequest) String() string {
 func (*DeleteApiKeyRequest) ProtoMessage() {}
 
 func (x *DeleteApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[32]
+	mi := &file_proto_etu_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1918,7 +1955,7 @@ func (x *DeleteApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{32}
+	return file_proto_etu_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *DeleteApiKeyRequest) GetUserId() string {
@@ -1944,7 +1981,7 @@ type DeleteApiKeyResponse struct {
 
 func (x *DeleteApiKeyResponse) Reset() {
 	*x = DeleteApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[33]
+	mi := &file_proto_etu_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1956,7 +1993,7 @@ func (x *DeleteApiKeyResponse) String() string {
 func (*DeleteApiKeyResponse) ProtoMessage() {}
 
 func (x *DeleteApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[33]
+	mi := &file_proto_etu_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1969,7 +2006,7 @@ func (x *DeleteApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*DeleteApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{33}
+	return file_proto_etu_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *DeleteApiKeyResponse) GetSuccess() bool {
@@ -1988,7 +2025,7 @@ type VerifyApiKeyRequest struct {
 
 func (x *VerifyApiKeyRequest) Reset() {
 	*x = VerifyApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[34]
+	mi := &file_proto_etu_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2000,7 +2037,7 @@ func (x *VerifyApiKeyRequest) String() string {
 func (*VerifyApiKeyRequest) ProtoMessage() {}
 
 func (x *VerifyApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[34]
+	mi := &file_proto_etu_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2013,7 +2050,7 @@ func (x *VerifyApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*VerifyApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{34}
+	return file_proto_etu_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *VerifyApiKeyRequest) GetRawKey() string {
@@ -2033,7 +2070,7 @@ type VerifyApiKeyResponse struct {
 
 func (x *VerifyApiKeyResponse) Reset() {
 	*x = VerifyApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[35]
+	mi := &file_proto_etu_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2045,7 +2082,7 @@ func (x *VerifyApiKeyResponse) String() string {
 func (*VerifyApiKeyResponse) ProtoMessage() {}
 
 func (x *VerifyApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[35]
+	mi := &file_proto_etu_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2058,7 +2095,7 @@ func (x *VerifyApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*VerifyApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{35}
+	return file_proto_etu_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *VerifyApiKeyResponse) GetValid() bool {
@@ -2084,7 +2121,7 @@ type GetUserSettingsRequest struct {
 
 func (x *GetUserSettingsRequest) Reset() {
 	*x = GetUserSettingsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[36]
+	mi := &file_proto_etu_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2096,7 +2133,7 @@ func (x *GetUserSettingsRequest) String() string {
 func (*GetUserSettingsRequest) ProtoMessage() {}
 
 func (x *GetUserSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[36]
+	mi := &file_proto_etu_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2109,7 +2146,7 @@ func (x *GetUserSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{36}
+	return file_proto_etu_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetUserSettingsRequest) GetUserId() string {
@@ -2128,7 +2165,7 @@ type GetUserSettingsResponse struct {
 
 func (x *GetUserSettingsResponse) Reset() {
 	*x = GetUserSettingsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[37]
+	mi := &file_proto_etu_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2140,7 +2177,7 @@ func (x *GetUserSettingsResponse) String() string {
 func (*GetUserSettingsResponse) ProtoMessage() {}
 
 func (x *GetUserSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[37]
+	mi := &file_proto_etu_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2153,7 +2190,7 @@ func (x *GetUserSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{37}
+	return file_proto_etu_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetUserSettingsResponse) GetUser() *User {
@@ -2176,7 +2213,7 @@ type UpdateUserSettingsRequest struct {
 
 func (x *UpdateUserSettingsRequest) Reset() {
 	*x = UpdateUserSettingsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[38]
+	mi := &file_proto_etu_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2188,7 +2225,7 @@ func (x *UpdateUserSettingsRequest) String() string {
 func (*UpdateUserSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateUserSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[38]
+	mi := &file_proto_etu_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2201,7 +2238,7 @@ func (x *UpdateUserSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{38}
+	return file_proto_etu_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *UpdateUserSettingsRequest) GetUserId() string {
@@ -2248,7 +2285,7 @@ type UpdateUserSettingsResponse struct {
 
 func (x *UpdateUserSettingsResponse) Reset() {
 	*x = UpdateUserSettingsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[39]
+	mi := &file_proto_etu_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2260,7 +2297,7 @@ func (x *UpdateUserSettingsResponse) String() string {
 func (*UpdateUserSettingsResponse) ProtoMessage() {}
 
 func (x *UpdateUserSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[39]
+	mi := &file_proto_etu_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2273,7 +2310,7 @@ func (x *UpdateUserSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSettingsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{39}
+	return file_proto_etu_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *UpdateUserSettingsResponse) GetUser() *User {
@@ -2290,7 +2327,10 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x0fproto/etu.proto\x12\x03etu\";\n" +
 	"\tTimestamp\x12\x18\n" +
 	"\aseconds\x18\x01 \x01(\x03R\aseconds\x12\x14\n" +
-	"\x05nanos\x18\x02 \x01(\x05R\x05nanos\"\xa0\x01\n" +
+	"\x05nanos\x18\x02 \x01(\x05R\x05nanos\">\n" +
+	"\vImageUpload\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1b\n" +
+	"\tmime_type\x18\x02 \x01(\tR\bmimeType\"\xa0\x01\n" +
 	"\tNoteImage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12%\n" +
@@ -2356,31 +2396,29 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x05notes\x18\x01 \x03(\v2\t.etu.NoteR\x05notes\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x04 \x01(\x05R\x06offset\"\x9c\x01\n" +
+	"\x06offset\x18\x04 \x01(\x05R\x06offset\"\x84\x01\n" +
 	"\x11CreateNoteRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x12\n" +
-	"\x04tags\x18\x03 \x03(\tR\x04tags\x12\x16\n" +
-	"\x06images\x18\x04 \x03(\fR\x06images\x12(\n" +
-	"\x10image_mime_types\x18\x05 \x03(\tR\x0eimageMimeTypes\"3\n" +
+	"\x04tags\x18\x03 \x03(\tR\x04tags\x12(\n" +
+	"\x06images\x18\x04 \x03(\v2\x10.etu.ImageUploadR\x06images\"3\n" +
 	"\x12CreateNoteResponse\x12\x1d\n" +
 	"\x04note\x18\x01 \x01(\v2\t.etu.NoteR\x04note\"9\n" +
 	"\x0eGetNoteRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\"0\n" +
 	"\x0fGetNoteResponse\x12\x1d\n" +
-	"\x04note\x18\x01 \x01(\v2\t.etu.NoteR\x04note\"\x96\x02\n" +
+	"\x04note\x18\x01 \x01(\v2\t.etu.NoteR\x04note\"\xf7\x01\n" +
 	"\x11UpdateNoteRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x1d\n" +
 	"\acontent\x18\x03 \x01(\tH\x00R\acontent\x88\x01\x01\x12\x12\n" +
 	"\x04tags\x18\x04 \x03(\tR\x04tags\x12\x1f\n" +
 	"\vupdate_tags\x18\x05 \x01(\bR\n" +
-	"updateTags\x12\x1d\n" +
+	"updateTags\x12/\n" +
 	"\n" +
-	"add_images\x18\x06 \x03(\fR\taddImages\x12/\n" +
-	"\x14add_image_mime_types\x18\a \x03(\tR\x11addImageMimeTypes\x12(\n" +
-	"\x10remove_image_ids\x18\b \x03(\tR\x0eremoveImageIdsB\n" +
+	"add_images\x18\x06 \x03(\v2\x10.etu.ImageUploadR\taddImages\x12(\n" +
+	"\x10remove_image_ids\x18\a \x03(\tR\x0eremoveImageIdsB\n" +
 	"\n" +
 	"\b_content\"3\n" +
 	"\x12UpdateNoteResponse\x12\x1d\n" +
@@ -2501,114 +2539,117 @@ func file_proto_etu_proto_rawDescGZIP() []byte {
 	return file_proto_etu_proto_rawDescData
 }
 
-var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_proto_etu_proto_goTypes = []any{
 	(*Timestamp)(nil),                         // 0: etu.Timestamp
-	(*NoteImage)(nil),                         // 1: etu.NoteImage
-	(*Note)(nil),                              // 2: etu.Note
-	(*Tag)(nil),                               // 3: etu.Tag
-	(*User)(nil),                              // 4: etu.User
-	(*ApiKey)(nil),                            // 5: etu.ApiKey
-	(*ListNotesRequest)(nil),                  // 6: etu.ListNotesRequest
-	(*ListNotesResponse)(nil),                 // 7: etu.ListNotesResponse
-	(*CreateNoteRequest)(nil),                 // 8: etu.CreateNoteRequest
-	(*CreateNoteResponse)(nil),                // 9: etu.CreateNoteResponse
-	(*GetNoteRequest)(nil),                    // 10: etu.GetNoteRequest
-	(*GetNoteResponse)(nil),                   // 11: etu.GetNoteResponse
-	(*UpdateNoteRequest)(nil),                 // 12: etu.UpdateNoteRequest
-	(*UpdateNoteResponse)(nil),                // 13: etu.UpdateNoteResponse
-	(*DeleteNoteRequest)(nil),                 // 14: etu.DeleteNoteRequest
-	(*DeleteNoteResponse)(nil),                // 15: etu.DeleteNoteResponse
-	(*ListTagsRequest)(nil),                   // 16: etu.ListTagsRequest
-	(*ListTagsResponse)(nil),                  // 17: etu.ListTagsResponse
-	(*RegisterRequest)(nil),                   // 18: etu.RegisterRequest
-	(*RegisterResponse)(nil),                  // 19: etu.RegisterResponse
-	(*AuthenticateRequest)(nil),               // 20: etu.AuthenticateRequest
-	(*AuthenticateResponse)(nil),              // 21: etu.AuthenticateResponse
-	(*GetUserRequest)(nil),                    // 22: etu.GetUserRequest
-	(*GetUserResponse)(nil),                   // 23: etu.GetUserResponse
-	(*GetUserByStripeCustomerIdRequest)(nil),  // 24: etu.GetUserByStripeCustomerIdRequest
-	(*GetUserByStripeCustomerIdResponse)(nil), // 25: etu.GetUserByStripeCustomerIdResponse
-	(*UpdateUserSubscriptionRequest)(nil),     // 26: etu.UpdateUserSubscriptionRequest
-	(*UpdateUserSubscriptionResponse)(nil),    // 27: etu.UpdateUserSubscriptionResponse
-	(*CreateApiKeyRequest)(nil),               // 28: etu.CreateApiKeyRequest
-	(*CreateApiKeyResponse)(nil),              // 29: etu.CreateApiKeyResponse
-	(*ListApiKeysRequest)(nil),                // 30: etu.ListApiKeysRequest
-	(*ListApiKeysResponse)(nil),               // 31: etu.ListApiKeysResponse
-	(*DeleteApiKeyRequest)(nil),               // 32: etu.DeleteApiKeyRequest
-	(*DeleteApiKeyResponse)(nil),              // 33: etu.DeleteApiKeyResponse
-	(*VerifyApiKeyRequest)(nil),               // 34: etu.VerifyApiKeyRequest
-	(*VerifyApiKeyResponse)(nil),              // 35: etu.VerifyApiKeyResponse
-	(*GetUserSettingsRequest)(nil),            // 36: etu.GetUserSettingsRequest
-	(*GetUserSettingsResponse)(nil),           // 37: etu.GetUserSettingsResponse
-	(*UpdateUserSettingsRequest)(nil),         // 38: etu.UpdateUserSettingsRequest
-	(*UpdateUserSettingsResponse)(nil),        // 39: etu.UpdateUserSettingsResponse
+	(*ImageUpload)(nil),                       // 1: etu.ImageUpload
+	(*NoteImage)(nil),                         // 2: etu.NoteImage
+	(*Note)(nil),                              // 3: etu.Note
+	(*Tag)(nil),                               // 4: etu.Tag
+	(*User)(nil),                              // 5: etu.User
+	(*ApiKey)(nil),                            // 6: etu.ApiKey
+	(*ListNotesRequest)(nil),                  // 7: etu.ListNotesRequest
+	(*ListNotesResponse)(nil),                 // 8: etu.ListNotesResponse
+	(*CreateNoteRequest)(nil),                 // 9: etu.CreateNoteRequest
+	(*CreateNoteResponse)(nil),                // 10: etu.CreateNoteResponse
+	(*GetNoteRequest)(nil),                    // 11: etu.GetNoteRequest
+	(*GetNoteResponse)(nil),                   // 12: etu.GetNoteResponse
+	(*UpdateNoteRequest)(nil),                 // 13: etu.UpdateNoteRequest
+	(*UpdateNoteResponse)(nil),                // 14: etu.UpdateNoteResponse
+	(*DeleteNoteRequest)(nil),                 // 15: etu.DeleteNoteRequest
+	(*DeleteNoteResponse)(nil),                // 16: etu.DeleteNoteResponse
+	(*ListTagsRequest)(nil),                   // 17: etu.ListTagsRequest
+	(*ListTagsResponse)(nil),                  // 18: etu.ListTagsResponse
+	(*RegisterRequest)(nil),                   // 19: etu.RegisterRequest
+	(*RegisterResponse)(nil),                  // 20: etu.RegisterResponse
+	(*AuthenticateRequest)(nil),               // 21: etu.AuthenticateRequest
+	(*AuthenticateResponse)(nil),              // 22: etu.AuthenticateResponse
+	(*GetUserRequest)(nil),                    // 23: etu.GetUserRequest
+	(*GetUserResponse)(nil),                   // 24: etu.GetUserResponse
+	(*GetUserByStripeCustomerIdRequest)(nil),  // 25: etu.GetUserByStripeCustomerIdRequest
+	(*GetUserByStripeCustomerIdResponse)(nil), // 26: etu.GetUserByStripeCustomerIdResponse
+	(*UpdateUserSubscriptionRequest)(nil),     // 27: etu.UpdateUserSubscriptionRequest
+	(*UpdateUserSubscriptionResponse)(nil),    // 28: etu.UpdateUserSubscriptionResponse
+	(*CreateApiKeyRequest)(nil),               // 29: etu.CreateApiKeyRequest
+	(*CreateApiKeyResponse)(nil),              // 30: etu.CreateApiKeyResponse
+	(*ListApiKeysRequest)(nil),                // 31: etu.ListApiKeysRequest
+	(*ListApiKeysResponse)(nil),               // 32: etu.ListApiKeysResponse
+	(*DeleteApiKeyRequest)(nil),               // 33: etu.DeleteApiKeyRequest
+	(*DeleteApiKeyResponse)(nil),              // 34: etu.DeleteApiKeyResponse
+	(*VerifyApiKeyRequest)(nil),               // 35: etu.VerifyApiKeyRequest
+	(*VerifyApiKeyResponse)(nil),              // 36: etu.VerifyApiKeyResponse
+	(*GetUserSettingsRequest)(nil),            // 37: etu.GetUserSettingsRequest
+	(*GetUserSettingsResponse)(nil),           // 38: etu.GetUserSettingsResponse
+	(*UpdateUserSettingsRequest)(nil),         // 39: etu.UpdateUserSettingsRequest
+	(*UpdateUserSettingsResponse)(nil),        // 40: etu.UpdateUserSettingsResponse
 }
 var file_proto_etu_proto_depIdxs = []int32{
 	0,  // 0: etu.NoteImage.created_at:type_name -> etu.Timestamp
 	0,  // 1: etu.Note.created_at:type_name -> etu.Timestamp
 	0,  // 2: etu.Note.updated_at:type_name -> etu.Timestamp
-	1,  // 3: etu.Note.images:type_name -> etu.NoteImage
+	2,  // 3: etu.Note.images:type_name -> etu.NoteImage
 	0,  // 4: etu.Tag.created_at:type_name -> etu.Timestamp
 	0,  // 5: etu.User.subscription_end:type_name -> etu.Timestamp
 	0,  // 6: etu.User.created_at:type_name -> etu.Timestamp
 	0,  // 7: etu.User.updated_at:type_name -> etu.Timestamp
 	0,  // 8: etu.ApiKey.created_at:type_name -> etu.Timestamp
 	0,  // 9: etu.ApiKey.last_used:type_name -> etu.Timestamp
-	2,  // 10: etu.ListNotesResponse.notes:type_name -> etu.Note
-	2,  // 11: etu.CreateNoteResponse.note:type_name -> etu.Note
-	2,  // 12: etu.GetNoteResponse.note:type_name -> etu.Note
-	2,  // 13: etu.UpdateNoteResponse.note:type_name -> etu.Note
-	3,  // 14: etu.ListTagsResponse.tags:type_name -> etu.Tag
-	4,  // 15: etu.RegisterResponse.user:type_name -> etu.User
-	4,  // 16: etu.AuthenticateResponse.user:type_name -> etu.User
-	4,  // 17: etu.GetUserResponse.user:type_name -> etu.User
-	4,  // 18: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	0,  // 19: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> etu.Timestamp
-	4,  // 20: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
-	5,  // 21: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
-	5,  // 22: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
-	4,  // 23: etu.GetUserSettingsResponse.user:type_name -> etu.User
-	4,  // 24: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
-	6,  // 25: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	8,  // 26: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	10, // 27: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	12, // 28: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	14, // 29: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	16, // 30: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	18, // 31: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	20, // 32: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	22, // 33: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	24, // 34: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	26, // 35: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	28, // 36: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	30, // 37: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	32, // 38: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	34, // 39: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	36, // 40: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	38, // 41: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	7,  // 42: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	9,  // 43: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	11, // 44: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	13, // 45: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	15, // 46: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	17, // 47: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	19, // 48: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	21, // 49: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	23, // 50: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	25, // 51: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	27, // 52: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	29, // 53: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	31, // 54: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	33, // 55: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	35, // 56: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	37, // 57: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	39, // 58: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	42, // [42:59] is the sub-list for method output_type
-	25, // [25:42] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	3,  // 10: etu.ListNotesResponse.notes:type_name -> etu.Note
+	1,  // 11: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
+	3,  // 12: etu.CreateNoteResponse.note:type_name -> etu.Note
+	3,  // 13: etu.GetNoteResponse.note:type_name -> etu.Note
+	1,  // 14: etu.UpdateNoteRequest.add_images:type_name -> etu.ImageUpload
+	3,  // 15: etu.UpdateNoteResponse.note:type_name -> etu.Note
+	4,  // 16: etu.ListTagsResponse.tags:type_name -> etu.Tag
+	5,  // 17: etu.RegisterResponse.user:type_name -> etu.User
+	5,  // 18: etu.AuthenticateResponse.user:type_name -> etu.User
+	5,  // 19: etu.GetUserResponse.user:type_name -> etu.User
+	5,  // 20: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
+	0,  // 21: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> etu.Timestamp
+	5,  // 22: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
+	6,  // 23: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
+	6,  // 24: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
+	5,  // 25: etu.GetUserSettingsResponse.user:type_name -> etu.User
+	5,  // 26: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
+	7,  // 27: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	9,  // 28: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	11, // 29: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	13, // 30: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	15, // 31: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	17, // 32: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	19, // 33: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	21, // 34: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	23, // 35: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	25, // 36: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	27, // 37: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	29, // 38: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	31, // 39: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	33, // 40: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	35, // 41: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	37, // 42: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	39, // 43: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	8,  // 44: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	10, // 45: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	12, // 46: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	14, // 47: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	16, // 48: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	18, // 49: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	20, // 50: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	22, // 51: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	24, // 52: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	26, // 53: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	28, // 54: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	30, // 55: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	32, // 56: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	34, // 57: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	36, // 58: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	38, // 59: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	40, // 60: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	44, // [44:61] is the sub-list for method output_type
+	27, // [27:44] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }
@@ -2616,21 +2657,21 @@ func file_proto_etu_proto_init() {
 	if File_proto_etu_proto != nil {
 		return
 	}
-	file_proto_etu_proto_msgTypes[4].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[5].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[12].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[21].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[25].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[6].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[13].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[22].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[26].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[35].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[38].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[27].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[36].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[39].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_etu_proto_rawDesc), len(file_proto_etu_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   40,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   5,
 		},

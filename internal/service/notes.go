@@ -87,11 +87,6 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		return nil, status.Error(codes.InvalidArgument, "content or images is required")
 	}
 
-	// Validate image mime types match images count
-	if len(req.Images) != len(req.ImageMimeTypes) {
-		return nil, status.Error(codes.InvalidArgument, "images and image_mime_types must have the same length")
-	}
-
 	// Verify authorization
 	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
 		return nil, err
@@ -104,11 +99,9 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 
 	// Process images if any
 	if len(req.Images) > 0 && s.storage != nil {
-		for i, imageData := range req.Images {
-			mimeType := req.ImageMimeTypes[i]
-
+		for i, img := range req.Images {
 			// Upload image to GCS
-			noteImage, err := s.processAndUploadImage(ctx, note.ID, imageData, mimeType)
+			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
 			if err != nil {
 				log.Printf("Failed to process image %d for note %s: %v", i, note.ID, err)
 				continue // Continue with other images even if one fails
@@ -207,11 +200,6 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 
-	// Validate image mime types match images count
-	if len(req.AddImages) != len(req.AddImageMimeTypes) {
-		return nil, status.Error(codes.InvalidArgument, "add_images and add_image_mime_types must have the same length")
-	}
-
 	// Verify authorization
 	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
 		return nil, err
@@ -247,10 +235,8 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 
 	// Add new images if any
 	if len(req.AddImages) > 0 && s.storage != nil {
-		for i, imageData := range req.AddImages {
-			mimeType := req.AddImageMimeTypes[i]
-
-			noteImage, err := s.processAndUploadImage(ctx, note.ID, imageData, mimeType)
+		for i, img := range req.AddImages {
+			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
 			if err != nil {
 				log.Printf("Failed to process image %d for note %s: %v", i, note.ID, err)
 				continue
