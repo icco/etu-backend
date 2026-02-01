@@ -1,9 +1,8 @@
 name: Publish Proto Package
-
 on:
   push:
-    branches: [main]
-
+    branches:
+      - main
 jobs:
   publish:
     name: Build and Publish
@@ -16,20 +15,16 @@ jobs:
         working-directory: packages/etu-proto
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          registry-url: 'https://npm.pkg.github.com'
+          node-version: "22"
+          registry-url: https://npm.pkg.github.com
           scope: '@icco'
-
       - name: Install dependencies
         run: npm ci || npm install
-
       - name: Generate and build
         run: npm run build
-
       - name: Set version from date
         run: |
           YEAR=$(date +%Y)
@@ -39,7 +34,6 @@ jobs:
           VERSION="${YEAR}.${MONTH}.${COUNTER}"
           npm version $VERSION --no-git-tag-version
           echo "Publishing version: $VERSION"
-
       - name: Publish to GitHub Packages
         run: npm publish --access public
         env:
