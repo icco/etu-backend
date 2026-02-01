@@ -8,20 +8,37 @@ import (
 
 // Note represents a note in the database
 type Note struct {
-	ID                 string     `gorm:"column:id;primaryKey"`
-	Content            string     `gorm:"column:content;type:text"`
-	CreatedAt          time.Time  `gorm:"column:createdAt"`
-	UpdatedAt          time.Time  `gorm:"column:updatedAt"`
-	UserID             string     `gorm:"column:userId;index"`
-	ExternalID         *string    `gorm:"column:externalId;index"`   // Notion page ID
-	NotionUUID         *string    `gorm:"column:notionUuid;index"`   // Notion post UUID (stored in ID property)
-	LastSyncedToNotion *time.Time `gorm:"column:lastSyncedToNotion"` // When this note was last pushed to Notion
-	Tags               []Tag      `gorm:"many2many:NoteTag;foreignKey:ID;joinForeignKey:noteId;References:ID;joinReferences:tagId"`
+	ID                 string      `gorm:"column:id;primaryKey"`
+	Content            string      `gorm:"column:content;type:text"`
+	CreatedAt          time.Time   `gorm:"column:createdAt"`
+	UpdatedAt          time.Time   `gorm:"column:updatedAt"`
+	UserID             string      `gorm:"column:userId;index"`
+	ExternalID         *string     `gorm:"column:externalId;index"`   // Notion page ID
+	NotionUUID         *string     `gorm:"column:notionUuid;index"`   // Notion post UUID (stored in ID property)
+	LastSyncedToNotion *time.Time  `gorm:"column:lastSyncedToNotion"` // When this note was last pushed to Notion
+	Tags               []Tag       `gorm:"many2many:NoteTag;foreignKey:ID;joinForeignKey:noteId;References:ID;joinReferences:tagId"`
+	Images             []NoteImage `gorm:"foreignKey:NoteID"`
 }
 
 // TableName specifies the table name for Note
 func (Note) TableName() string {
 	return "Note"
+}
+
+// NoteImage represents an image attached to a note
+type NoteImage struct {
+	ID            string    `gorm:"column:id;primaryKey"`
+	NoteID        string    `gorm:"column:noteId;index;not null"`
+	URL           string    `gorm:"column:url;not null"`
+	GCSObjectName string    `gorm:"column:gcsObjectName;not null"` // Object name in GCS for deletion
+	ExtractedText string    `gorm:"column:extractedText;type:text"`
+	MimeType      string    `gorm:"column:mimeType"`
+	CreatedAt     time.Time `gorm:"column:createdAt"`
+}
+
+// TableName specifies the table name for NoteImage
+func (NoteImage) TableName() string {
+	return "NoteImage"
 }
 
 // Tag represents a tag in the database
@@ -124,6 +141,14 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 func (a *ApiKey) BeforeCreate(tx *gorm.DB) error {
 	if a.ID == "" {
 		a.ID = GenerateCUID()
+	}
+	return nil
+}
+
+// BeforeCreate hook to generate CUID-like ID for note images
+func (ni *NoteImage) BeforeCreate(tx *gorm.DB) error {
+	if ni.ID == "" {
+		ni.ID = GenerateCUID()
 	}
 	return nil
 }
