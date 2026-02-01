@@ -367,3 +367,34 @@ func (s *NotesService) noteToProto(n *db.Note) *pb.Note {
 		Images:    pbImages,
 	}
 }
+
+// GetRandomNotes retrieves a random subset of notes for a user
+func (s *NotesService) GetRandomNotes(ctx context.Context, req *pb.GetRandomNotesRequest) (*pb.GetRandomNotesResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+
+	// Verify authorization
+	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+		return nil, err
+	}
+
+	count := int(req.Count)
+	if count <= 0 {
+		count = 5 // Default to 5 notes
+	}
+
+	notes, err := s.db.GetRandomNotes(ctx, req.UserId, count)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get random notes: %v", err)
+	}
+
+	pbNotes := make([]*pb.Note, len(notes))
+	for i, n := range notes {
+		pbNotes[i] = s.noteToProto(&n)
+	}
+
+	return &pb.GetRandomNotesResponse{
+		Notes: pbNotes,
+	}, nil
+}

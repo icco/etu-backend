@@ -128,6 +128,7 @@ authorization: etu_<64 hex characters>
 | `GetNote` | Retrieve a single note by ID |
 | `UpdateNote` | Update note content and/or tags |
 | `DeleteNote` | Delete a note by ID |
+| `GetRandomNotes` | Get a random subset of notes for highlighting past thoughts |
 
 ### TagsService
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteReq
 	}
 
 	note := &db.Note{
-		ID:        "test-note-id",
+		ID:        models.GenerateCUID(),
 		Content:   req.Content,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -137,6 +138,38 @@ func (s *mockNotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteReq
 
 	delete(s.notes, req.Id)
 	return &pb.DeleteNoteResponse{Success: true}, nil
+}
+
+func (s *mockNotesService) GetRandomNotes(ctx context.Context, req *pb.GetRandomNotesRequest) (*pb.GetRandomNotesResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+
+	// Collect all notes for the user
+	var userNotes []*db.Note
+	for _, n := range s.notes {
+		if n.UserID == req.UserId {
+			userNotes = append(userNotes, n)
+		}
+	}
+
+	// Return up to count notes (or all if less than count)
+	count := int(req.Count)
+	if count <= 0 {
+		count = 5
+	}
+	if count > len(userNotes) {
+		count = len(userNotes)
+	}
+
+	notes := make([]*pb.Note, count)
+	for i := 0; i < count; i++ {
+		notes[i] = mockNoteToProto(userNotes[i])
+	}
+
+	return &pb.GetRandomNotesResponse{
+		Notes: notes,
+	}, nil
 }
 
 func TestCreateNote(t *testing.T) {
@@ -406,6 +439,123 @@ func TestDeleteNote(t *testing.T) {
 				}
 				if resp.Success != tt.wantSuccess {
 					t.Errorf("expected success=%v, got %v", tt.wantSuccess, resp.Success)
+				}
+			} else {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				st, ok := status.FromError(err)
+				if !ok {
+					t.Errorf("expected gRPC status error, got %v", err)
+				}
+				if st.Code() != tt.wantErr {
+					t.Errorf("expected error code %v, got %v", tt.wantErr, st.Code())
+				}
+			}
+		})
+	}
+}
+
+func TestGetRandomNotes(t *testing.T) {
+	svc := newMockNotesService()
+	ctx := context.Background()
+
+	// Create several notes for testing
+	for i := 1; i <= 10; i++ {
+		_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
+			UserId:  "user-123",
+			Content: fmt.Sprintf("Test note %d", i),
+		})
+	}
+
+	// Create a smaller set of notes for another user
+	for i := 1; i <= 2; i++ {
+		_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
+			UserId:  "user-456",
+			Content: fmt.Sprintf("Test note for user-456: %d", i),
+		})
+	}
+
+	tests := []struct {
+		name         string
+		req          *pb.GetRandomNotesRequest
+		wantErr      codes.Code
+		wantNotesMin int
+		wantNotesMax int
+	}{
+		{
+			name: "valid get random notes with default count",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-123",
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 5,
+			wantNotesMax: 5,
+		},
+		{
+			name: "valid get random notes with custom count",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-123",
+				Count:  3,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 3,
+			wantNotesMax: 3,
+		},
+		{
+			name: "valid get random notes with count larger than available",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-123",
+				Count:  20,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 10,
+			wantNotesMax: 10,
+		},
+		{
+			name: "request more notes than available (small dataset)",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-456",
+				Count:  5,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 2,
+			wantNotesMax: 2,
+		},
+		{
+			name: "missing user_id",
+			req: &pb.GetRandomNotesRequest{
+				Count: 5,
+			},
+			wantErr: codes.InvalidArgument,
+		},
+		{
+			name: "user with no notes",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-no-notes",
+				Count:  5,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 0,
+			wantNotesMax: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := svc.GetRandomNotes(ctx, tt.req)
+
+			if tt.wantErr == codes.OK {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+				if resp == nil {
+					t.Error("expected response")
+				} else {
+					notesCount := len(resp.Notes)
+					if notesCount < tt.wantNotesMin || notesCount > tt.wantNotesMax {
+						t.Errorf("expected %d-%d notes, got %d", tt.wantNotesMin, tt.wantNotesMax, notesCount)
+					}
 				}
 			} else {
 				if err == nil {
