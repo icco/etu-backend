@@ -112,19 +112,32 @@ func (db *DB) ListNotes(ctx context.Context, userID, search string, tags []strin
 		return nil, 0, fmt.Errorf("failed to query notes: %w", err)
 	}
 
-	// Fetch tags and images for each note
-	for i := range notes {
-		tagNames, err := db.getNoteTags(ctx, notes[i].ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get tags for note %s: %w", notes[i].ID, err)
-		}
-		notes[i].Tags = tagNames
+	if len(notes) == 0 {
+		return notes, int(total), nil
+	}
 
-		images, err := db.getNoteImages(ctx, notes[i].ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get images for note %s: %w", notes[i].ID, err)
-		}
-		notes[i].Images = images
+	// Collect note IDs for batch fetching
+	noteIDs := make([]string, len(notes))
+	for i, n := range notes {
+		noteIDs[i] = n.ID
+	}
+
+	// Batch fetch tags for all notes
+	tagsByNoteID, err := db.getTagsForNotes(ctx, noteIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to batch fetch tags: %w", err)
+	}
+
+	// Batch fetch images for all notes
+	imagesByNoteID, err := db.getImagesForNotes(ctx, noteIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to batch fetch images: %w", err)
+	}
+
+	// Assign tags and images to notes
+	for i := range notes {
+		notes[i].Tags = tagsByNoteID[notes[i].ID]
+		notes[i].Images = imagesByNoteID[notes[i].ID]
 	}
 
 	return notes, int(total), nil
@@ -149,6 +162,65 @@ func (db *DB) getNoteImages(ctx context.Context, noteID string) ([]NoteImage, er
 		Order(`"createdAt" ASC`).
 		Find(&images).Error
 	return images, err
+}
+
+// noteTagResult is used for batch fetching tags with their note associations
+type noteTagResult struct {
+	NoteID string
+	Tag
+}
+
+// getTagsForNotes batch fetches tags for multiple notes
+func (db *DB) getTagsForNotes(ctx context.Context, noteIDs []string) (map[string][]Tag, error) {
+	var results []noteTagResult
+
+	err := db.conn.WithContext(ctx).
+		Table(`"Tag"`).
+		Select(`"NoteTag"."noteId" as note_id, "Tag".*`).
+		Joins(`JOIN "NoteTag" ON "Tag".id = "NoteTag"."tagId"`).
+		Where(`"NoteTag"."noteId" IN ?`, noteIDs).
+		Order(`"Tag".name`).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Group tags by note ID
+	tagsByNoteID := make(map[string][]Tag)
+	for _, noteID := range noteIDs {
+		tagsByNoteID[noteID] = []Tag{} // Initialize empty slice for notes with no tags
+	}
+	for _, r := range results {
+		tagsByNoteID[r.NoteID] = append(tagsByNoteID[r.NoteID], r.Tag)
+	}
+
+	return tagsByNoteID, nil
+}
+
+// getImagesForNotes batch fetches images for multiple notes
+func (db *DB) getImagesForNotes(ctx context.Context, noteIDs []string) (map[string][]NoteImage, error) {
+	var images []NoteImage
+
+	err := db.conn.WithContext(ctx).
+		Where(`"noteId" IN ?`, noteIDs).
+		Order(`"createdAt" ASC`).
+		Find(&images).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Group images by note ID
+	imagesByNoteID := make(map[string][]NoteImage)
+	for _, noteID := range noteIDs {
+		imagesByNoteID[noteID] = []NoteImage{} // Initialize empty slice for notes with no images
+	}
+	for _, img := range images {
+		imagesByNoteID[img.NoteID] = append(imagesByNoteID[img.NoteID], img)
+	}
+
+	return imagesByNoteID, nil
 }
 
 // GetNote retrieves a single note by ID for a user

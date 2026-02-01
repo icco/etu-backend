@@ -28,8 +28,12 @@ func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteReq
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
-	if req.Content == "" {
-		return nil, status.Error(codes.InvalidArgument, "content is required")
+	if req.Content == "" && len(req.Images) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "content or images is required")
+	}
+	// Mock: if images provided but no content, simulate storage not configured
+	if req.Content == "" && len(req.Images) > 0 {
+		return nil, status.Error(codes.FailedPrecondition, "image storage is not configured")
 	}
 
 	now := time.Now()
@@ -136,11 +140,19 @@ func TestCreateNote(t *testing.T) {
 			wantErr: codes.InvalidArgument,
 		},
 		{
-			name: "missing content",
+			name: "missing content and images",
 			req: &pb.CreateNoteRequest{
 				UserId: "user-123",
 			},
 			wantErr: codes.InvalidArgument,
+		},
+		{
+			name: "image only without storage configured",
+			req: &pb.CreateNoteRequest{
+				UserId: "user-123",
+				Images: []*pb.ImageUpload{{Data: []byte("test"), MimeType: "image/png"}},
+			},
+			wantErr: codes.FailedPrecondition,
 		},
 	}
 

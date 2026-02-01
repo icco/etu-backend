@@ -12,12 +12,24 @@ import (
 	pb "github.com/icco/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
 	MaxNotesLimit     = 100
 	DefaultNotesLimit = 50
+	MaxImageSize      = 10 * 1024 * 1024 // 10MB max image size
 )
+
+// allowedImageMIMETypes is the list of allowed image MIME types
+var allowedImageMIMETypes = map[string]bool{
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/heic": true,
+	"image/heif": true,
+}
 
 // NotesService implements the NotesService gRPC service
 type NotesService struct {
@@ -86,6 +98,9 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 	if req.Content == "" && len(req.Images) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "content or images is required")
 	}
+	if req.Content == "" && len(req.Images) > 0 && s.storage == nil {
+		return nil, status.Error(codes.FailedPrecondition, "image storage is not configured")
+	}
 
 	// Verify authorization
 	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
@@ -128,10 +143,30 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 	}, nil
 }
 
+// validateImage validates the image MIME type and size
+func validateImage(imageData []byte, mimeType string) error {
+	// Validate MIME type against allow-list
+	if !allowedImageMIMETypes[mimeType] {
+		return fmt.Errorf("unsupported image type: %s. Allowed types: image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif", mimeType)
+	}
+
+	// Validate image size
+	if len(imageData) > MaxImageSize {
+		return fmt.Errorf("image size %d bytes exceeds maximum allowed size of %d bytes", len(imageData), MaxImageSize)
+	}
+
+	return nil
+}
+
 // processAndUploadImage uploads an image to GCS and extracts text using Gemini OCR
 func (s *NotesService) processAndUploadImage(ctx context.Context, noteID string, imageData []byte, mimeType string) (*models.NoteImage, error) {
 	if s.storage == nil {
 		return nil, fmt.Errorf("storage client not configured")
+	}
+
+	// Validate image before uploading
+	if err := validateImage(imageData, mimeType); err != nil {
+		return nil, err
 	}
 
 	// Generate a unique object name
@@ -305,7 +340,7 @@ func noteToProto(n *db.Note) *pb.Note {
 			Url:           img.URL,
 			ExtractedText: img.ExtractedText,
 			MimeType:      img.MimeType,
-			CreatedAt:     &pb.Timestamp{Seconds: img.CreatedAt.Unix(), Nanos: int32(img.CreatedAt.Nanosecond())},
+			CreatedAt:     timestamppb.New(img.CreatedAt),
 		}
 	}
 
@@ -313,8 +348,8 @@ func noteToProto(n *db.Note) *pb.Note {
 		Id:        n.ID,
 		Content:   n.Content,
 		Tags:      tagNames,
-		CreatedAt: &pb.Timestamp{Seconds: n.CreatedAt.Unix(), Nanos: int32(n.CreatedAt.Nanosecond())},
-		UpdatedAt: &pb.Timestamp{Seconds: n.UpdatedAt.Unix(), Nanos: int32(n.UpdatedAt.Nanosecond())},
+		CreatedAt: timestamppb.New(n.CreatedAt),
+		UpdatedAt: timestamppb.New(n.UpdatedAt),
 		Images:    pbImages,
 	}
 }

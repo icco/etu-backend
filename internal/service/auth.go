@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // AuthService implements the AuthService gRPC service
@@ -170,8 +171,8 @@ func userToProto(u *db.User) *pb.User {
 		Id:                 u.ID,
 		Email:              u.Email,
 		SubscriptionStatus: u.SubscriptionStatus,
-		CreatedAt:          &pb.Timestamp{Seconds: u.CreatedAt.Unix(), Nanos: int32(u.CreatedAt.Nanosecond())},
-		UpdatedAt:          &pb.Timestamp{Seconds: u.UpdatedAt.Unix(), Nanos: int32(u.UpdatedAt.Nanosecond())},
+		CreatedAt:          timestamppb.New(u.CreatedAt),
+		UpdatedAt:          timestamppb.New(u.UpdatedAt),
 	}
 
 	if u.Name != nil {
@@ -181,10 +182,7 @@ func userToProto(u *db.User) *pb.User {
 		pbUser.Image = u.Image
 	}
 	if u.SubscriptionEnd != nil {
-		pbUser.SubscriptionEnd = &pb.Timestamp{
-			Seconds: u.SubscriptionEnd.Unix(),
-			Nanos:   int32(u.SubscriptionEnd.Nanosecond()),
-		}
+		pbUser.SubscriptionEnd = timestamppb.New(*u.SubscriptionEnd)
 	}
 	if u.StripeCustomerID != nil {
 		pbUser.StripeCustomerId = u.StripeCustomerID

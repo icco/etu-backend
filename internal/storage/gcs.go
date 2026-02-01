@@ -35,7 +35,10 @@ func (c *Client) Close() error {
 	return c.client.Close()
 }
 
-// UploadImage uploads image data to GCS and returns the public URL.
+// SignedURLDuration is how long signed URLs remain valid
+const SignedURLDuration = 7 * 24 * time.Hour // 7 days
+
+// UploadImage uploads image data to GCS and returns a signed URL for access.
 // objectName should be a unique identifier for the image (e.g., "notes/{noteID}/{imageID}").
 // mimeType should be the MIME type of the image (e.g., "image/jpeg", "image/png").
 func (c *Client) UploadImage(ctx context.Context, objectName string, data []byte, mimeType string) (string, error) {
@@ -46,7 +49,7 @@ func (c *Client) UploadImage(ctx context.Context, objectName string, data []byte
 
 	writer := obj.NewWriter(ctx)
 	writer.ContentType = mimeType
-	writer.CacheControl = "public, max-age=31536000" // Cache for 1 year
+	writer.CacheControl = "private, max-age=3600" // Cache for 1 hour, private since we use signed URLs
 
 	if _, err := writer.Write(data); err != nil {
 		return "", fmt.Errorf("failed to write image data: %w", err)
@@ -56,8 +59,29 @@ func (c *Client) UploadImage(ctx context.Context, objectName string, data []byte
 		return "", fmt.Errorf("failed to close writer: %w", err)
 	}
 
-	// Return the public URL for the object
-	url := fmt.Sprintf("https://storage.googleapis.com/%s/%s", c.bucket, objectName)
+	// Generate a signed URL for accessing the object
+	url, err := c.GetSignedURL(ctx, objectName)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate signed URL: %w", err)
+	}
+
+	return url, nil
+}
+
+// GetSignedURL generates a signed URL for accessing an object.
+// The URL is valid for SignedURLDuration.
+func (c *Client) GetSignedURL(ctx context.Context, objectName string) (string, error) {
+	opts := &storage.SignedURLOptions{
+		Scheme:  storage.SigningSchemeV4,
+		Method:  "GET",
+		Expires: time.Now().Add(SignedURLDuration),
+	}
+
+	url, err := c.client.Bucket(c.bucket).SignedURL(objectName, opts)
+	if err != nil {
+		return "", fmt.Errorf("failed to create signed URL: %w", err)
+	}
+
 	return url, nil
 }
 
