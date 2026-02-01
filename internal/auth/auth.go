@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -56,7 +56,8 @@ func SetAuthContext(ctx context.Context, userID, authType string) context.Contex
 
 // Authenticator handles API key authentication
 type Authenticator struct {
-	db *sql.DB
+	db  *sql.DB
+	log *slog.Logger
 }
 
 // New creates a new Authenticator
@@ -75,7 +76,10 @@ func New() (*Authenticator, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &Authenticator{db: conn}, nil
+	return &Authenticator{
+		db:  conn,
+		log: slog.Default(),
+	}, nil
 }
 
 // Close closes the database connection
@@ -105,7 +109,7 @@ func (a *Authenticator) VerifyAPIKey(ctx context.Context, apiKey string) (string
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			log.Printf("Error closing rows: %v", err)
+			a.log.Error("error closing rows", "error", err)
 		}
 	}()
 

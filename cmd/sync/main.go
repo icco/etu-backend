@@ -3,18 +3,21 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/notion"
 	"github.com/icco/etu-backend/internal/sync"
 	"github.com/icco/etu-backend/internal/syncdb"
 )
 
 func main() {
+	log := logger.New()
+
 	// Parse command line flags
 	fullSync := flag.Bool("full", false, "Perform a full sync instead of incremental")
 	direction := flag.String("direction", "from-notion", "Sync direction: from-notion, to-notion, or bidirectional")
@@ -28,32 +31,39 @@ func main() {
 		"bidirectional": true,
 	}
 	if !validDirections[*direction] {
-		log.Fatalf("Error: invalid -direction value %q. Must be one of: from-notion, to-notion, bidirectional", *direction)
+		log.Error("invalid direction value", "direction", *direction, "valid_options", []string{"from-notion", "to-notion", "bidirectional"})
+		os.Exit(1)
 	}
 
-	log.Printf("Starting Notion sync job for all users with Notion keys")
-	log.Printf("  Direction: %s", *direction)
-	log.Printf("  Full sync: %v", *fullSync)
+	intervalStr := "once"
 	if *interval > 0 {
-		log.Printf("  Interval: %s", *interval)
+		intervalStr = interval.String()
 	}
+
+	log.Info("starting Notion sync job", 
+		"direction", *direction,
+		"full_sync", *fullSync,
+		"continuous", *interval > 0,
+		"interval", intervalStr)
 
 	// Initialize database with GORM
 	database, err := syncdb.New()
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer func() {
 		if err := database.Close(); err != nil {
-			log.Printf("Error closing database: %v", err)
+			log.Error("error closing database", "error", err)
 		}
 	}()
-	log.Println("Connected to database")
 
 	// Run auto-migrations to ensure all tables exist
 	if err := database.AutoMigrate(); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		log.Error("failed to run migrations", "error", err)
+		os.Exit(1)
 	}
+	log.Info("database connected and migrations completed")
 
 	// Handle graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -63,27 +73,27 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-sigCh
-		log.Println("Received shutdown signal, stopping...")
+		sig := <-sigCh
+		log.Info("received shutdown signal, stopping", "signal", sig.String())
 		cancel()
 	}()
 
 	if *interval > 0 {
 		// Run continuously
-		runContinuously(ctx, database, *fullSync, *direction, *interval)
+		runContinuously(ctx, log, database, *fullSync, *direction, *interval)
 	} else {
 		// Run once
-		runOnce(ctx, database, *fullSync, *direction)
+		runOnce(ctx, log, database, *fullSync, *direction)
 	}
 }
 
-func runOnce(ctx context.Context, database *syncdb.DB, fullSync bool, syncMode string) {
-	syncAllUsers(ctx, database, fullSync, syncMode)
+func runOnce(ctx context.Context, log *slog.Logger, database *syncdb.DB, fullSync bool, syncMode string) {
+	syncAllUsers(ctx, log, database, fullSync, syncMode)
 }
 
-func runContinuously(ctx context.Context, database *syncdb.DB, fullSync bool, syncMode string, interval time.Duration) {
+func runContinuously(ctx context.Context, log *slog.Logger, database *syncdb.DB, fullSync bool, syncMode string, interval time.Duration) {
 	// Run immediately on start
-	syncAllUsers(ctx, database, fullSync, syncMode)
+	syncAllUsers(ctx, log, database, fullSync, syncMode)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -91,31 +101,31 @@ func runContinuously(ctx context.Context, database *syncdb.DB, fullSync bool, sy
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Shutting down sync job")
+			log.Info("shutting down sync job")
 			return
 		case <-ticker.C:
 			// After the first run, always do incremental syncs unless --full was specified
-			syncAllUsers(ctx, database, fullSync, syncMode)
+			syncAllUsers(ctx, log, database, fullSync, syncMode)
 		}
 	}
 }
 
-func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncMode string) {
-	log.Printf("Starting sync for all users at %s", time.Now().Format(time.RFC3339))
+func syncAllUsers(ctx context.Context, log *slog.Logger, database *syncdb.DB, fullSync bool, syncMode string) {
+	log.Info("starting sync for all users", "timestamp", time.Now().Format(time.RFC3339))
 
 	// Get all users with Notion keys
 	users, err := database.GetUsersWithNotionKeys(ctx)
 	if err != nil {
-		log.Printf("Error: Failed to get users with Notion keys: %v", err)
+		log.Error("failed to get users with Notion keys", "error", err)
 		return
 	}
 
 	if len(users) == 0 {
-		log.Println("No users with Notion API keys configured")
+		log.Info("no users with Notion API keys configured")
 		return
 	}
 
-	log.Printf("Found %d user(s) with Notion keys configured", len(users))
+	log.Info("found users with Notion keys", "count", len(users))
 
 	successCount := 0
 	failureCount := 0
@@ -125,14 +135,12 @@ func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncM
 			continue
 		}
 
-		log.Printf("Syncing user %s...", user.ID)
-
 		// Create Notion client with user's API key
 		notionClient := notion.NewClientWithKey(*user.NotionKey)
 		syncer := sync.NewSyncer(database, notionClient)
 
 		// Try to sync and track success/failure
-		syncResult := performSyncWithResult(ctx, syncer, user.ID, fullSync, syncMode)
+		syncResult := performSyncWithResult(ctx, log, syncer, user.ID, fullSync, syncMode)
 		if syncResult {
 			successCount++
 		} else {
@@ -140,41 +148,74 @@ func syncAllUsers(ctx context.Context, database *syncdb.DB, fullSync bool, syncM
 		}
 	}
 
-	log.Printf("Completed sync for all users: %d succeeded, %d failed", successCount, failureCount)
+	log.Info("completed sync for all users", 
+		"succeeded", successCount,
+		"failed", failureCount,
+		"total", len(users))
 }
 
-func performSyncWithResult(ctx context.Context, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) bool {
+func performSyncWithResult(ctx context.Context, log *slog.Logger, syncer *sync.Syncer, userID string, fullSync bool, syncMode string) bool {
 	switch syncMode {
 	case "to-notion":
 		result, err := syncer.SyncUserToNotion(ctx, userID)
 		if err != nil {
-			log.Printf(`{"user": "%s", "direction": "to-notion", "status": "failed", "error": "%v"}`, userID, err)
+			log.Error("sync to Notion failed", 
+				"user_id", userID,
+				"direction", "to-notion",
+				"error", err)
 			return false
 		}
-		log.Printf(`{"user": "%s", "direction": "to-notion", "status": "success", "duration": "%s", "created": %d, "updated": %d, "archived": %d, "errors": %d}`,
-			userID, result.Duration, result.Created, result.Updated, result.Archived, result.Errors)
+		log.Info("sync to Notion completed",
+			"user_id", userID,
+			"direction", "to-notion",
+			"duration", result.Duration.String(),
+			"created", result.Created,
+			"updated", result.Updated,
+			"archived", result.Archived,
+			"errors", result.Errors)
 		return result.Errors == 0
 
 	case "bidirectional":
 		fromResult, toResult, err := syncer.SyncUserBidirectional(ctx, userID, fullSync)
 		if err != nil {
-			log.Printf(`{"user": "%s", "direction": "bidirectional", "status": "failed", "error": "%v"}`, userID, err)
+			log.Error("bidirectional sync failed",
+				"user_id", userID,
+				"direction", "bidirectional",
+				"error", err)
 			return false
 		}
-		log.Printf(`{"user": "%s", "direction": "bidirectional", "status": "success", "from_notion": {"duration": "%s", "created": %d, "updated": %d, "unchanged": %d, "errors": %d}, "to_notion": {"duration": "%s", "created": %d, "updated": %d, "archived": %d, "errors": %d}}`,
-			userID,
-			fromResult.Duration, fromResult.Created, fromResult.Updated, fromResult.Unchanged, fromResult.Errors,
-			toResult.Duration, toResult.Created, toResult.Updated, toResult.Archived, toResult.Errors)
+		log.Info("bidirectional sync completed",
+			"user_id", userID,
+			"direction", "bidirectional",
+			"from_notion_duration", fromResult.Duration.String(),
+			"from_notion_created", fromResult.Created,
+			"from_notion_updated", fromResult.Updated,
+			"from_notion_unchanged", fromResult.Unchanged,
+			"from_notion_errors", fromResult.Errors,
+			"to_notion_duration", toResult.Duration.String(),
+			"to_notion_created", toResult.Created,
+			"to_notion_updated", toResult.Updated,
+			"to_notion_archived", toResult.Archived,
+			"to_notion_errors", toResult.Errors)
 		return fromResult.Errors == 0 && toResult.Errors == 0
 
 	default: // from-notion
 		result, err := syncer.SyncUser(ctx, userID, fullSync)
 		if err != nil {
-			log.Printf(`{"user": "%s", "direction": "from-notion", "status": "failed", "error": "%v"}`, userID, err)
+			log.Error("sync from Notion failed",
+				"user_id", userID,
+				"direction", "from-notion",
+				"error", err)
 			return false
 		}
-		log.Printf(`{"user": "%s", "direction": "from-notion", "status": "success", "duration": "%s", "created": %d, "updated": %d, "unchanged": %d, "errors": %d}`,
-			userID, result.Duration, result.Created, result.Updated, result.Unchanged, result.Errors)
+		log.Info("sync from Notion completed",
+			"user_id", userID,
+			"direction", "from-notion",
+			"duration", result.Duration.String(),
+			"created", result.Created,
+			"updated", result.Updated,
+			"unchanged", result.Unchanged,
+			"errors", result.Errors)
 		return result.Errors == 0
 	}
 }
