@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/icco/etu-backend/internal/ai"
 	"github.com/icco/etu-backend/internal/db"
@@ -38,6 +38,7 @@ type NotesService struct {
 	storage      *storage.Client
 	geminiAPIKey string
 	imgixDomain  string
+	log          *slog.Logger
 }
 
 // NewNotesService creates a new NotesService
@@ -47,6 +48,7 @@ func NewNotesService(database *db.DB, storageClient *storage.Client, geminiAPIKe
 		storage:      storageClient,
 		geminiAPIKey: geminiAPIKey,
 		imgixDomain:  imgixDomain,
+		log:          slog.Default(),
 	}
 }
 
@@ -120,17 +122,17 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 			// Upload image to GCS
 			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
 			if err != nil {
-				log.Printf("Failed to process image %d for note %s: %v", i, note.ID, err)
+				s.log.Error("failed to process image", "note_id", note.ID, "image_index", i, "error", err)
 				continue // Continue with other images even if one fails
 			}
 
 			// Add image to database
 			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
-				log.Printf("Failed to save image %d for note %s: %v", i, note.ID, err)
+				s.log.Error("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, "error", err)
 				// Try to clean up the uploaded image
 				if s.storage != nil {
 					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
-						log.Printf("Failed to clean up image %s from GCS after DB error: %v", noteImage.GCSObjectName, deleteErr)
+						s.log.Error("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, "error", deleteErr)
 					}
 				}
 				continue
@@ -186,7 +188,7 @@ func (s *NotesService) processAndUploadImage(ctx context.Context, noteID string,
 	if s.geminiAPIKey != "" {
 		extractedText, err = ai.ExtractTextFromImage(ctx, imageData, mimeType, s.geminiAPIKey)
 		if err != nil {
-			log.Printf("Failed to extract text from image %s: %v", imageID, err)
+			s.log.Warn("failed to extract text from image", "image_id", imageID, "error", err)
 			// Continue without extracted text - don't fail the whole operation
 		}
 	}
@@ -260,15 +262,15 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		for i, img := range req.AddImages {
 			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
 			if err != nil {
-				log.Printf("Failed to process image %d for note %s: %v", i, note.ID, err)
+				s.log.Error("failed to process image", "note_id", note.ID, "image_index", i, "error", err)
 				continue
 			}
 
 			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
-				log.Printf("Failed to save image %d for note %s: %v", i, note.ID, err)
+				s.log.Error("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, "error", err)
 				if s.storage != nil {
 					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
-						log.Printf("Failed to clean up image %s from GCS after DB error: %v", noteImage.GCSObjectName, deleteErr)
+						s.log.Error("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, "error", deleteErr)
 					}
 				}
 				continue
@@ -304,7 +306,7 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 	// Get images before deleting the note so we can clean them up from GCS
 	images, err := s.db.GetImagesByNoteID(ctx, req.Id)
 	if err != nil {
-		log.Printf("Failed to get images for note %s before deletion: %v", req.Id, err)
+		s.log.Warn("failed to get images for note before deletion", "note_id", req.Id, "error", err)
 	}
 
 	deleted, err := s.db.DeleteNote(ctx, req.UserId, req.Id)
@@ -316,7 +318,7 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 	if deleted && s.storage != nil {
 		for _, img := range images {
 			if err := s.storage.DeleteImage(ctx, img.GCSObjectName); err != nil {
-				log.Printf("Failed to delete image %s from GCS: %v", img.GCSObjectName, err)
+				s.log.Error("failed to delete image from GCS", "object_name", img.GCSObjectName, "error", err)
 			}
 		}
 	}

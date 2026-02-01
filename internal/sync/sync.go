@@ -3,7 +3,7 @@ package sync
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/icco/etu-backend/internal/notion"
@@ -14,6 +14,7 @@ import (
 type Syncer struct {
 	db     *syncdb.DB
 	notion *notion.Client
+	log    *slog.Logger
 }
 
 // NewSyncer creates a new Syncer instance.
@@ -21,6 +22,7 @@ func NewSyncer(database *syncdb.DB, notionClient *notion.Client) *Syncer {
 	return &Syncer{
 		db:     database,
 		notion: notionClient,
+		log:    slog.Default(),
 	}
 }
 
@@ -52,7 +54,6 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 	var err error
 
 	if fullSync {
-		log.Printf("Starting full sync for user %s", userID)
 		posts, err = s.notion.ListAllPosts(ctx)
 	} else {
 		lastSync, syncErr := s.db.GetLastSyncTime(userID)
@@ -61,12 +62,12 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 		}
 
 		if lastSync == nil {
-			log.Printf("No previous sync found for user %s, performing full sync", userID)
+			s.log.Info("no previous sync found, performing full sync", "user_id", userID)
 			posts, err = s.notion.ListAllPosts(ctx)
 		} else {
 			// Add a small buffer to avoid missing posts due to timing
 			since := lastSync.Add(-5 * time.Minute)
-			log.Printf("Starting incremental sync for user %s (since %s)", userID, since.Format(time.RFC3339))
+			s.log.Info("starting incremental sync", "user_id", userID, "since", since.Format(time.RFC3339))
 			posts, err = s.notion.ListPostsSince(ctx, since)
 		}
 	}
@@ -75,13 +76,13 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 		return nil, fmt.Errorf("failed to fetch posts from Notion: %w", err)
 	}
 
-	log.Printf("Fetched %d posts from Notion", len(posts))
+	s.log.Info("fetched posts from Notion", "user_id", userID, "count", len(posts))
 
 	for _, post := range posts {
 		// Get existing note to check if it changed
 		existing, getErr := s.db.GetNoteByNotionUUID(userID, post.ID)
 		if getErr != nil {
-			log.Printf("Error checking existing note for %s: %v", post.ID, getErr)
+			s.log.Error("error checking existing note", "notion_uuid", post.ID, "error", getErr)
 			result.Errors++
 			continue
 		}
@@ -97,7 +98,7 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 			post.ModifiedAt,
 		)
 		if upsertErr != nil {
-			log.Printf("Error upserting note %s: %v", post.ID, upsertErr)
+			s.log.Error("error upserting note", "notion_uuid", post.ID, "error", upsertErr)
 			result.Errors++
 			continue
 		}
@@ -113,7 +114,7 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 
 	// Update last sync time
 	if err := s.db.UpdateLastSyncTime(userID, time.Now()); err != nil {
-		log.Printf("Warning: failed to update last sync time: %v", err)
+		s.log.Warn("failed to update last sync time", "user_id", userID, "error", err)
 	}
 
 	result.Duration = time.Since(start)
@@ -156,13 +157,13 @@ func (s *Syncer) SyncUserToNotion(ctx context.Context, userID string) (*SyncToNo
 		return nil, fmt.Errorf("failed to get notes needing sync: %w", err)
 	}
 
-	log.Printf("Found %d notes to sync to Notion for user %s", len(notes), userID)
+	s.log.Info("syncing notes to Notion", "user_id", userID, "count", len(notes))
 
 	for _, note := range notes {
 		// Get tags for this note
 		tags, tagErr := s.db.GetNoteTags(note.ID)
 		if tagErr != nil {
-			log.Printf("Error getting tags for note %s: %v", note.ID, tagErr)
+			s.log.Error("error getting tags for note", "note_id", note.ID, "error", tagErr)
 			result.Errors++
 			continue
 		}
@@ -171,53 +172,53 @@ func (s *Syncer) SyncUserToNotion(ctx context.Context, userID string) (*SyncToNo
 			// Note doesn't exist in Notion yet - create it
 			pageID, createErr := s.notion.CreatePost(ctx, note.ID, note.Content, tags)
 			if createErr != nil {
-				log.Printf("Error creating Notion page for note %s: %v", note.ID, createErr)
+				s.log.Error("error creating Notion page", "note_id", note.ID, "error", createErr)
 				result.Errors++
 				continue
 			}
 
 			// Update the note with the new Notion page ID
 			if markErr := s.db.MarkNoteSyncedToNotion(note.ID, pageID, note.ID); markErr != nil {
-				log.Printf("Error marking note %s as synced: %v", note.ID, markErr)
+				s.log.Error("error marking note as synced", "note_id", note.ID, "error", markErr)
 				result.Errors++
 				continue
 			}
 
 			result.Created++
-			log.Printf("Created Notion page %s for note %s", pageID, note.ID)
+			s.log.Info("created Notion page", "note_id", note.ID, "page_id", pageID)
 		} else {
 			// Note exists in Notion - update it
 			if updateErr := s.notion.UpdatePost(ctx, *note.ExternalID, note.Content, tags); updateErr != nil {
-				log.Printf("Error updating Notion page %s for note %s: %v", *note.ExternalID, note.ID, updateErr)
+				s.log.Error("error updating Notion page", "note_id", note.ID, "page_id", *note.ExternalID, "error", updateErr)
 				result.Errors++
 				continue
 			}
 
 			// Update the sync timestamp
 			if markErr := s.db.UpdateNoteNotionSyncTime(note.ID); markErr != nil {
-				log.Printf("Error updating sync time for note %s: %v", note.ID, markErr)
+				s.log.Error("error updating sync time", "note_id", note.ID, "error", markErr)
 				result.Errors++
 				continue
 			}
 
 			result.Updated++
-			log.Printf("Updated Notion page %s for note %s", *note.ExternalID, note.ID)
+			s.log.Info("updated Notion page", "note_id", note.ID, "page_id", *note.ExternalID)
 		}
 	}
 
 	// Handle archived/deleted notes (archive them in Notion)
 	archivedPageIDs, err := s.db.GetArchivedNotePageIDs(userID)
 	if err != nil {
-		log.Printf("Warning: failed to get archived notes: %v", err)
+		s.log.Warn("failed to get archived notes", "user_id", userID, "error", err)
 	} else {
 		for _, pageID := range archivedPageIDs {
 			if archiveErr := s.notion.ArchivePost(ctx, pageID); archiveErr != nil {
-				log.Printf("Error archiving Notion page %s: %v", pageID, archiveErr)
+				s.log.Error("error archiving Notion page", "page_id", pageID, "error", archiveErr)
 				result.Errors++
 				continue
 			}
 			result.Archived++
-			log.Printf("Archived Notion page %s", pageID)
+			s.log.Info("archived Notion page", "page_id", pageID)
 		}
 	}
 
