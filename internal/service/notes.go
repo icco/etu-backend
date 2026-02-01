@@ -115,7 +115,7 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
 	if req.Content == "" && len(req.Images) == 0 && len(req.Audios) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "content, images, or audios is required")
+		return nil, status.Error(codes.InvalidArgument, "at least one of content, images, or audios is required")
 	}
 	if req.Content == "" && (len(req.Images) > 0 || len(req.Audios) > 0) && s.storage == nil {
 		return nil, status.Error(codes.FailedPrecondition, "storage is not configured")
