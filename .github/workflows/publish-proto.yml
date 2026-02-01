@@ -30,11 +30,13 @@ jobs:
       - name: Generate and build
         run: npm run build
 
-      - name: Set version from commit
+      - name: Set version from date
         run: |
-          COMMIT_SHA=$(git rev-parse --short HEAD)
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
-          VERSION="0.0.0-${TIMESTAMP}.${COMMIT_SHA}"
+          YEAR=$(date +%Y)
+          MONTH=$(date +%m)
+          # Use hours + minutes as the daily counter (000-2359)
+          COUNTER=$(date +%H%M)
+          VERSION="${YEAR}.${MONTH}.${COUNTER}"
           npm version $VERSION --no-git-tag-version
           echo "Publishing version: $VERSION"
 
