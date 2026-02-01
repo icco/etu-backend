@@ -22,30 +22,6 @@ const (
 	MaxAudioSize      = 25 * 1024 * 1024 // 25MB max audio size
 )
 
-// allowedImageMIMETypes is the list of allowed image MIME types
-var allowedImageMIMETypes = map[string]bool{
-	"image/jpeg": true,
-	"image/png":  true,
-	"image/gif":  true,
-	"image/webp": true,
-	"image/heic": true,
-	"image/heif": true,
-}
-
-// allowedAudioMIMETypes is the list of allowed audio MIME types
-var allowedAudioMIMETypes = map[string]bool{
-	"audio/mpeg": true, // MP3
-	"audio/mp3":  true, // MP3 (alternative)
-	"audio/wav":  true, // WAV
-	"audio/wave": true, // WAV (alternative)
-	"audio/ogg":  true, // OGG
-	"audio/webm": true, // WebM
-	"audio/mp4":  true, // MP4 audio
-	"audio/m4a":  true, // M4A
-	"audio/flac": true, // FLAC
-	"audio/aac":  true, // AAC
-}
-
 // NotesService implements the NotesService gRPC service
 type NotesService struct {
 	pb.UnimplementedNotesServiceServer
@@ -191,7 +167,7 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 // validateImage validates the image MIME type and size
 func validateImage(imageData []byte, mimeType string) error {
 	// Validate MIME type against allow-list
-	if !allowedImageMIMETypes[mimeType] {
+	if !ai.IsValidImageMimeType(mimeType) {
 		return fmt.Errorf("unsupported image type: %s. Allowed types: image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif", mimeType)
 	}
 
@@ -238,7 +214,7 @@ func (s *NotesService) processAndUploadImage(ctx context.Context, noteID string,
 // validateAudio validates the audio MIME type and size
 func validateAudio(audioData []byte, mimeType string) error {
 	// Validate MIME type against allow-list
-	if !allowedAudioMIMETypes[mimeType] {
+	if !ai.IsValidAudioMimeType(mimeType) {
 		return fmt.Errorf("unsupported audio type: %s. Allowed types: audio/mpeg, audio/mp3, audio/wav, audio/wave, audio/ogg, audio/webm, audio/mp4, audio/m4a, audio/flac, audio/aac", mimeType)
 	}
 
