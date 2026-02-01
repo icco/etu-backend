@@ -16,14 +16,12 @@ import (
 // mockNotesService wraps NotesService for testing
 type mockNotesService struct {
 	pb.UnimplementedNotesServiceServer
-	notes      map[string]*db.Note
-	nextNoteID int
+	notes map[string]*db.Note
 }
 
 func newMockNotesService() *mockNotesService {
 	return &mockNotesService{
-		notes:      make(map[string]*db.Note),
-		nextNoteID: 1,
+		notes: make(map[string]*db.Note),
 	}
 }
 
@@ -72,11 +70,8 @@ func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteReq
 		tags[i] = models.Tag{Name: name}
 	}
 
-	noteID := fmt.Sprintf("test-note-id-%d", s.nextNoteID)
-	s.nextNoteID++
-
 	note := &db.Note{
-		ID:        noteID,
+		ID:        models.GenerateCUID(),
 		Content:   req.Content,
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -473,6 +468,14 @@ func TestGetRandomNotes(t *testing.T) {
 		})
 	}
 
+	// Create a smaller set of notes for another user
+	for i := 1; i <= 2; i++ {
+		_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
+			UserId:  "user-456",
+			Content: fmt.Sprintf("Test note for user-456: %d", i),
+		})
+	}
+
 	tests := []struct {
 		name         string
 		req          *pb.GetRandomNotesRequest
@@ -508,6 +511,16 @@ func TestGetRandomNotes(t *testing.T) {
 			wantErr:      codes.OK,
 			wantNotesMin: 10,
 			wantNotesMax: 10,
+		},
+		{
+			name: "request more notes than available (small dataset)",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-456",
+				Count:  5,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 2,
+			wantNotesMax: 2,
 		},
 		{
 			name: "missing user_id",
