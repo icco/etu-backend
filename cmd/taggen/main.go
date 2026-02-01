@@ -195,7 +195,7 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 		return nil, err
 	}
 
-	log.Info("processing user for tag generation", 
+	log.Info("processing user for tag generation",
 		"user_id", userID,
 		"notes_with_few_tags", len(notes),
 		"existing_tags", len(existingTags))

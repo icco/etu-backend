@@ -40,7 +40,7 @@ func main() {
 		intervalStr = interval.String()
 	}
 
-	log.Info("starting Notion sync job", 
+	log.Info("starting Notion sync job",
 		"direction", *direction,
 		"full_sync", *fullSync,
 		"continuous", *interval > 0,
@@ -148,7 +148,7 @@ func syncAllUsers(ctx context.Context, log *slog.Logger, database *syncdb.DB, fu
 		}
 	}
 
-	log.Info("completed sync for all users", 
+	log.Info("completed sync for all users",
 		"succeeded", successCount,
 		"failed", failureCount,
 		"total", len(users))
@@ -159,7 +159,7 @@ func performSyncWithResult(ctx context.Context, log *slog.Logger, syncer *sync.S
 	case "to-notion":
 		result, err := syncer.SyncUserToNotion(ctx, userID)
 		if err != nil {
-			log.Error("sync to Notion failed", 
+			log.Error("sync to Notion failed",
 				"user_id", userID,
 				"direction", "to-notion",
 				"error", err)

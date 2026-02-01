@@ -98,11 +98,11 @@ func main() {
 	// Get Gemini API key for OCR (optional)
 	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
 	geminiEnabled := geminiAPIKey != ""
-	
+
 	// Get imgix domain for image URLs (optional)
 	imgixDomain := os.Getenv("IMGIX_DOMAIN")
-	
-	log.Info("optional features configured", 
+
+	log.Info("optional features configured",
 		"gemini_ocr_enabled", geminiEnabled,
 		"imgix_enabled", imgixDomain != "",
 		"imgix_domain", imgixDomain)
