@@ -113,7 +113,6 @@ message UpdateNoteRequest {
   repeated string tags = 4;
   bool update_tags = 5;    // Flag to indicate if tags should be updated
   repeated ImageUpload add_images = 6;
-  repeated string remove_image_ids = 7;
 }
 
 message UpdateNoteResponse {

@@ -218,21 +218,6 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		return nil, status.Error(codes.NotFound, "note not found")
 	}
 
-	// Remove images if requested
-	for _, imageID := range req.RemoveImageIds {
-		objectName, err := s.db.RemoveImageFromNote(ctx, req.UserId, req.Id, imageID)
-		if err != nil {
-			log.Printf("Failed to remove image %s from note %s: %v", imageID, req.Id, err)
-			continue
-		}
-		// Delete from GCS
-		if objectName != "" && s.storage != nil {
-			if err := s.storage.DeleteImage(ctx, objectName); err != nil {
-				log.Printf("Failed to delete image %s from GCS: %v", objectName, err)
-			}
-		}
-	}
-
 	// Add new images if any
 	if len(req.AddImages) > 0 && s.storage != nil {
 		for i, img := range req.AddImages {

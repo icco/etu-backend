@@ -921,16 +921,15 @@ func (x *GetNoteResponse) GetNote() *Note {
 }
 
 type UpdateNoteRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Required for auth context
-	Id             string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
-	Content        *string                `protobuf:"bytes,3,opt,name=content,proto3,oneof" json:"content,omitempty"`
-	Tags           []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
-	UpdateTags     bool                   `protobuf:"varint,5,opt,name=update_tags,json=updateTags,proto3" json:"update_tags,omitempty"` // Flag to indicate if tags should be updated
-	AddImages      []*ImageUpload         `protobuf:"bytes,6,rep,name=add_images,json=addImages,proto3" json:"add_images,omitempty"`
-	RemoveImageIds []string               `protobuf:"bytes,7,rep,name=remove_image_ids,json=removeImageIds,proto3" json:"remove_image_ids,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // Required for auth context
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	Content       *string                `protobuf:"bytes,3,opt,name=content,proto3,oneof" json:"content,omitempty"`
+	Tags          []string               `protobuf:"bytes,4,rep,name=tags,proto3" json:"tags,omitempty"`
+	UpdateTags    bool                   `protobuf:"varint,5,opt,name=update_tags,json=updateTags,proto3" json:"update_tags,omitempty"` // Flag to indicate if tags should be updated
+	AddImages     []*ImageUpload         `protobuf:"bytes,6,rep,name=add_images,json=addImages,proto3" json:"add_images,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateNoteRequest) Reset() {
@@ -1001,13 +1000,6 @@ func (x *UpdateNoteRequest) GetUpdateTags() bool {
 func (x *UpdateNoteRequest) GetAddImages() []*ImageUpload {
 	if x != nil {
 		return x.AddImages
-	}
-	return nil
-}
-
-func (x *UpdateNoteRequest) GetRemoveImageIds() []string {
-	if x != nil {
-		return x.RemoveImageIds
 	}
 	return nil
 }
@@ -2408,7 +2400,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\"0\n" +
 	"\x0fGetNoteResponse\x12\x1d\n" +
-	"\x04note\x18\x01 \x01(\v2\t.etu.NoteR\x04note\"\xf7\x01\n" +
+	"\x04note\x18\x01 \x01(\v2\t.etu.NoteR\x04note\"\xcd\x01\n" +
 	"\x11UpdateNoteRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x1d\n" +
@@ -2417,8 +2409,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\vupdate_tags\x18\x05 \x01(\bR\n" +
 	"updateTags\x12/\n" +
 	"\n" +
-	"add_images\x18\x06 \x03(\v2\x10.etu.ImageUploadR\taddImages\x12(\n" +
-	"\x10remove_image_ids\x18\a \x03(\tR\x0eremoveImageIdsB\n" +
+	"add_images\x18\x06 \x03(\v2\x10.etu.ImageUploadR\taddImagesB\n" +
 	"\n" +
 	"\b_content\"3\n" +
 	"\x12UpdateNoteResponse\x12\x1d\n" +
