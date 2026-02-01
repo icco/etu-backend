@@ -52,6 +52,12 @@ func main() {
 	}()
 	log.Println("Connected to database")
 
+	// Run database migrations
+	if err := database.AutoMigrate(); err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
+	}
+	log.Println("Database migrations completed")
+
 	// Initialize authenticator
 	authenticator, err := auth.New()
 	if err != nil {
