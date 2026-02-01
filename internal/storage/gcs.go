@@ -104,7 +104,7 @@ func (c *Client) DeleteImage(ctx context.Context, objectName string) error {
 }
 
 // GetImage retrieves image data from GCS.
-func (c *Client) GetImage(ctx context.Context, objectName string) ([]byte, error) {
+func (c *Client) GetImage(ctx context.Context, objectName string) (data []byte, err error) {
 	obj := c.client.Bucket(c.bucket).Object(objectName)
 
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -114,9 +114,13 @@ func (c *Client) GetImage(ctx context.Context, objectName string) ([]byte, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to create reader: %w", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close reader: %w", closeErr)
+		}
+	}()
 
-	data, err := io.ReadAll(reader)
+	data, err = io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read image data: %w", err)
 	}

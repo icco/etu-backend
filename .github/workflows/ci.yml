@@ -43,10 +43,10 @@ jobs:
           git diff --staged --quiet || git commit -m "style: apply go fmt"
           git push || true
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.64.8
-          install-mode: goinstall
+          version: v2.8.0
+          install-mode: binary
   build:
     name: Build
     runs-on: ubuntu-latest
