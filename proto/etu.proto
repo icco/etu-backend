@@ -124,6 +124,15 @@ message DeleteNoteResponse {
   bool success = 1;
 }
 
+message GetRandomNotesRequest {
+  string user_id = 1;      // Required for auth context
+  int32 count = 2;         // Number of random notes to return (default: 5)
+}
+
+message GetRandomNotesResponse {
+  repeated Note notes = 1;
+}
+
 // Request/Response messages for Tags
 
 message ListTagsRequest {
@@ -253,6 +262,7 @@ service NotesService {
   rpc GetNote(GetNoteRequest) returns (GetNoteResponse);
   rpc UpdateNote(UpdateNoteRequest) returns (UpdateNoteResponse);
   rpc DeleteNote(DeleteNoteRequest) returns (DeleteNoteResponse);
+  rpc GetRandomNotes(GetRandomNotesRequest) returns (GetRandomNotesResponse);
 }
 
 service TagsService {
