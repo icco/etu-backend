@@ -462,100 +462,100 @@ func TestDeleteNote(t *testing.T) {
 }
 
 func TestGetRandomNotes(t *testing.T) {
-svc := newMockNotesService()
-ctx := context.Background()
+	svc := newMockNotesService()
+	ctx := context.Background()
 
-// Create several notes for testing
-for i := 1; i <= 10; i++ {
-_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
-UserId:  "user-123",
-Content: fmt.Sprintf("Test note %d", i),
-})
-}
+	// Create several notes for testing
+	for i := 1; i <= 10; i++ {
+		_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
+			UserId:  "user-123",
+			Content: fmt.Sprintf("Test note %d", i),
+		})
+	}
 
-tests := []struct {
-name          string
-req           *pb.GetRandomNotesRequest
-wantErr       codes.Code
-wantNotesMin  int
-wantNotesMax  int
-}{
-{
-name: "valid get random notes with default count",
-req: &pb.GetRandomNotesRequest{
-UserId: "user-123",
-},
-wantErr:      codes.OK,
-wantNotesMin: 5,
-wantNotesMax: 5,
-},
-{
-name: "valid get random notes with custom count",
-req: &pb.GetRandomNotesRequest{
-UserId: "user-123",
-Count:  3,
-},
-wantErr:      codes.OK,
-wantNotesMin: 3,
-wantNotesMax: 3,
-},
-{
-name: "valid get random notes with count larger than available",
-req: &pb.GetRandomNotesRequest{
-UserId: "user-123",
-Count:  20,
-},
-wantErr:      codes.OK,
-wantNotesMin: 10,
-wantNotesMax: 10,
-},
-{
-name: "missing user_id",
-req: &pb.GetRandomNotesRequest{
-Count: 5,
-},
-wantErr: codes.InvalidArgument,
-},
-{
-name: "user with no notes",
-req: &pb.GetRandomNotesRequest{
-UserId: "user-no-notes",
-Count:  5,
-},
-wantErr:      codes.OK,
-wantNotesMin: 0,
-wantNotesMax: 0,
-},
-}
+	tests := []struct {
+		name         string
+		req          *pb.GetRandomNotesRequest
+		wantErr      codes.Code
+		wantNotesMin int
+		wantNotesMax int
+	}{
+		{
+			name: "valid get random notes with default count",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-123",
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 5,
+			wantNotesMax: 5,
+		},
+		{
+			name: "valid get random notes with custom count",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-123",
+				Count:  3,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 3,
+			wantNotesMax: 3,
+		},
+		{
+			name: "valid get random notes with count larger than available",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-123",
+				Count:  20,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 10,
+			wantNotesMax: 10,
+		},
+		{
+			name: "missing user_id",
+			req: &pb.GetRandomNotesRequest{
+				Count: 5,
+			},
+			wantErr: codes.InvalidArgument,
+		},
+		{
+			name: "user with no notes",
+			req: &pb.GetRandomNotesRequest{
+				UserId: "user-no-notes",
+				Count:  5,
+			},
+			wantErr:      codes.OK,
+			wantNotesMin: 0,
+			wantNotesMax: 0,
+		},
+	}
 
-for _, tt := range tests {
-t.Run(tt.name, func(t *testing.T) {
-resp, err := svc.GetRandomNotes(ctx, tt.req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := svc.GetRandomNotes(ctx, tt.req)
 
-if tt.wantErr == codes.OK {
-if err != nil {
-t.Errorf("expected no error, got %v", err)
-}
-if resp == nil {
-t.Error("expected response")
-} else {
-notesCount := len(resp.Notes)
-if notesCount < tt.wantNotesMin || notesCount > tt.wantNotesMax {
-t.Errorf("expected %d-%d notes, got %d", tt.wantNotesMin, tt.wantNotesMax, notesCount)
-}
-}
-} else {
-if err == nil {
-t.Error("expected error, got nil")
-}
-st, ok := status.FromError(err)
-if !ok {
-t.Errorf("expected gRPC status error, got %v", err)
-}
-if st.Code() != tt.wantErr {
-t.Errorf("expected error code %v, got %v", tt.wantErr, st.Code())
-}
-}
-})
-}
+			if tt.wantErr == codes.OK {
+				if err != nil {
+					t.Errorf("expected no error, got %v", err)
+				}
+				if resp == nil {
+					t.Error("expected response")
+				} else {
+					notesCount := len(resp.Notes)
+					if notesCount < tt.wantNotesMin || notesCount > tt.wantNotesMax {
+						t.Errorf("expected %d-%d notes, got %d", tt.wantNotesMin, tt.wantNotesMax, notesCount)
+					}
+				}
+			} else {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				st, ok := status.FromError(err)
+				if !ok {
+					t.Errorf("expected gRPC status error, got %v", err)
+				}
+				if st.Code() != tt.wantErr {
+					t.Errorf("expected error code %v, got %v", tt.wantErr, st.Code())
+				}
+			}
+		})
+	}
 }
