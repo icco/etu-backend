@@ -2,8 +2,13 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"log"
 
+	"github.com/icco/etu-backend/internal/ai"
 	"github.com/icco/etu-backend/internal/db"
+	"github.com/icco/etu-backend/internal/models"
+	"github.com/icco/etu-backend/internal/storage"
 	pb "github.com/icco/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,12 +22,18 @@ const (
 // NotesService implements the NotesService gRPC service
 type NotesService struct {
 	pb.UnimplementedNotesServiceServer
-	db *db.DB
+	db           *db.DB
+	storage      *storage.Client
+	geminiAPIKey string
 }
 
 // NewNotesService creates a new NotesService
-func NewNotesService(database *db.DB) *NotesService {
-	return &NotesService{db: database}
+func NewNotesService(database *db.DB, storageClient *storage.Client, geminiAPIKey string) *NotesService {
+	return &NotesService{
+		db:           database,
+		storage:      storageClient,
+		geminiAPIKey: geminiAPIKey,
+	}
 }
 
 // ListNotes retrieves notes for a user with optional filtering
@@ -72,8 +83,13 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
-	if req.Content == "" {
-		return nil, status.Error(codes.InvalidArgument, "content is required")
+	if req.Content == "" && len(req.Images) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "content or images is required")
+	}
+
+	// Validate image mime types match images count
+	if len(req.Images) != len(req.ImageMimeTypes) {
+		return nil, status.Error(codes.InvalidArgument, "images and image_mime_types must have the same length")
 	}
 
 	// Verify authorization
@@ -86,8 +102,70 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		return nil, status.Errorf(codes.Internal, "failed to create note: %v", err)
 	}
 
+	// Process images if any
+	if len(req.Images) > 0 && s.storage != nil {
+		for i, imageData := range req.Images {
+			mimeType := req.ImageMimeTypes[i]
+
+			// Upload image to GCS
+			noteImage, err := s.processAndUploadImage(ctx, note.ID, imageData, mimeType)
+			if err != nil {
+				log.Printf("Failed to process image %d for note %s: %v", i, note.ID, err)
+				continue // Continue with other images even if one fails
+			}
+
+			// Add image to database
+			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
+				log.Printf("Failed to save image %d for note %s: %v", i, note.ID, err)
+				// Try to clean up the uploaded image
+				if s.storage != nil {
+					_ = s.storage.DeleteImage(ctx, noteImage.GCSObjectName)
+				}
+				continue
+			}
+
+			note.Images = append(note.Images, *noteImage)
+		}
+	}
+
 	return &pb.CreateNoteResponse{
 		Note: noteToProto(note),
+	}, nil
+}
+
+// processAndUploadImage uploads an image to GCS and extracts text using Gemini OCR
+func (s *NotesService) processAndUploadImage(ctx context.Context, noteID string, imageData []byte, mimeType string) (*models.NoteImage, error) {
+	if s.storage == nil {
+		return nil, fmt.Errorf("storage client not configured")
+	}
+
+	// Generate a unique object name
+	imageID := models.GenerateCUID()
+	objectName := fmt.Sprintf("notes/%s/%s", noteID, imageID)
+
+	// Upload to GCS
+	url, err := s.storage.UploadImage(ctx, objectName, imageData, mimeType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload image: %w", err)
+	}
+
+	// Extract text using Gemini OCR
+	var extractedText string
+	if s.geminiAPIKey != "" {
+		extractedText, err = ai.ExtractTextFromImage(ctx, imageData, mimeType, s.geminiAPIKey)
+		if err != nil {
+			log.Printf("Failed to extract text from image %s: %v", imageID, err)
+			// Continue without extracted text - don't fail the whole operation
+		}
+	}
+
+	return &models.NoteImage{
+		ID:            imageID,
+		NoteID:        noteID,
+		URL:           url,
+		GCSObjectName: objectName,
+		ExtractedText: extractedText,
+		MimeType:      mimeType,
 	}, nil
 }
 
@@ -127,6 +205,11 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
 
+	// Validate image mime types match images count
+	if len(req.AddImages) != len(req.AddImageMimeTypes) {
+		return nil, status.Error(codes.InvalidArgument, "add_images and add_image_mime_types must have the same length")
+	}
+
 	// Verify authorization
 	if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
 		return nil, err
@@ -143,6 +226,48 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 	}
 	if note == nil {
 		return nil, status.Error(codes.NotFound, "note not found")
+	}
+
+	// Remove images if requested
+	for _, imageID := range req.RemoveImageIds {
+		objectName, err := s.db.RemoveImageFromNote(ctx, req.UserId, req.Id, imageID)
+		if err != nil {
+			log.Printf("Failed to remove image %s from note %s: %v", imageID, req.Id, err)
+			continue
+		}
+		// Delete from GCS
+		if objectName != "" && s.storage != nil {
+			if err := s.storage.DeleteImage(ctx, objectName); err != nil {
+				log.Printf("Failed to delete image %s from GCS: %v", objectName, err)
+			}
+		}
+	}
+
+	// Add new images if any
+	if len(req.AddImages) > 0 && s.storage != nil {
+		for i, imageData := range req.AddImages {
+			mimeType := req.AddImageMimeTypes[i]
+
+			noteImage, err := s.processAndUploadImage(ctx, note.ID, imageData, mimeType)
+			if err != nil {
+				log.Printf("Failed to process image %d for note %s: %v", i, note.ID, err)
+				continue
+			}
+
+			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
+				log.Printf("Failed to save image %d for note %s: %v", i, note.ID, err)
+				if s.storage != nil {
+					_ = s.storage.DeleteImage(ctx, noteImage.GCSObjectName)
+				}
+				continue
+			}
+		}
+	}
+
+	// Reload note to get updated images
+	note, err = s.db.GetNote(ctx, req.UserId, req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to reload note: %v", err)
 	}
 
 	return &pb.UpdateNoteResponse{
@@ -164,9 +289,24 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 		return nil, err
 	}
 
+	// Get images before deleting the note so we can clean them up from GCS
+	images, err := s.db.GetImagesByNoteID(ctx, req.Id)
+	if err != nil {
+		log.Printf("Failed to get images for note %s before deletion: %v", req.Id, err)
+	}
+
 	deleted, err := s.db.DeleteNote(ctx, req.UserId, req.Id)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete note: %v", err)
+	}
+
+	// Clean up images from GCS if the note was deleted
+	if deleted && s.storage != nil {
+		for _, img := range images {
+			if err := s.storage.DeleteImage(ctx, img.GCSObjectName); err != nil {
+				log.Printf("Failed to delete image %s from GCS: %v", img.GCSObjectName, err)
+			}
+		}
 	}
 
 	return &pb.DeleteNoteResponse{
@@ -182,11 +322,24 @@ func noteToProto(n *db.Note) *pb.Note {
 		tagNames[i] = t.Name
 	}
 
+	// Convert []NoteImage to []*pb.NoteImage
+	pbImages := make([]*pb.NoteImage, len(n.Images))
+	for i, img := range n.Images {
+		pbImages[i] = &pb.NoteImage{
+			Id:            img.ID,
+			Url:           img.URL,
+			ExtractedText: img.ExtractedText,
+			MimeType:      img.MimeType,
+			CreatedAt:     &pb.Timestamp{Seconds: img.CreatedAt.Unix(), Nanos: int32(img.CreatedAt.Nanosecond())},
+		}
+	}
+
 	return &pb.Note{
 		Id:        n.ID,
 		Content:   n.Content,
 		Tags:      tagNames,
 		CreatedAt: &pb.Timestamp{Seconds: n.CreatedAt.Unix(), Nanos: int32(n.CreatedAt.Nanosecond())},
 		UpdatedAt: &pb.Timestamp{Seconds: n.UpdatedAt.Unix(), Nanos: int32(n.UpdatedAt.Nanosecond())},
+		Images:    pbImages,
 	}
 }
