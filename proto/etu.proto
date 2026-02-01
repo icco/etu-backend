@@ -2,21 +2,17 @@ syntax = "proto3";
 
 package etu;
 
-option go_package = "github.com/icco/etu-backend/proto";
+import "google/protobuf/timestamp.proto";
 
-// Timestamp message
-message Timestamp {
-  int64 seconds = 1;
-  int32 nanos = 2;
-}
+option go_package = "github.com/icco/etu-backend/proto";
 
 // Note message
 message Note {
   string id = 1;
   string content = 2;
   repeated string tags = 3;
-  Timestamp created_at = 4;
-  Timestamp updated_at = 5;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
 }
 
 // Tag message
@@ -24,7 +20,7 @@ message Tag {
   string id = 1;
   string name = 2;
   int32 count = 3;
-  Timestamp created_at = 4;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 // User message
@@ -34,12 +30,12 @@ message User {
   optional string name = 3;
   optional string image = 4;
   string subscription_status = 5;
-  optional Timestamp subscription_end = 6;
-  Timestamp created_at = 7;
+  optional google.protobuf.Timestamp subscription_end = 6;
+  google.protobuf.Timestamp created_at = 7;
   optional string stripe_customer_id = 8;
   optional string notion_key = 9;
   reserved 10; // was username, use name instead
-  Timestamp updated_at = 11;
+  google.protobuf.Timestamp updated_at = 11;
 }
 
 // API Key message
@@ -47,8 +43,8 @@ message ApiKey {
   string id = 1;
   string name = 2;
   string key_prefix = 3;
-  Timestamp created_at = 4;
-  optional Timestamp last_used = 5;
+  google.protobuf.Timestamp created_at = 4;
+  optional google.protobuf.Timestamp last_used = 5;
 }
 
 // Request/Response messages for Notes
@@ -161,7 +157,7 @@ message UpdateUserSubscriptionRequest {
   string user_id = 1;
   string subscription_status = 2;
   optional string stripe_customer_id = 3;
-  optional Timestamp subscription_end = 4;
+  optional google.protobuf.Timestamp subscription_end = 4;
 }
 
 message UpdateUserSubscriptionResponse {
