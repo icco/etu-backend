@@ -6,6 +6,21 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/icco/etu-backend/proto";
 
+// ImageUpload message for uploading images (client -> server)
+message ImageUpload {
+  bytes data = 1;
+  string mime_type = 2;
+}
+
+// NoteImage message for images attached to notes (server -> client)
+message NoteImage {
+  string id = 1;
+  string url = 2;
+  string extracted_text = 3;
+  string mime_type = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
 // Note message
 message Note {
   string id = 1;
@@ -13,6 +28,7 @@ message Note {
   repeated string tags = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+  repeated NoteImage images = 6;
 }
 
 // Tag message
@@ -70,6 +86,7 @@ message CreateNoteRequest {
   string user_id = 1;      // Required for auth context
   string content = 2;
   repeated string tags = 3;
+  repeated ImageUpload images = 4;
 }
 
 message CreateNoteResponse {
@@ -91,6 +108,7 @@ message UpdateNoteRequest {
   optional string content = 3;
   repeated string tags = 4;
   bool update_tags = 5;    // Flag to indicate if tags should be updated
+  repeated ImageUpload add_images = 6;
 }
 
 message UpdateNoteResponse {

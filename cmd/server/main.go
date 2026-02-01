@@ -14,6 +14,7 @@ import (
 	"github.com/icco/etu-backend/internal/auth"
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/service"
+	"github.com/icco/etu-backend/internal/storage"
 	pb "github.com/icco/etu-backend/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -63,13 +64,42 @@ func main() {
 	}()
 	log.Println("Authenticator initialized")
 
+	// Initialize GCS storage client (optional - image uploads won't work without it)
+	var storageClient *storage.Client
+	gcsBucket := os.Getenv("GCS_BUCKET")
+	if gcsBucket != "" {
+		ctx := context.Background()
+		storageClient, err = storage.New(ctx, gcsBucket)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize GCS storage client: %v", err)
+			log.Println("Image uploads will be disabled")
+		} else {
+			defer func() {
+				if err := storageClient.Close(); err != nil {
+					log.Printf("Error closing storage client: %v", err)
+				}
+			}()
+			log.Printf("GCS storage initialized with bucket: %s", gcsBucket)
+		}
+	} else {
+		log.Println("GCS_BUCKET not set - image uploads will be disabled")
+	}
+
+	// Get Gemini API key for OCR (optional)
+	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
+	if geminiAPIKey != "" {
+		log.Println("Gemini API key configured for image OCR")
+	} else {
+		log.Println("GEMINI_API_KEY not set - image OCR will be disabled")
+	}
+
 	// Create gRPC server with authentication interceptor
 	server := grpc.NewServer(
 		grpc.UnaryInterceptor(authInterceptor(authenticator)),
 	)
 
 	// Register services
-	notesService := service.NewNotesService(database)
+	notesService := service.NewNotesService(database, storageClient, geminiAPIKey)
 	tagsService := service.NewTagsService(database)
 	authService := service.NewAuthService(database)
 	apiKeysService := service.NewApiKeysService(database)

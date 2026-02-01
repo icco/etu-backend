@@ -23,6 +23,7 @@ type Note = models.Note
 type Tag = models.Tag
 type User = models.User
 type ApiKey = models.ApiKey
+type NoteImage = models.NoteImage
 
 // New creates a new GORM database connection
 func New() (*DB, error) {
@@ -69,6 +70,7 @@ func (db *DB) AutoMigrate() error {
 		&models.NoteTag{},
 		&models.ApiKey{},
 		&models.SyncState{},
+		&models.NoteImage{},
 	)
 }
 
@@ -110,13 +112,32 @@ func (db *DB) ListNotes(ctx context.Context, userID, search string, tags []strin
 		return nil, 0, fmt.Errorf("failed to query notes: %w", err)
 	}
 
-	// Fetch tags for each note
+	if len(notes) == 0 {
+		return notes, int(total), nil
+	}
+
+	// Collect note IDs for batch fetching
+	noteIDs := make([]string, len(notes))
+	for i, n := range notes {
+		noteIDs[i] = n.ID
+	}
+
+	// Batch fetch tags for all notes
+	tagsByNoteID, err := db.getTagsForNotes(ctx, noteIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to batch fetch tags: %w", err)
+	}
+
+	// Batch fetch images for all notes
+	imagesByNoteID, err := db.getImagesForNotes(ctx, noteIDs)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to batch fetch images: %w", err)
+	}
+
+	// Assign tags and images to notes
 	for i := range notes {
-		tagNames, err := db.getNoteTags(ctx, notes[i].ID)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get tags for note %s: %w", notes[i].ID, err)
-		}
-		notes[i].Tags = tagNames
+		notes[i].Tags = tagsByNoteID[notes[i].ID]
+		notes[i].Images = imagesByNoteID[notes[i].ID]
 	}
 
 	return notes, int(total), nil
@@ -131,6 +152,75 @@ func (db *DB) getNoteTags(ctx context.Context, noteID string) ([]Tag, error) {
 		Order(`"Tag".name`).
 		Find(&tags).Error
 	return tags, err
+}
+
+// getNoteImages retrieves images for a note
+func (db *DB) getNoteImages(ctx context.Context, noteID string) ([]NoteImage, error) {
+	var images []NoteImage
+	err := db.conn.WithContext(ctx).
+		Where(`"noteId" = ?`, noteID).
+		Order(`"createdAt" ASC`).
+		Find(&images).Error
+	return images, err
+}
+
+// noteTagResult is used for batch fetching tags with their note associations
+type noteTagResult struct {
+	NoteID string
+	Tag
+}
+
+// getTagsForNotes batch fetches tags for multiple notes
+func (db *DB) getTagsForNotes(ctx context.Context, noteIDs []string) (map[string][]Tag, error) {
+	var results []noteTagResult
+
+	err := db.conn.WithContext(ctx).
+		Table(`"Tag"`).
+		Select(`"NoteTag"."noteId" as note_id, "Tag".*`).
+		Joins(`JOIN "NoteTag" ON "Tag".id = "NoteTag"."tagId"`).
+		Where(`"NoteTag"."noteId" IN ?`, noteIDs).
+		Order(`"Tag".name`).
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Group tags by note ID
+	tagsByNoteID := make(map[string][]Tag)
+	for _, noteID := range noteIDs {
+		tagsByNoteID[noteID] = []Tag{} // Initialize empty slice for notes with no tags
+	}
+	for _, r := range results {
+		tagsByNoteID[r.NoteID] = append(tagsByNoteID[r.NoteID], r.Tag)
+	}
+
+	return tagsByNoteID, nil
+}
+
+// getImagesForNotes batch fetches images for multiple notes
+func (db *DB) getImagesForNotes(ctx context.Context, noteIDs []string) (map[string][]NoteImage, error) {
+	var images []NoteImage
+
+	err := db.conn.WithContext(ctx).
+		Where(`"noteId" IN ?`, noteIDs).
+		Order(`"createdAt" ASC`).
+		Find(&images).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Group images by note ID
+	imagesByNoteID := make(map[string][]NoteImage)
+	for _, noteID := range noteIDs {
+		imagesByNoteID[noteID] = []NoteImage{} // Initialize empty slice for notes with no images
+	}
+	for _, img := range images {
+		imagesByNoteID[img.NoteID] = append(imagesByNoteID[img.NoteID], img)
+	}
+
+	return imagesByNoteID, nil
 }
 
 // GetNote retrieves a single note by ID for a user
@@ -149,6 +239,12 @@ func (db *DB) GetNote(ctx context.Context, userID, noteID string) (*Note, error)
 		return nil, fmt.Errorf("failed to get tags for note: %w", err)
 	}
 	note.Tags = tags
+
+	images, err := db.getNoteImages(ctx, note.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images for note: %w", err)
+	}
+	note.Images = images
 
 	return &note, nil
 }
@@ -207,12 +303,18 @@ func (db *DB) CreateNote(ctx context.Context, userID, content string, tagNames [
 		return nil, err
 	}
 
-	// Reload tags
+	// Reload tags and images
 	tags, err := db.getNoteTags(ctx, note.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tags for note: %w", err)
 	}
 	note.Tags = tags
+
+	images, err := db.getNoteImages(ctx, note.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images for note: %w", err)
+	}
+	note.Images = images
 
 	return &note, nil
 }
@@ -288,12 +390,18 @@ func (db *DB) UpdateNote(ctx context.Context, userID, noteID string, content *st
 		return nil, nil
 	}
 
-	// Reload tags
+	// Reload tags and images
 	tags, err := db.getNoteTags(ctx, note.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tags for note: %w", err)
 	}
 	note.Tags = tags
+
+	images, err := db.getNoteImages(ctx, note.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images for note: %w", err)
+	}
+	note.Images = images
 
 	return &note, nil
 }
@@ -305,6 +413,63 @@ func (db *DB) DeleteNote(ctx context.Context, userID, noteID string) (bool, erro
 		return false, fmt.Errorf("failed to delete note: %w", result.Error)
 	}
 	return result.RowsAffected > 0, nil
+}
+
+// AddImageToNote adds an image to a note
+func (db *DB) AddImageToNote(ctx context.Context, noteID string, image *NoteImage) error {
+	image.NoteID = noteID
+	if image.CreatedAt.IsZero() {
+		image.CreatedAt = time.Now()
+	}
+	if err := db.conn.WithContext(ctx).Create(image).Error; err != nil {
+		return fmt.Errorf("failed to add image to note: %w", err)
+	}
+	return nil
+}
+
+// RemoveImageFromNote removes an image from a note and returns the GCS object name for cleanup
+func (db *DB) RemoveImageFromNote(ctx context.Context, userID, noteID, imageID string) (string, error) {
+	// First verify the note belongs to the user
+	var note Note
+	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
+	if result.Error == gorm.ErrRecordNotFound {
+		return "", fmt.Errorf("note not found")
+	}
+	if result.Error != nil {
+		return "", fmt.Errorf("failed to verify note ownership: %w", result.Error)
+	}
+
+	// Get the image to return the GCS object name
+	var image NoteImage
+	result = db.conn.WithContext(ctx).Where(`id = ? AND "noteId" = ?`, imageID, noteID).First(&image)
+	if result.Error == gorm.ErrRecordNotFound {
+		return "", nil // Image doesn't exist, nothing to delete
+	}
+	if result.Error != nil {
+		return "", fmt.Errorf("failed to get image: %w", result.Error)
+	}
+
+	// Delete the image
+	if err := db.conn.WithContext(ctx).Delete(&image).Error; err != nil {
+		return "", fmt.Errorf("failed to delete image: %w", err)
+	}
+
+	return image.GCSObjectName, nil
+}
+
+// GetNoteImages retrieves all images for a note (public version)
+func (db *DB) GetNoteImages(ctx context.Context, noteID string) ([]NoteImage, error) {
+	return db.getNoteImages(ctx, noteID)
+}
+
+// GetImagesByNoteID retrieves images for a note for deletion purposes
+func (db *DB) GetImagesByNoteID(ctx context.Context, noteID string) ([]NoteImage, error) {
+	var images []NoteImage
+	err := db.conn.WithContext(ctx).Where(`"noteId" = ?`, noteID).Find(&images).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images: %w", err)
+	}
+	return images, nil
 }
 
 // ListTags retrieves all tags for a user with usage counts

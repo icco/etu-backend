@@ -9,6 +9,7 @@ import (
 	pb "github.com/icco/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // mockTagsService wraps TagsService for testing
@@ -46,7 +47,7 @@ func (s *mockTagsService) ListTags(ctx context.Context, req *pb.ListTagsRequest)
 				Id:        t.ID,
 				Name:      t.Name,
 				Count:     int32(t.Count),
-				CreatedAt: &pb.Timestamp{Seconds: t.CreatedAt.Unix(), Nanos: int32(t.CreatedAt.Nanosecond())},
+				CreatedAt: timestamppb.New(t.CreatedAt),
 			})
 		}
 	}

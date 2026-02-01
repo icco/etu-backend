@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // ApiKeysService implements the ApiKeysService gRPC service
@@ -159,14 +160,11 @@ func apiKeyToProto(k *db.ApiKey) *pb.ApiKey {
 		Id:        k.ID,
 		Name:      k.Name,
 		KeyPrefix: k.KeyPrefix,
-		CreatedAt: &pb.Timestamp{Seconds: k.CreatedAt.Unix(), Nanos: int32(k.CreatedAt.Nanosecond())},
+		CreatedAt: timestamppb.New(k.CreatedAt),
 	}
 
 	if k.LastUsed != nil {
-		pbKey.LastUsed = &pb.Timestamp{
-			Seconds: k.LastUsed.Unix(),
-			Nanos:   int32(k.LastUsed.Nanosecond()),
-		}
+		pbKey.LastUsed = timestamppb.New(*k.LastUsed)
 	}
 
 	return pbKey
