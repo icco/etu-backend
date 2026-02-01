@@ -67,19 +67,21 @@ func (c *Client) TranscribeAudio(ctx context.Context, audioData []byte, mimeType
 	return strings.TrimSpace(transcribedText.String()), nil
 }
 
+// supportedAudioTypes is the map of supported audio MIME types
+var supportedAudioTypes = map[string]bool{
+	"audio/mpeg": true, // MP3
+	"audio/mp3":  true, // MP3 (alternative)
+	"audio/wav":  true, // WAV
+	"audio/wave": true, // WAV (alternative)
+	"audio/ogg":  true, // OGG
+	"audio/webm": true, // WebM
+	"audio/mp4":  true, // MP4 audio
+	"audio/m4a":  true, // M4A
+	"audio/flac": true, // FLAC
+	"audio/aac":  true, // AAC
+}
+
 // IsValidAudioMimeType checks if the MIME type is a supported audio format.
 func IsValidAudioMimeType(mimeType string) bool {
-	supportedTypes := map[string]bool{
-		"audio/mpeg": true,  // MP3
-		"audio/mp3":  true,  // MP3 (alternative)
-		"audio/wav":  true,  // WAV
-		"audio/wave": true,  // WAV (alternative)
-		"audio/ogg":  true,  // OGG
-		"audio/webm": true,  // WebM
-		"audio/mp4":  true,  // MP4 audio
-		"audio/m4a":  true,  // M4A
-		"audio/flac": true,  // FLAC
-		"audio/aac":  true,  // AAC
-	}
-	return supportedTypes[strings.ToLower(mimeType)]
+	return supportedAudioTypes[strings.ToLower(mimeType)]
 }

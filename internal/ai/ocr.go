@@ -67,16 +67,18 @@ func (c *Client) ExtractTextFromImage(ctx context.Context, imageData []byte, mim
 	return strings.TrimSpace(extractedText.String()), nil
 }
 
+// supportedImageTypes is the map of supported image MIME types
+var supportedImageTypes = map[string]bool{
+	"image/jpeg": true,
+	"image/jpg":  true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/heic": true,
+	"image/heif": true,
+}
+
 // IsValidImageMimeType checks if the MIME type is a supported image format.
 func IsValidImageMimeType(mimeType string) bool {
-	supportedTypes := map[string]bool{
-		"image/jpeg": true,
-		"image/jpg":  true,
-		"image/png":  true,
-		"image/gif":  true,
-		"image/webp": true,
-		"image/heic": true,
-		"image/heif": true,
-	}
-	return supportedTypes[strings.ToLower(mimeType)]
+	return supportedImageTypes[strings.ToLower(mimeType)]
 }
