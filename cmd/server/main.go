@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/icco/etu-backend/internal/ai"
 	"github.com/icco/etu-backend/internal/auth"
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/logger"
@@ -95,15 +96,25 @@ func main() {
 		log.Info("GCS storage not configured, image uploads will be disabled")
 	}
 
-	// Get Gemini API key for OCR (optional)
+	// Get Gemini API key for AI operations (optional)
+	var aiClient *ai.Client
 	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	geminiEnabled := geminiAPIKey != ""
+	if geminiAPIKey != "" {
+		aiClient, err = ai.NewClient(geminiAPIKey)
+		if err != nil {
+			log.Warn("failed to initialize AI client", "error", err)
+		} else {
+			log.Info("AI client initialized (OCR, transcription enabled)")
+		}
+	} else {
+		log.Info("AI client not configured (OCR, transcription disabled)")
+	}
 
 	// Get imgix domain for image URLs (optional)
 	imgixDomain := os.Getenv("IMGIX_DOMAIN")
 
 	log.Info("optional features configured",
-		"gemini_ocr_enabled", geminiEnabled,
+		"ai_enabled", aiClient != nil,
 		"imgix_enabled", imgixDomain != "",
 		"imgix_domain", imgixDomain)
 
@@ -113,7 +124,7 @@ func main() {
 	)
 
 	// Register services
-	notesService := service.NewNotesService(database, storageClient, geminiAPIKey, imgixDomain)
+	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
 	tagsService := service.NewTagsService(database)
 	authService := service.NewAuthService(database)
 	apiKeysService := service.NewApiKeysService(database)

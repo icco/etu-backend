@@ -11,11 +11,7 @@ import (
 // ExtractTextFromImage uses Gemini's vision capabilities to extract text from an image.
 // imageData is the raw image bytes, mimeType is the MIME type (e.g., "image/jpeg", "image/png").
 // Returns the extracted text, or an empty string if no text is found.
-func ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string, apiKey string) (string, error) {
-	if apiKey == "" {
-		return "", fmt.Errorf("no Gemini API key configured")
-	}
-
+func (c *Client) ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string) (string, error) {
 	if len(imageData) == 0 {
 		return "", fmt.Errorf("image data is empty")
 	}
@@ -25,11 +21,9 @@ func ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string
 		return "", fmt.Errorf("unsupported image MIME type: %s", mimeType)
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
-	})
+	client, err := c.newGenaiClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create Gemini client: %w", err)
+		return "", err
 	}
 
 	// Create content with both text prompt and image

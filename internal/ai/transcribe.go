@@ -11,11 +11,7 @@ import (
 // TranscribeAudio uses Gemini's audio capabilities to transcribe audio files.
 // audioData is the raw audio bytes, mimeType is the MIME type (e.g., "audio/mpeg", "audio/wav").
 // Returns the transcribed text, or an empty string if transcription fails.
-func TranscribeAudio(ctx context.Context, audioData []byte, mimeType string, apiKey string) (string, error) {
-	if apiKey == "" {
-		return "", fmt.Errorf("no Gemini API key configured")
-	}
-
+func (c *Client) TranscribeAudio(ctx context.Context, audioData []byte, mimeType string) (string, error) {
 	if len(audioData) == 0 {
 		return "", fmt.Errorf("audio data is empty")
 	}
@@ -25,11 +21,9 @@ func TranscribeAudio(ctx context.Context, audioData []byte, mimeType string, api
 		return "", fmt.Errorf("unsupported audio MIME type: %s", mimeType)
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
-	})
+	client, err := c.newGenaiClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create Gemini client: %w", err)
+		return "", err
 	}
 
 	// Create content with both text prompt and audio

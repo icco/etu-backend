@@ -30,6 +30,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize AI client
+	aiClient, err := ai.NewClient(geminiKey)
+	if err != nil {
+		log.Error("failed to initialize AI client", "error", err)
+		os.Exit(1)
+	}
+
 	intervalStr := "once"
 	if *interval > 0 {
 		intervalStr = interval.String()
@@ -69,15 +76,15 @@ func main() {
 
 	if *interval > 0 {
 		// Run continuously
-		runContinuously(ctx, log, database, geminiKey, *dryRun, *delay, *interval)
+		runContinuously(ctx, log, database, aiClient, *dryRun, *delay, *interval)
 	} else {
 		// Run once
-		runOnce(ctx, log, database, geminiKey, *dryRun, *delay)
+		runOnce(ctx, log, database, aiClient, *dryRun, *delay)
 	}
 }
 
-func runOnce(ctx context.Context, log *slog.Logger, database *db.DB, geminiKey string, dryRun bool, delay time.Duration) {
-	result, err := generateTagsForAllUsers(ctx, log, database, geminiKey, dryRun, delay)
+func runOnce(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration) {
+	result, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, delay)
 	if err != nil {
 		log.Error("tag generation failed", "error", err)
 		os.Exit(1)
@@ -91,9 +98,9 @@ func runOnce(ctx context.Context, log *slog.Logger, database *db.DB, geminiKey s
 		"errors", result.Errors)
 }
 
-func runContinuously(ctx context.Context, log *slog.Logger, database *db.DB, geminiKey string, dryRun bool, delay time.Duration, interval time.Duration) {
+func runContinuously(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration, interval time.Duration) {
 	// Run immediately on start
-	performTagGeneration(ctx, log, database, geminiKey, dryRun, delay)
+	performTagGeneration(ctx, log, database, aiClient, dryRun, delay)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -104,13 +111,13 @@ func runContinuously(ctx context.Context, log *slog.Logger, database *db.DB, gem
 			log.Info("shutting down tag generation job")
 			return
 		case <-ticker.C:
-			performTagGeneration(ctx, log, database, geminiKey, dryRun, delay)
+			performTagGeneration(ctx, log, database, aiClient, dryRun, delay)
 		}
 	}
 }
 
-func performTagGeneration(ctx context.Context, log *slog.Logger, database *db.DB, geminiKey string, dryRun bool, delay time.Duration) {
-	result, err := generateTagsForAllUsers(ctx, log, database, geminiKey, dryRun, delay)
+func performTagGeneration(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration) {
+	result, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, delay)
 	if err != nil {
 		log.Error("tag generation failed", "error", err)
 		return
@@ -125,7 +132,7 @@ func performTagGeneration(ctx context.Context, log *slog.Logger, database *db.DB
 }
 
 // generateTagsForAllUsers generates tags for all users in the database
-func generateTagsForAllUsers(ctx context.Context, log *slog.Logger, database *db.DB, geminiKey string, dryRun bool, delay time.Duration) (*TagGenResult, error) {
+func generateTagsForAllUsers(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration) (*TagGenResult, error) {
 	start := time.Now()
 	result := &TagGenResult{}
 
@@ -145,7 +152,7 @@ func generateTagsForAllUsers(ctx context.Context, log *slog.Logger, database *db
 		default:
 		}
 
-		userResult, err := generateTagsForUser(ctx, log, database, user.ID, geminiKey, dryRun, delay)
+		userResult, err := generateTagsForUser(ctx, log, database, user.ID, aiClient, dryRun, delay)
 		if err != nil {
 			log.Error("failed to generate tags for user", "user_id", user.ID, "error", err)
 			result.Errors++
@@ -171,7 +178,7 @@ type TagGenResult struct {
 	Duration       time.Duration
 }
 
-func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB, userID, geminiKey string, dryRun bool, delay time.Duration) (*TagGenResult, error) {
+func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB, userID string, aiClient *ai.Client, dryRun bool, delay time.Duration) (*TagGenResult, error) {
 	result := &TagGenResult{}
 
 	// Fetch all existing tags for the user to prefer reusing them
@@ -212,7 +219,7 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 		}
 
 		// Generate tags using Gemini, passing existing tags
-		generatedTags, err := ai.GenerateTags(ctx, note.Content, existingTagList, geminiKey)
+		generatedTags, err := aiClient.GenerateTags(ctx, note.Content, existingTagList)
 		if err != nil {
 			log.Error("failed to generate tags for note", "note_id", note.ID, "error", err)
 			result.Errors++

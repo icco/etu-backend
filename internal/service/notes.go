@@ -49,21 +49,21 @@ var allowedAudioMIMETypes = map[string]bool{
 // NotesService implements the NotesService gRPC service
 type NotesService struct {
 	pb.UnimplementedNotesServiceServer
-	db           *db.DB
-	storage      *storage.Client
-	geminiAPIKey string
+	db        *db.DB
+	storage   *storage.Client
+	aiClient  *ai.Client
 	imgixDomain  string
-	log          *slog.Logger
+	log       *slog.Logger
 }
 
 // NewNotesService creates a new NotesService
-func NewNotesService(database *db.DB, storageClient *storage.Client, geminiAPIKey, imgixDomain string) *NotesService {
+func NewNotesService(database *db.DB, storageClient *storage.Client, aiClient *ai.Client, imgixDomain string) *NotesService {
 	return &NotesService{
-		db:           database,
-		storage:      storageClient,
-		geminiAPIKey: geminiAPIKey,
+		db:        database,
+		storage:   storageClient,
+		aiClient:  aiClient,
 		imgixDomain:  imgixDomain,
-		log:          slog.Default(),
+		log:       slog.Default(),
 	}
 }
 
@@ -224,22 +224,13 @@ func (s *NotesService) processAndUploadImage(ctx context.Context, noteID string,
 		return nil, fmt.Errorf("failed to upload image: %w", err)
 	}
 
-	// Extract text using Gemini OCR
-	var extractedText string
-	if s.geminiAPIKey != "" {
-		extractedText, err = ai.ExtractTextFromImage(ctx, imageData, mimeType, s.geminiAPIKey)
-		if err != nil {
-			s.log.Warn("failed to extract text from image", "image_id", imageID, "error", err)
-			// Continue without extracted text - don't fail the whole operation
-		}
-	}
-
+	// Note: Text extraction is handled asynchronously by a background job for performance
 	return &models.NoteImage{
 		ID:            imageID,
 		NoteID:        noteID,
 		URL:           url,
 		GCSObjectName: objectName,
-		ExtractedText: extractedText,
+		ExtractedText: "", // Will be filled by background job
 		MimeType:      mimeType,
 	}, nil
 }
@@ -280,22 +271,13 @@ func (s *NotesService) processAndUploadAudio(ctx context.Context, noteID string,
 		return nil, fmt.Errorf("failed to upload audio: %w", err)
 	}
 
-	// Transcribe audio using Gemini
-	var transcribedText string
-	if s.geminiAPIKey != "" {
-		transcribedText, err = ai.TranscribeAudio(ctx, audioData, mimeType, s.geminiAPIKey)
-		if err != nil {
-			s.log.Warn("failed to transcribe audio", "audio_id", audioID, "error", err)
-			// Continue without transcription - don't fail the whole operation
-		}
-	}
-
+	// Note: Transcription is handled asynchronously by a background job for performance
 	return &models.NoteAudio{
 		ID:              audioID,
 		NoteID:          noteID,
 		URL:             url,
 		GCSObjectName:   objectName,
-		TranscribedText: transcribedText,
+		TranscribedText: "", // Will be filled by background job
 		MimeType:        mimeType,
 	}, nil
 }
