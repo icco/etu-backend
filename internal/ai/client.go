@@ -23,6 +23,9 @@ func NewClient(apiKey string) (*Client, error) {
 }
 
 // newGenaiClient creates a new Gemini API client
+// Note: Creates a new client for each call. If performance becomes an issue,
+// consider caching the client in the Client struct. However, the genai library
+// manages connection pooling internally, so this approach is acceptable for now.
 func (c *Client) newGenaiClient(ctx context.Context) (*genai.Client, error) {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
 		APIKey: c.apiKey,

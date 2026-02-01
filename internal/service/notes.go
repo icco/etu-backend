@@ -49,21 +49,21 @@ var allowedAudioMIMETypes = map[string]bool{
 // NotesService implements the NotesService gRPC service
 type NotesService struct {
 	pb.UnimplementedNotesServiceServer
-	db        *db.DB
-	storage   *storage.Client
-	aiClient  *ai.Client
-	imgixDomain  string
-	log       *slog.Logger
+	db          *db.DB
+	storage     *storage.Client
+	aiClient    *ai.Client
+	imgixDomain string
+	log         *slog.Logger
 }
 
 // NewNotesService creates a new NotesService
 func NewNotesService(database *db.DB, storageClient *storage.Client, aiClient *ai.Client, imgixDomain string) *NotesService {
 	return &NotesService{
-		db:        database,
-		storage:   storageClient,
-		aiClient:  aiClient,
-		imgixDomain:  imgixDomain,
-		log:       slog.Default(),
+		db:          database,
+		storage:     storageClient,
+		aiClient:    aiClient,
+		imgixDomain: imgixDomain,
+		log:         slog.Default(),
 	}
 }
 
