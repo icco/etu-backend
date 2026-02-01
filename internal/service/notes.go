@@ -19,36 +19,27 @@ const (
 	MaxNotesLimit     = 100
 	DefaultNotesLimit = 50
 	MaxImageSize      = 10 * 1024 * 1024 // 10MB max image size
+	MaxAudioSize      = 25 * 1024 * 1024 // 25MB max audio size
 )
-
-// allowedImageMIMETypes is the list of allowed image MIME types
-var allowedImageMIMETypes = map[string]bool{
-	"image/jpeg": true,
-	"image/png":  true,
-	"image/gif":  true,
-	"image/webp": true,
-	"image/heic": true,
-	"image/heif": true,
-}
 
 // NotesService implements the NotesService gRPC service
 type NotesService struct {
 	pb.UnimplementedNotesServiceServer
-	db           *db.DB
-	storage      *storage.Client
-	geminiAPIKey string
-	imgixDomain  string
-	log          *slog.Logger
+	db          *db.DB
+	storage     *storage.Client
+	aiClient    *ai.Client
+	imgixDomain string
+	log         *slog.Logger
 }
 
 // NewNotesService creates a new NotesService
-func NewNotesService(database *db.DB, storageClient *storage.Client, geminiAPIKey, imgixDomain string) *NotesService {
+func NewNotesService(database *db.DB, storageClient *storage.Client, aiClient *ai.Client, imgixDomain string) *NotesService {
 	return &NotesService{
-		db:           database,
-		storage:      storageClient,
-		geminiAPIKey: geminiAPIKey,
-		imgixDomain:  imgixDomain,
-		log:          slog.Default(),
+		db:          database,
+		storage:     storageClient,
+		aiClient:    aiClient,
+		imgixDomain: imgixDomain,
+		log:         slog.Default(),
 	}
 }
 
@@ -99,11 +90,11 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
-	if req.Content == "" && len(req.Images) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "content or images is required")
+	if req.Content == "" && len(req.Images) == 0 && len(req.Audios) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "at least one of content, images, or audio files is required")
 	}
-	if req.Content == "" && len(req.Images) > 0 && s.storage == nil {
-		return nil, status.Error(codes.FailedPrecondition, "image storage is not configured")
+	if req.Content == "" && (len(req.Images) > 0 || len(req.Audios) > 0) && s.storage == nil {
+		return nil, status.Error(codes.FailedPrecondition, "storage is not configured")
 	}
 
 	// Verify authorization
@@ -142,6 +133,32 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		}
 	}
 
+	// Process audio files if any
+	if len(req.Audios) > 0 && s.storage != nil {
+		for i, aud := range req.Audios {
+			// Upload audio to GCS
+			noteAudio, err := s.processAndUploadAudio(ctx, note.ID, aud.Data, aud.MimeType)
+			if err != nil {
+				s.log.Error("failed to process audio", "note_id", note.ID, "audio_index", i, "error", err)
+				continue // Continue with other audios even if one fails
+			}
+
+			// Add audio to database
+			if err := s.db.AddAudioToNote(ctx, note.ID, noteAudio); err != nil {
+				s.log.Error("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, "error", err)
+				// Try to clean up the uploaded audio
+				if s.storage != nil {
+					if deleteErr := s.storage.DeleteImage(ctx, noteAudio.GCSObjectName); deleteErr != nil {
+						s.log.Error("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, "error", deleteErr)
+					}
+				}
+				continue
+			}
+
+			note.Audios = append(note.Audios, *noteAudio)
+		}
+	}
+
 	return &pb.CreateNoteResponse{
 		Note: s.noteToProto(note),
 	}, nil
@@ -150,7 +167,7 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 // validateImage validates the image MIME type and size
 func validateImage(imageData []byte, mimeType string) error {
 	// Validate MIME type against allow-list
-	if !allowedImageMIMETypes[mimeType] {
+	if !ai.IsValidImageMimeType(mimeType) {
 		return fmt.Errorf("unsupported image type: %s. Allowed types: image/jpeg, image/png, image/gif, image/webp, image/heic, image/heif", mimeType)
 	}
 
@@ -183,23 +200,61 @@ func (s *NotesService) processAndUploadImage(ctx context.Context, noteID string,
 		return nil, fmt.Errorf("failed to upload image: %w", err)
 	}
 
-	// Extract text using Gemini OCR
-	var extractedText string
-	if s.geminiAPIKey != "" {
-		extractedText, err = ai.ExtractTextFromImage(ctx, imageData, mimeType, s.geminiAPIKey)
-		if err != nil {
-			s.log.Warn("failed to extract text from image", "image_id", imageID, "error", err)
-			// Continue without extracted text - don't fail the whole operation
-		}
-	}
-
+	// Note: Text extraction is handled asynchronously by a background job for performance
 	return &models.NoteImage{
 		ID:            imageID,
 		NoteID:        noteID,
 		URL:           url,
 		GCSObjectName: objectName,
-		ExtractedText: extractedText,
+		ExtractedText: "", // Will be filled by background job
 		MimeType:      mimeType,
+	}, nil
+}
+
+// validateAudio validates the audio MIME type and size
+func validateAudio(audioData []byte, mimeType string) error {
+	// Validate MIME type against allow-list
+	if !ai.IsValidAudioMimeType(mimeType) {
+		return fmt.Errorf("unsupported audio type: %s. Allowed types: audio/mpeg, audio/mp3, audio/wav, audio/wave, audio/ogg, audio/webm, audio/mp4, audio/m4a, audio/flac, audio/aac", mimeType)
+	}
+
+	// Validate audio size
+	if len(audioData) > MaxAudioSize {
+		return fmt.Errorf("audio size %d bytes exceeds maximum allowed size of %d bytes", len(audioData), MaxAudioSize)
+	}
+
+	return nil
+}
+
+// processAndUploadAudio uploads an audio file to GCS and transcribes it using Gemini
+func (s *NotesService) processAndUploadAudio(ctx context.Context, noteID string, audioData []byte, mimeType string) (*models.NoteAudio, error) {
+	if s.storage == nil {
+		return nil, fmt.Errorf("storage client not configured")
+	}
+
+	// Validate audio before uploading
+	if err := validateAudio(audioData, mimeType); err != nil {
+		return nil, err
+	}
+
+	// Generate a unique object name
+	audioID := models.GenerateCUID()
+	objectName := fmt.Sprintf("notes/%s/%s", noteID, audioID)
+
+	// Upload to GCS
+	url, err := s.storage.UploadImage(ctx, objectName, audioData, mimeType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload audio: %w", err)
+	}
+
+	// Note: Transcription is handled asynchronously by a background job for performance
+	return &models.NoteAudio{
+		ID:              audioID,
+		NoteID:          noteID,
+		URL:             url,
+		GCSObjectName:   objectName,
+		TranscribedText: "", // Will be filled by background job
+		MimeType:        mimeType,
 	}, nil
 }
 
@@ -278,7 +333,28 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		}
 	}
 
-	// Reload note to get updated images
+	// Add new audio files if any
+	if len(req.AddAudios) > 0 && s.storage != nil {
+		for i, aud := range req.AddAudios {
+			noteAudio, err := s.processAndUploadAudio(ctx, note.ID, aud.Data, aud.MimeType)
+			if err != nil {
+				s.log.Error("failed to process audio", "note_id", note.ID, "audio_index", i, "error", err)
+				continue
+			}
+
+			if err := s.db.AddAudioToNote(ctx, note.ID, noteAudio); err != nil {
+				s.log.Error("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, "error", err)
+				if s.storage != nil {
+					if deleteErr := s.storage.DeleteImage(ctx, noteAudio.GCSObjectName); deleteErr != nil {
+						s.log.Error("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, "error", deleteErr)
+					}
+				}
+				continue
+			}
+		}
+	}
+
+	// Reload note to get updated images and audios
 	note, err = s.db.GetNote(ctx, req.UserId, req.Id)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to reload note: %v", err)
@@ -309,6 +385,12 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 		s.log.Warn("failed to get images for note before deletion", "note_id", req.Id, "error", err)
 	}
 
+	// Get audio files before deleting the note so we can clean them up from GCS
+	audios, err := s.db.GetAudiosByNoteID(ctx, req.Id)
+	if err != nil {
+		s.log.Warn("failed to get audios for note before deletion", "note_id", req.Id, "error", err)
+	}
+
 	deleted, err := s.db.DeleteNote(ctx, req.UserId, req.Id)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete note: %v", err)
@@ -319,6 +401,15 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 		for _, img := range images {
 			if err := s.storage.DeleteImage(ctx, img.GCSObjectName); err != nil {
 				s.log.Error("failed to delete image from GCS", "object_name", img.GCSObjectName, "error", err)
+			}
+		}
+	}
+
+	// Clean up audio files from GCS if the note was deleted
+	if deleted && s.storage != nil {
+		for _, aud := range audios {
+			if err := s.storage.DeleteImage(ctx, aud.GCSObjectName); err != nil {
+				s.log.Error("failed to delete audio from GCS", "object_name", aud.GCSObjectName, "error", err)
 			}
 		}
 	}
@@ -336,6 +427,16 @@ func (s *NotesService) getImageURL(img *models.NoteImage) string {
 		return fmt.Sprintf("https://%s/%s", s.imgixDomain, img.GCSObjectName)
 	}
 	return img.URL
+}
+
+// getAudioURL returns the appropriate URL for an audio file.
+// If imgix is configured, it returns an imgix URL using the GCS object name.
+// Otherwise, it returns the original GCS signed URL.
+func (s *NotesService) getAudioURL(aud *models.NoteAudio) string {
+	if s.imgixDomain != "" && aud.GCSObjectName != "" {
+		return fmt.Sprintf("https://%s/%s", s.imgixDomain, aud.GCSObjectName)
+	}
+	return aud.URL
 }
 
 // noteToProto converts a db.Note to a protobuf Note
@@ -358,6 +459,18 @@ func (s *NotesService) noteToProto(n *db.Note) *pb.Note {
 		}
 	}
 
+	// Convert []NoteAudio to []*pb.NoteAudio
+	pbAudios := make([]*pb.NoteAudio, len(n.Audios))
+	for i, aud := range n.Audios {
+		pbAudios[i] = &pb.NoteAudio{
+			Id:              aud.ID,
+			Url:             s.getAudioURL(&aud),
+			TranscribedText: aud.TranscribedText,
+			MimeType:        aud.MimeType,
+			CreatedAt:       timestamppb.New(aud.CreatedAt),
+		}
+	}
+
 	return &pb.Note{
 		Id:        n.ID,
 		Content:   n.Content,
@@ -365,6 +478,7 @@ func (s *NotesService) noteToProto(n *db.Note) *pb.Note {
 		CreatedAt: timestamppb.New(n.CreatedAt),
 		UpdatedAt: timestamppb.New(n.UpdatedAt),
 		Images:    pbImages,
+		Audios:    pbAudios,
 	}
 }
 

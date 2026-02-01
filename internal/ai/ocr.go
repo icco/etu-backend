@@ -11,25 +11,19 @@ import (
 // ExtractTextFromImage uses Gemini's vision capabilities to extract text from an image.
 // imageData is the raw image bytes, mimeType is the MIME type (e.g., "image/jpeg", "image/png").
 // Returns the extracted text, or an empty string if no text is found.
-func ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string, apiKey string) (string, error) {
-	if apiKey == "" {
-		return "", fmt.Errorf("no Gemini API key configured")
-	}
-
+func (c *Client) ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string) (string, error) {
 	if len(imageData) == 0 {
 		return "", fmt.Errorf("image data is empty")
 	}
 
 	// Validate mime type
-	if !isValidImageMimeType(mimeType) {
+	if !IsValidImageMimeType(mimeType) {
 		return "", fmt.Errorf("unsupported image MIME type: %s", mimeType)
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
-	})
+	client, err := c.newGenaiClient(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to create Gemini client: %w", err)
+		return "", err
 	}
 
 	// Create content with both text prompt and image
@@ -73,16 +67,18 @@ func ExtractTextFromImage(ctx context.Context, imageData []byte, mimeType string
 	return strings.TrimSpace(extractedText.String()), nil
 }
 
-// isValidImageMimeType checks if the MIME type is a supported image format.
-func isValidImageMimeType(mimeType string) bool {
-	supportedTypes := map[string]bool{
-		"image/jpeg": true,
-		"image/jpg":  true,
-		"image/png":  true,
-		"image/gif":  true,
-		"image/webp": true,
-		"image/heic": true,
-		"image/heif": true,
-	}
-	return supportedTypes[strings.ToLower(mimeType)]
+// supportedImageTypes is the map of supported image MIME types
+var supportedImageTypes = map[string]bool{
+	"image/jpeg": true,
+	"image/jpg":  true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+	"image/heic": true,
+	"image/heif": true,
+}
+
+// IsValidImageMimeType checks if the MIME type is a supported image format.
+func IsValidImageMimeType(mimeType string) bool {
+	return supportedImageTypes[strings.ToLower(mimeType)]
 }

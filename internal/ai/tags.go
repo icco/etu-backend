@@ -12,16 +12,10 @@ import (
 
 // GenerateTags generates a list of lowercase, single-word tags for a given text using Gemini.
 // It returns up to 3 tags. existingTags is a list of tags the user has previously used.
-func GenerateTags(ctx context.Context, text string, existingTags []string, apiKey string) ([]string, error) {
-	if apiKey == "" {
-		return nil, fmt.Errorf("no Gemini API key configured")
-	}
-
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
-	})
+func (c *Client) GenerateTags(ctx context.Context, text string, existingTags []string) ([]string, error) {
+	client, err := c.newGenaiClient(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+		return nil, err
 	}
 
 	// Build the existing tags list for the prompt

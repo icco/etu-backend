@@ -18,6 +18,7 @@ type Note struct {
 	LastSyncedToNotion *time.Time  `gorm:"column:lastSyncedToNotion"` // When this note was last pushed to Notion
 	Tags               []Tag       `gorm:"many2many:NoteTag;foreignKey:ID;joinForeignKey:noteId;References:ID;joinReferences:tagId"`
 	Images             []NoteImage `gorm:"foreignKey:NoteID"`
+	Audios             []NoteAudio `gorm:"foreignKey:NoteID"`
 }
 
 // TableName specifies the table name for Note
@@ -39,6 +40,22 @@ type NoteImage struct {
 // TableName specifies the table name for NoteImage
 func (NoteImage) TableName() string {
 	return "NoteImage"
+}
+
+// NoteAudio represents an audio file attached to a note
+type NoteAudio struct {
+	ID             string    `gorm:"column:id;primaryKey"`
+	NoteID         string    `gorm:"column:noteId;index;not null"`
+	URL            string    `gorm:"column:url;not null"`
+	GCSObjectName  string    `gorm:"column:gcsObjectName;not null"` // Object name in GCS for deletion
+	TranscribedText string   `gorm:"column:transcribedText;type:text"`
+	MimeType       string    `gorm:"column:mimeType"`
+	CreatedAt      time.Time `gorm:"column:createdAt"`
+}
+
+// TableName specifies the table name for NoteAudio
+func (NoteAudio) TableName() string {
+	return "NoteAudio"
 }
 
 // Tag represents a tag in the database
@@ -149,6 +166,14 @@ func (a *ApiKey) BeforeCreate(tx *gorm.DB) error {
 func (ni *NoteImage) BeforeCreate(tx *gorm.DB) error {
 	if ni.ID == "" {
 		ni.ID = GenerateCUID()
+	}
+	return nil
+}
+
+// BeforeCreate hook to generate CUID-like ID for note audios
+func (na *NoteAudio) BeforeCreate(tx *gorm.DB) error {
+	if na.ID == "" {
+		na.ID = GenerateCUID()
 	}
 	return nil
 }
