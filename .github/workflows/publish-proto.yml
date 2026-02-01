@@ -34,8 +34,8 @@ jobs:
         run: |
           YEAR=$(date +%Y)
           MONTH=$(date +%m)
-          # Use hours + minutes as the daily counter (000-2359)
-          COUNTER=$(date +%H%M)
+          # Use hours, minutes, and seconds as the daily counter (000000-235959)
+          COUNTER=$(date +%H%M%S)
           VERSION="${YEAR}.${MONTH}.${COUNTER}"
           npm version $VERSION --no-git-tag-version
           echo "Publishing version: $VERSION"
