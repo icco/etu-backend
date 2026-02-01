@@ -24,6 +24,7 @@ type Tag = models.Tag
 type User = models.User
 type ApiKey = models.ApiKey
 type NoteImage = models.NoteImage
+type NoteAudio = models.NoteAudio
 
 // New creates a new GORM database connection
 func New() (*DB, error) {
@@ -71,6 +72,7 @@ func (db *DB) AutoMigrate() error {
 		&models.ApiKey{},
 		&models.SyncState{},
 		&models.NoteImage{},
+		&models.NoteAudio{},
 	)
 }
 
@@ -470,6 +472,58 @@ func (db *DB) GetImagesByNoteID(ctx context.Context, noteID string) ([]NoteImage
 		return nil, fmt.Errorf("failed to get images: %w", err)
 	}
 	return images, nil
+}
+
+// AddAudioToNote adds an audio file to a note
+func (db *DB) AddAudioToNote(ctx context.Context, noteID string, audio *NoteAudio) error {
+	audio.NoteID = noteID
+	if audio.CreatedAt.IsZero() {
+		audio.CreatedAt = time.Now()
+	}
+	if err := db.conn.WithContext(ctx).Create(audio).Error; err != nil {
+		return fmt.Errorf("failed to add audio to note: %w", err)
+	}
+	return nil
+}
+
+// RemoveAudioFromNote removes an audio file from a note and returns the GCS object name for cleanup
+func (db *DB) RemoveAudioFromNote(ctx context.Context, userID, noteID, audioID string) (string, error) {
+	// First verify the note belongs to the user
+	var note Note
+	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
+	if result.Error == gorm.ErrRecordNotFound {
+		return "", fmt.Errorf("note not found")
+	}
+	if result.Error != nil {
+		return "", fmt.Errorf("failed to verify note ownership: %w", result.Error)
+	}
+
+	// Get the audio to return the GCS object name
+	var audio NoteAudio
+	result = db.conn.WithContext(ctx).Where(`id = ? AND "noteId" = ?`, audioID, noteID).First(&audio)
+	if result.Error == gorm.ErrRecordNotFound {
+		return "", nil // Audio doesn't exist, nothing to delete
+	}
+	if result.Error != nil {
+		return "", fmt.Errorf("failed to get audio: %w", result.Error)
+	}
+
+	// Delete the audio
+	if err := db.conn.WithContext(ctx).Delete(&audio).Error; err != nil {
+		return "", fmt.Errorf("failed to delete audio: %w", err)
+	}
+
+	return audio.GCSObjectName, nil
+}
+
+// GetAudiosByNoteID retrieves audio files for a note for deletion purposes
+func (db *DB) GetAudiosByNoteID(ctx context.Context, noteID string) ([]NoteAudio, error) {
+	var audios []NoteAudio
+	err := db.conn.WithContext(ctx).Where(`"noteId" = ?`, noteID).Find(&audios).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get audios: %w", err)
+	}
+	return audios, nil
 }
 
 // ListTags retrieves all tags for a user with usage counts

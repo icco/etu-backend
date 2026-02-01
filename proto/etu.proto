@@ -12,11 +12,26 @@ message ImageUpload {
   string mime_type = 2;
 }
 
+// AudioUpload message for uploading audio files (client -> server)
+message AudioUpload {
+  bytes data = 1;
+  string mime_type = 2;
+}
+
 // NoteImage message for images attached to notes (server -> client)
 message NoteImage {
   string id = 1;
   string url = 2;
   string extracted_text = 3;
+  string mime_type = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// NoteAudio message for audio files attached to notes (server -> client)
+message NoteAudio {
+  string id = 1;
+  string url = 2;
+  string transcribed_text = 3;
   string mime_type = 4;
   google.protobuf.Timestamp created_at = 5;
 }
@@ -29,6 +44,7 @@ message Note {
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
   repeated NoteImage images = 6;
+  repeated NoteAudio audios = 7;
 }
 
 // Tag message
@@ -87,6 +103,7 @@ message CreateNoteRequest {
   string content = 2;
   repeated string tags = 3;
   repeated ImageUpload images = 4;
+  repeated AudioUpload audios = 5;
 }
 
 message CreateNoteResponse {
@@ -109,6 +126,7 @@ message UpdateNoteRequest {
   repeated string tags = 4;
   bool update_tags = 5;    // Flag to indicate if tags should be updated
   repeated ImageUpload add_images = 6;
+  repeated AudioUpload add_audios = 7;
 }
 
 message UpdateNoteResponse {
