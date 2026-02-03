@@ -193,7 +193,9 @@ func GenerateCUID() string {
 
 	// Use crypto/rand for proper randomness
 	randomBytes := make([]byte, 16)
-	rand.Read(randomBytes)
+	if _, err := rand.Read(randomBytes); err != nil {
+		panic("crypto/rand.Read failed: " + err.Error())
+	}
 	for i := 9; i < 25; i++ {
 		result[i] = chars[randomBytes[i-9]%36]
 	}
