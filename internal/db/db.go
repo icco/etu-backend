@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/icco/etu-backend/internal/models"
@@ -83,17 +85,21 @@ func (db *DB) ListNotes(ctx context.Context, userID, search string, tags []strin
 
 	query := db.conn.WithContext(ctx).Model(&Note{}).Where(`"userId" = ?`, userID)
 
+	// Parse tag: syntax from search string
+	searchTags, remainingSearch := parseTagSearch(search)
+	allTags := append(tags, searchTags...)
+
 	// Tag filtering
-	if len(tags) > 0 {
+	if len(allTags) > 0 {
 		query = query.Joins(`JOIN "NoteTag" ON "Note".id = "NoteTag"."noteId"`).
 			Joins(`JOIN "Tag" ON "NoteTag"."tagId" = "Tag".id`).
-			Where(`"Tag".name IN ?`, tags).
+			Where(`"Tag".name IN ?`, allTags).
 			Distinct()
 	}
 
-	// Search filter
-	if search != "" {
-		query = query.Where("content ILIKE ?", "%"+search+"%")
+	// Search filter (remaining text after tag: extraction)
+	if remainingSearch != "" {
+		query = query.Where("content ILIKE ?", "%"+remainingSearch+"%")
 	}
 
 	// Date filters
@@ -901,4 +907,25 @@ func (db *DB) GetRandomNotes(ctx context.Context, userID string, count int) ([]N
 	}
 
 	return notes, nil
+}
+
+// parseTagSearch extracts tag:tagname patterns from a search string.
+// Returns the extracted tag names and the remaining search text.
+var tagSearchRegex = regexp.MustCompile(`\btag:([a-z0-9]+)\b`)
+
+func parseTagSearch(search string) (tags []string, remaining string) {
+	matches := tagSearchRegex.FindAllStringSubmatch(search, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			tags = append(tags, match[1])
+		}
+	}
+
+	// Remove the tag: patterns from the search string
+	remaining = tagSearchRegex.ReplaceAllString(search, "")
+	remaining = strings.TrimSpace(remaining)
+	// Clean up multiple spaces
+	remaining = regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " ")
+
+	return tags, remaining
 }

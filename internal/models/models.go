@@ -1,6 +1,7 @@
 package models
 
 import (
+	"crypto/rand"
 	"time"
 
 	"gorm.io/gorm"
@@ -190,8 +191,11 @@ func GenerateCUID() string {
 		timestamp /= 36
 	}
 
+	// Use crypto/rand for proper randomness
+	randomBytes := make([]byte, 16)
+	rand.Read(randomBytes)
 	for i := 9; i < 25; i++ {
-		result[i] = chars[time.Now().UnixNano()%36]
+		result[i] = chars[randomBytes[i-9]%36]
 	}
 
 	return string(result)
