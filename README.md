@@ -130,6 +130,8 @@ authorization: etu_<64 hex characters>
 | `DeleteNote` | Delete a note by ID |
 | `GetRandomNotes` | Get a random subset of notes for highlighting past thoughts |
 
+**Search.** Search is performed by calling **ListNotes** with the `search` field set on `ListNotesRequest`. The backend does a case-insensitive substring match on note `content`. You can combine search with the existing filters: `tags`, `start_date`, `end_date`, `limit`, and `offset`.
+
 ### TagsService
 
 | Method | Description |
