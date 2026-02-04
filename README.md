@@ -7,8 +7,8 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 
 ## Clients
 
-- **[etu](https://github.com/icco/etu)** - Web frontend for etu-backend
-- **[etu-cli](https://github.com/icco/etu-cli)** - Command-line client for etu-backend
+- **[etu-web](https://github.com/icco/etu-web)** - Web frontend for etu-backend
+- **[etu](https://github.com/icco/etu)** - Command-line client for etu-backend
 
 ## Features
 
@@ -70,21 +70,18 @@ task --list      # List all available tasks
 
 ## Notion Sync Job
 
-Syncs journal entries from a Notion database to PostgreSQL. Requires `NOTION_KEY` environment variable.
+Syncs journal entries from a Notion database to PostgreSQL. Automatically syncs all users with Notion API keys configured.
 
 **Usage:**
 ```bash
-./bin/sync -user <USER_ID> -full              # One-time full sync
-./bin/sync -user <USER_ID>                     # Incremental sync
-./bin/sync -user <USER_ID> -interval 1h        # Continuous sync (hourly)
+./bin/sync -full                    # One-time full sync
+./bin/sync                          # Incremental sync
+./bin/sync -interval 1h             # Continuous sync (hourly)
+./bin/sync -direction to-notion     # Sync from PostgreSQL to Notion
+./bin/sync -direction bidirectional # Two-way sync
 ```
 
-**Flags:** `-user` (required), `-full`, `-interval` (e.g., `1h`, `30m`)
-
-**Cron example:**
-```cron
-0 * * * * DATABASE_URL="..." NOTION_KEY="..." /path/to/sync -user <USER_ID> >> /var/log/etu-sync.log 2>&1
-```
+**Flags:** `-full`, `-interval` (e.g., `1h`, `30m`), `-direction` (from-notion, to-notion, bidirectional)
 
 ## AI Tag Generation Job
 
@@ -92,17 +89,12 @@ Automatically generates up to 3 tags per note using Google Gemini 1.5 Flash. Onl
 
 **Usage:**
 ```bash
-./bin/taggen -user <USER_ID>                   # One-time generation
-./bin/taggen -user <USER_ID> -dry-run          # Test without adding tags
-./bin/taggen -user <USER_ID> -interval 6h      # Continuous (every 6 hours)
+./bin/taggen                        # One-time generation
+./bin/taggen -dry-run               # Test without adding tags
+./bin/taggen -interval 6h           # Continuous (every 6 hours)
 ```
 
-**Flags:** `-user` (required), `-dry-run`, `-delay` (default: 2s), `-interval` (e.g., `6h`, `1h`)
-
-**Cron example:**
-```cron
-0 */6 * * * DATABASE_URL="..." GEMINI_API_KEY="..." /path/to/taggen -user <USER_ID> >> /var/log/etu-taggen.log 2>&1
-```
+**Flags:** `-dry-run`, `-delay` (default: 2s), `-interval` (e.g., `6h`, `1h`)
 
 **Features:** Prefers reusing existing tags, all tags are lowercase single words, never modifies existing tags.
 
