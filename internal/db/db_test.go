@@ -87,3 +87,61 @@ func TestParseTagSearch(t *testing.T) {
 		})
 	}
 }
+
+func TestCountWords(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  int64
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  0,
+		},
+		{
+			name:  "whitespace only",
+			input: "   \t\n  ",
+			want:  0,
+		},
+		{
+			name:  "single word",
+			input: "hello",
+			want:  1,
+		},
+		{
+			name:  "multiple words",
+			input: "hello world foo bar",
+			want:  4,
+		},
+		{
+			name:  "words with extra whitespace",
+			input: "  hello   world  \n  foo   ",
+			want:  3,
+		},
+		{
+			name:  "words with newlines",
+			input: "hello\nworld\nfoo",
+			want:  3,
+		},
+		{
+			name:  "sentence with punctuation",
+			input: "Hello, world! How are you?",
+			want:  5,
+		},
+		{
+			name:  "mixed whitespace",
+			input: "hello\t\tworld\n\nfoo  bar",
+			want:  4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := countWords(tt.input)
+			if got != tt.want {
+				t.Errorf("countWords(%q) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}
