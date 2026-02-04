@@ -943,7 +943,7 @@ func (db *DB) GetStats(ctx context.Context, userID string) (totalBlips, uniqueTa
 	}
 
 	// Count unique tags
-	tagsQuery := db.conn.WithContext(ctx).Model(&Tag{}).Distinct("id")
+	tagsQuery := db.conn.WithContext(ctx).Model(&Tag{})
 	if userID != "" {
 		tagsQuery = tagsQuery.Where(`"userId" = ?`, userID)
 	}
@@ -951,20 +951,36 @@ func (db *DB) GetStats(ctx context.Context, userID string) (totalBlips, uniqueTa
 		return 0, 0, 0, fmt.Errorf("failed to count tags: %w", err)
 	}
 
-	// Calculate total words written
-	// We'll fetch all note contents and count words
-	var notes []Note
-	notesQuery := db.conn.WithContext(ctx).Model(&Note{}).Select("content")
-	if userID != "" {
-		notesQuery = notesQuery.Where(`"userId" = ?`, userID)
-	}
-	if err = notesQuery.Find(&notes).Error; err != nil {
-		return 0, 0, 0, fmt.Errorf("failed to fetch notes for word count: %w", err)
-	}
+	// Calculate total words written using batch processing to avoid memory issues
+	const batchSize = 1000
+	var offset int
 
-	// Count words in all note contents
-	for _, note := range notes {
-		wordsWritten += countWords(note.Content)
+	for {
+		var notes []Note
+		notesQuery := db.conn.WithContext(ctx).Model(&Note{}).Select("content").Limit(batchSize).Offset(offset)
+		if userID != "" {
+			notesQuery = notesQuery.Where(`"userId" = ?`, userID)
+		}
+		if err = notesQuery.Find(&notes).Error; err != nil {
+			return 0, 0, 0, fmt.Errorf("failed to fetch notes for word count: %w", err)
+		}
+
+		// If no more notes, we're done
+		if len(notes) == 0 {
+			break
+		}
+
+		// Count words in this batch
+		for _, note := range notes {
+			wordsWritten += countWords(note.Content)
+		}
+
+		// If we got fewer notes than the batch size, we're done
+		if len(notes) < batchSize {
+			break
+		}
+
+		offset += batchSize
 	}
 
 	return totalBlips, uniqueTags, wordsWritten, nil
