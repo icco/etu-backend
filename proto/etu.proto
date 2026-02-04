@@ -272,6 +272,18 @@ message UpdateUserSettingsResponse {
   User user = 2;
 }
 
+// Stats request/response messages
+
+message GetStatsRequest {
+  string user_id = 1;  // If empty or omitted, returns stats for all users
+}
+
+message GetStatsResponse {
+  int64 total_blips = 1;      // Total number of notes (blips)
+  int64 unique_tags = 2;      // Number of unique tags
+  int64 words_written = 3;    // Total word count across all notes
+}
+
 // Service definitions
 
 service NotesService {
@@ -305,4 +317,8 @@ service ApiKeysService {
 service UserSettingsService {
   rpc GetUserSettings(GetUserSettingsRequest) returns (GetUserSettingsResponse);
   rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (UpdateUserSettingsResponse);
+}
+
+service StatsService {
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
 }

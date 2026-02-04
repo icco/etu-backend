@@ -129,12 +129,14 @@ func main() {
 	authService := service.NewAuthService(database)
 	apiKeysService := service.NewApiKeysService(database)
 	userSettingsService := service.NewUserSettingsService(database)
+	statsService := service.NewStatsService(database)
 
 	pb.RegisterNotesServiceServer(server, notesService)
 	pb.RegisterTagsServiceServer(server, tagsService)
 	pb.RegisterAuthServiceServer(server, authService)
 	pb.RegisterApiKeysServiceServer(server, apiKeysService)
 	pb.RegisterUserSettingsServiceServer(server, userSettingsService)
+	pb.RegisterStatsServiceServer(server, statsService)
 
 	// Enable reflection for development/debugging
 	reflection.Register(server)

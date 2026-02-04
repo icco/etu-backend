@@ -929,3 +929,71 @@ func parseTagSearch(search string) (tags []string, remaining string) {
 
 	return tags, remaining
 }
+
+// GetStats retrieves statistics for a user or all users
+// If userID is empty, returns stats for all users
+func (db *DB) GetStats(ctx context.Context, userID string) (totalBlips, uniqueTags, wordsWritten int64, err error) {
+	// Count total blips (notes)
+	blipsQuery := db.conn.WithContext(ctx).Model(&Note{})
+	if userID != "" {
+		blipsQuery = blipsQuery.Where(`"userId" = ?`, userID)
+	}
+	if err = blipsQuery.Count(&totalBlips).Error; err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to count notes: %w", err)
+	}
+
+	// Count unique tags
+	tagsQuery := db.conn.WithContext(ctx).Model(&Tag{})
+	if userID != "" {
+		tagsQuery = tagsQuery.Where(`"userId" = ?`, userID)
+	}
+	if err = tagsQuery.Count(&uniqueTags).Error; err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to count tags: %w", err)
+	}
+
+	// Calculate total words written using batch processing to avoid memory issues
+	const batchSize = 1000
+	var offset int
+
+	for {
+		var notes []Note
+		notesQuery := db.conn.WithContext(ctx).Model(&Note{}).Select("content").Limit(batchSize).Offset(offset)
+		if userID != "" {
+			notesQuery = notesQuery.Where(`"userId" = ?`, userID)
+		}
+		if err = notesQuery.Find(&notes).Error; err != nil {
+			return 0, 0, 0, fmt.Errorf("failed to fetch notes for word count: %w", err)
+		}
+
+		// If no more notes, we're done
+		if len(notes) == 0 {
+			break
+		}
+
+		// Count words in this batch
+		for _, note := range notes {
+			wordsWritten += countWords(note.Content)
+		}
+
+		// If we got fewer notes than the batch size, we're done
+		if len(notes) < batchSize {
+			break
+		}
+
+		offset += batchSize
+	}
+
+	return totalBlips, uniqueTags, wordsWritten, nil
+}
+
+// countWords counts the number of words in a string
+// Words are defined as sequences of non-whitespace characters
+func countWords(text string) int64 {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return 0
+	}
+	// Split by whitespace and count non-empty parts
+	words := strings.Fields(text)
+	return int64(len(words))
+}
