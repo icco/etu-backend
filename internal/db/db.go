@@ -870,7 +870,7 @@ func (db *DB) GetRandomNotes(ctx context.Context, userID string, count int) ([]N
 	var notes []Note
 	err := db.conn.WithContext(ctx).
 		Where(`"userId" = ?`, userID).
-		Where(`RANDOM() < 0.01`).
+		Order("RANDOM()").
 		Limit(count).
 		Find(&notes).Error
 	if err != nil {
