@@ -27,6 +27,8 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 **Environment Variables:**
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `PORT` - Server port (default: 50051)
+- `GRPC_API_KEYS` - Comma-separated list of M2M tokens for server-to-server auth (supports rotation)
+- `GRPC_API_KEY` - Single M2M token (deprecated, use `GRPC_API_KEYS` instead)
 - `NOTION_KEY` - Notion API key (for sync job)
 - `GEMINI_API_KEY` - Gemini API key (for tag generation)
 
@@ -57,6 +59,42 @@ authorization: etu_<64 hex characters>
 Search is performed via `ListNotes` with the `search` field (case-insensitive substring match on content). Can be combined with filters: `tags`, `start_date`, `end_date`, `limit`, `offset`.
 
 See [`proto/etu.proto`](proto/etu.proto) for full definitions.
+
+## Machine-to-Machine (M2M) Authentication
+
+For server-to-server authentication (e.g., between `etu-web` and `etu-backend`), use M2M tokens passed via the `authorization` metadata header.
+
+**Configuration:**
+- `GRPC_API_KEYS` (recommended) - Comma-separated list of valid M2M tokens
+- `GRPC_API_KEY` (deprecated) - Single M2M token (for backwards compatibility)
+
+**Token Rotation Procedure:**
+
+To rotate M2M tokens without downtime:
+
+1. Generate a new secret token (e.g., using `openssl rand -hex 32`)
+2. Add the new token to `GRPC_API_KEYS` alongside the old token:
+   ```bash
+   GRPC_API_KEYS="new_token_here,old_token_here"
+   ```
+3. Deploy the backend with both tokens active
+4. Update clients (e.g., `etu-web`) to use the new token
+5. After all clients are updated, remove the old token from `GRPC_API_KEYS`
+6. Deploy the backend with only the new token
+
+**Migration from deprecated single-token:**
+
+If you're currently using `GRPC_API_KEY`, migrate to `GRPC_API_KEYS`:
+
+```bash
+# Old (deprecated)
+GRPC_API_KEY="your_token"
+
+# New (recommended)
+GRPC_API_KEYS="your_token"
+```
+
+The system will log a deprecation warning if using `GRPC_API_KEY`.
 
 ## Development
 

@@ -249,9 +249,8 @@ func authInterceptor(authenticator *auth.Authenticator, log *slog.Logger) grpc.U
 		"/etu.ApiKeysService/VerifyApiKey": true,
 	}
 
-	// Load GRPC API key from environment for server-to-server auth
-	grpcApiKey := os.Getenv("GRPC_API_KEY")
-	grpcAuthEnabled := grpcApiKey != ""
+	// Initialize M2M authentication configuration
+	m2mConfig := auth.NewM2MConfig(log)
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Skip auth for public methods
@@ -274,12 +273,14 @@ func authInterceptor(authenticator *auth.Authenticator, log *slog.Logger) grpc.U
 
 		token := authHeaders[0]
 
-		// Check for GRPC API key (server-to-server auth)
-		if grpcAuthEnabled && token == grpcApiKey {
-			// GRPC API key authentication successful - no user context
-			ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
-			log.Info("authenticated request", "method", info.FullMethod, "auth_type", "m2m")
-			return handler(ctx, req)
+		// Check for M2M token (server-to-server auth)
+		if m2mConfig.IsEnabled() {
+			if valid, tokenIndex := m2mConfig.ValidateToken(token); valid {
+				// M2M authentication successful - no user context
+				ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
+				m2mConfig.LogAuthentication(info.FullMethod, tokenIndex)
+				return handler(ctx, req)
+			}
 		}
 
 		// Fall back to API key verification
