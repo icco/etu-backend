@@ -29,7 +29,8 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 - `PORT` - Server port (default: 50051)
 - `NOTION_KEY` - Notion API key (for sync job)
 - `GEMINI_API_KEY` - Gemini API key (for tag generation)
-- `ENCRYPTION_KEY` - Base64-encoded 32-byte key for encrypting sensitive data at rest (optional but recommended for production)
+- `ENCRYPTION_KEY` - Base64-encoded 32-byte key for encrypting sensitive data at rest (optional, for local/env-based encryption)
+- `GCP_SECRET_NAME` - GCP Secret Manager secret name for encryption key (optional, takes priority over ENCRYPTION_KEY, format: `projects/PROJECT_ID/secrets/SECRET_NAME/versions/VERSION`)
 
 **Run locally:**
 ```bash
@@ -103,7 +104,29 @@ Automatically generates up to 3 tags per note using Google Gemini 1.5 Flash. Onl
 
 ### Encryption at Rest
 
-Notion API keys stored in the database are encrypted using AES-256-GCM encryption. To enable encryption:
+Notion API keys stored in the database are encrypted using AES-256-GCM encryption. The encryption key can be provided in two ways:
+
+#### Option 1: GCP Secret Manager (Recommended for Production)
+
+Store your encryption key in GCP Secret Manager:
+
+1. Create a secret in GCP Secret Manager:
+```bash
+# Generate encryption key
+KEY=$(openssl rand -base64 32)
+
+# Create secret in GCP
+echo -n "$KEY" | gcloud secrets create notion-encryption-key --data-file=-
+```
+
+2. Set the `GCP_SECRET_NAME` environment variable:
+```bash
+export GCP_SECRET_NAME="projects/YOUR_PROJECT_ID/secrets/notion-encryption-key/versions/latest"
+```
+
+Your application must have permissions to access GCP Secret Manager (e.g., via service account or workload identity).
+
+#### Option 2: Environment Variable (For Development/Testing)
 
 1. Generate a 32-byte (256-bit) encryption key:
 ```bash
@@ -115,10 +138,13 @@ openssl rand -base64 32
 export ENCRYPTION_KEY="<your-base64-encoded-key>"
 ```
 
+**Priority:** If both `GCP_SECRET_NAME` and `ENCRYPTION_KEY` are set, GCP Secret Manager takes priority.
+
 **Important Notes:**
-- If `ENCRYPTION_KEY` is not set, Notion keys will be stored in plaintext (not recommended for production)
+- If neither encryption option is configured, Notion keys will be stored in plaintext (not recommended for production)
 - Keep your encryption key secure and backed up - losing it means losing access to encrypted data
-- **Migration**: Existing plaintext keys will continue to work after setting the encryption key. However, they will remain unencrypted in the database until users update their settings (e.g., by re-saving their Notion key). The system detects plaintext keys during retrieval and handles them transparently.
+- The encryption key is cached after first retrieval for performance
+- **Migration**: Existing plaintext keys will continue to work after enabling encryption. They will remain unencrypted in the database until users update their settings (e.g., by re-saving their Notion key). The system detects plaintext keys during retrieval and handles them transparently.
 - Keys are encrypted before storage and decrypted when retrieved, transparently to application code
 
 ## License

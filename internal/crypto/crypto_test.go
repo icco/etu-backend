@@ -5,8 +5,16 @@ import (
 	"encoding/base64"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 )
+
+// resetEncryptionKeyCache resets the cached encryption key for testing
+func resetEncryptionKeyCache() {
+	encryptionKeyOnce = sync.Once{}
+	encryptionKey = nil
+	encryptionKeyErr = nil
+}
 
 // generateTestKey generates a random 32-byte key for testing
 func generateTestKey() string {
@@ -21,7 +29,9 @@ func TestEncryptDecrypt(t *testing.T) {
 	// Set up test encryption key
 	testKey := generateTestKey()
 	os.Setenv("ENCRYPTION_KEY", testKey)
+	os.Unsetenv("GCP_SECRET_NAME")
 	defer os.Unsetenv("ENCRYPTION_KEY")
+	resetEncryptionKeyCache()
 
 	tests := []struct {
 		name      string
@@ -97,7 +107,9 @@ func TestEncryptDeterministic(t *testing.T) {
 	// Set up test encryption key
 	testKey := generateTestKey()
 	os.Setenv("ENCRYPTION_KEY", testKey)
+	os.Unsetenv("GCP_SECRET_NAME")
 	defer os.Unsetenv("ENCRYPTION_KEY")
+	resetEncryptionKeyCache()
 
 	plaintext := "test_secret"
 
@@ -149,7 +161,7 @@ func TestGetEncryptionKey(t *testing.T) {
 			name:      "missing key",
 			envValue:  "",
 			wantError: true,
-			errorMsg:  "ENCRYPTION_KEY environment variable not set",
+			errorMsg:  "environment variable",
 		},
 		{
 			name:      "invalid base64",
@@ -173,7 +185,11 @@ func TestGetEncryptionKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Reset cache for each test
+			resetEncryptionKeyCache()
+
 			// Set environment variable
+			os.Unsetenv("GCP_SECRET_NAME")
 			if tt.envValue != "" {
 				os.Setenv("ENCRYPTION_KEY", tt.envValue)
 				defer os.Unsetenv("ENCRYPTION_KEY")
@@ -205,7 +221,9 @@ func TestDecryptInvalidData(t *testing.T) {
 	// Set up test encryption key
 	testKey := generateTestKey()
 	os.Setenv("ENCRYPTION_KEY", testKey)
+	os.Unsetenv("GCP_SECRET_NAME")
 	defer os.Unsetenv("ENCRYPTION_KEY")
+	resetEncryptionKeyCache()
 
 	tests := []struct {
 		name       string
@@ -251,6 +269,8 @@ func TestDecryptInvalidData(t *testing.T) {
 func TestEncryptWithoutKey(t *testing.T) {
 	// Ensure no encryption key is set
 	os.Unsetenv("ENCRYPTION_KEY")
+	os.Unsetenv("GCP_SECRET_NAME")
+	resetEncryptionKeyCache()
 
 	_, err := Encrypt("test")
 	if err == nil {
@@ -262,6 +282,8 @@ func TestDecryptWithoutKey(t *testing.T) {
 	// First encrypt with a key
 	testKey := generateTestKey()
 	os.Setenv("ENCRYPTION_KEY", testKey)
+	os.Unsetenv("GCP_SECRET_NAME")
+	resetEncryptionKeyCache()
 	ciphertext, err := Encrypt("test")
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
@@ -269,6 +291,7 @@ func TestDecryptWithoutKey(t *testing.T) {
 
 	// Then try to decrypt without key
 	os.Unsetenv("ENCRYPTION_KEY")
+	resetEncryptionKeyCache()
 
 	_, err = Decrypt(ciphertext)
 	if err == nil {
@@ -280,6 +303,8 @@ func TestDecryptWithDifferentKey(t *testing.T) {
 	// Encrypt with one key
 	testKey1 := generateTestKey()
 	os.Setenv("ENCRYPTION_KEY", testKey1)
+	os.Unsetenv("GCP_SECRET_NAME")
+	resetEncryptionKeyCache()
 	ciphertext, err := Encrypt("test")
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
@@ -289,6 +314,7 @@ func TestDecryptWithDifferentKey(t *testing.T) {
 	testKey2 := generateTestKey()
 	os.Setenv("ENCRYPTION_KEY", testKey2)
 	defer os.Unsetenv("ENCRYPTION_KEY")
+	resetEncryptionKeyCache()
 
 	_, err = Decrypt(ciphertext)
 	if err == nil {

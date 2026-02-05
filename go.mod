@@ -3,6 +3,7 @@ module github.com/icco/etu-backend
 go 1.25
 
 require (
+	cloud.google.com/go/secretmanager v1.16.0
 	cloud.google.com/go/storage v1.59.2
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/google/go-cmp v0.7.0
