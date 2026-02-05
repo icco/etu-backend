@@ -7,10 +7,10 @@ import (
 
 func TestSanitizeUserContent(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
+		name         string
+		input        string
 		wantFiltered bool
-		description string
+		description  string
 	}{
 		{
 			name:         "clean content",
@@ -89,13 +89,13 @@ func TestSanitizeUserContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := sanitizeUserContent(tt.input)
-			
+
 			if tt.wantFiltered {
 				// Check if content was modified (filtered or truncated)
 				if got == tt.input {
 					t.Errorf("sanitizeUserContent() = %q, expected filtering but content unchanged", got)
 				}
-				
+
 				// For long content, check it was truncated
 				if len(tt.input) > 10000 {
 					if !strings.Contains(got, "[truncated]") {
@@ -139,14 +139,14 @@ func TestSanitizeUserContentLength(t *testing.T) {
 	// Test that content is truncated at max length
 	longContent := strings.Repeat("a", 15000)
 	sanitized := sanitizeUserContent(longContent)
-	
+
 	// Should be truncated to max length + truncation message
 	// Expected length: 10000 (max) + len("... [truncated]") = 10015
 	const expectedLength = 10015
 	if len(sanitized) != expectedLength {
 		t.Errorf("Content length after truncation = %d, expected %d", len(sanitized), expectedLength)
 	}
-	
+
 	if !strings.HasSuffix(sanitized, "... [truncated]") {
 		t.Errorf("Truncated content should end with '... [truncated]', got: %s", sanitized[len(sanitized)-20:])
 	}

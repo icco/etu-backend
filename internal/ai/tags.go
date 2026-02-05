@@ -30,17 +30,17 @@ var promptInjectionPatterns = []*regexp.Regexp{
 func sanitizeUserContent(content string) string {
 	// Replace common prompt injection patterns
 	sanitized := content
-	
+
 	for _, pattern := range promptInjectionPatterns {
 		sanitized = pattern.ReplaceAllString(sanitized, "[filtered]")
 	}
-	
+
 	// Limit length to prevent extremely long inputs
 	const maxLength = 10000
 	if len(sanitized) > maxLength {
 		sanitized = sanitized[:maxLength] + "... [truncated]"
 	}
-	
+
 	return sanitized
 }
 
@@ -54,7 +54,7 @@ func (c *Client) GenerateTags(ctx context.Context, text string, existingTags []s
 
 	// Sanitize user-provided text to prevent prompt injection
 	sanitizedText := sanitizeUserContent(text)
-	
+
 	// Build the existing tags list for the prompt
 	existingTagsStr := ""
 	if len(existingTags) > 0 {
