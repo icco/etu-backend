@@ -10,31 +10,29 @@ import (
 	"google.golang.org/genai"
 )
 
+// Compiled regex patterns for prompt injection detection
+var promptInjectionPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)ignore\s+(previous|prior|above|all)\s+(instructions|prompts|rules|directions)`),
+	regexp.MustCompile(`(?i)disregard\s+(previous|prior|above|all)\s+(instructions|prompts|rules|directions)`),
+	regexp.MustCompile(`(?i)forget\s+(previous|prior|above|all)\s+(instructions|prompts|rules|directions)`),
+	regexp.MustCompile(`(?i)(new|updated|different)\s+(instructions|prompts|rules|directions)`),
+	regexp.MustCompile(`(?i)you\s+are\s+(now|a|an)\s+\w+`),
+	regexp.MustCompile(`(?i)your\s+new\s+(role|task|purpose|job)`),
+	regexp.MustCompile(`(?i)act\s+as\s+(a|an)\s+\w+`),
+	regexp.MustCompile(`(?i)pretend\s+(to\s+be|you\s+are)`),
+	regexp.MustCompile(`(?i)system\s*:\s*`),
+	regexp.MustCompile(`(?i)assistant\s*:\s*`),
+	regexp.MustCompile(`(?i)user\s*:\s*`),
+}
+
 // sanitizeUserContent sanitizes user-provided content to prevent prompt injection attacks.
 // It removes potentially harmful patterns while preserving the content's meaning.
 func sanitizeUserContent(content string) string {
 	// Replace common prompt injection patterns
 	sanitized := content
 	
-	// Remove sequences that might be interpreted as instructions
-	// Replace variations of "ignore previous/above instructions"
-	patterns := []string{
-		`(?i)ignore\s+(previous|prior|above|all)\s+(instructions|prompts|rules|directions)`,
-		`(?i)disregard\s+(previous|prior|above|all)\s+(instructions|prompts|rules|directions)`,
-		`(?i)forget\s+(previous|prior|above|all)\s+(instructions|prompts|rules|directions)`,
-		`(?i)(new|updated|different)\s+(instructions|prompts|rules|directions)`,
-		`(?i)you\s+are\s+(now|a|an)\s+\w+`,
-		`(?i)your\s+new\s+(role|task|purpose|job)`,
-		`(?i)act\s+as\s+(a|an)\s+\w+`,
-		`(?i)pretend\s+(to\s+be|you\s+are)`,
-		`(?i)system\s*:\s*`,
-		`(?i)assistant\s*:\s*`,
-		`(?i)user\s*:\s*`,
-	}
-	
-	for _, pattern := range patterns {
-		re := regexp.MustCompile(pattern)
-		sanitized = re.ReplaceAllString(sanitized, "[filtered]")
+	for _, pattern := range promptInjectionPatterns {
+		sanitized = pattern.ReplaceAllString(sanitized, "[filtered]")
 	}
 	
 	// Limit length to prevent extremely long inputs

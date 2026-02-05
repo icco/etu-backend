@@ -141,8 +141,10 @@ func TestSanitizeUserContentLength(t *testing.T) {
 	sanitized := sanitizeUserContent(longContent)
 	
 	// Should be truncated to max length + truncation message
-	if len(sanitized) <= 10000 || len(sanitized) > 10100 {
-		t.Errorf("Content length after truncation = %d, expected around 10000-10100 chars", len(sanitized))
+	// Expected length: 10000 (max) + len("... [truncated]") = 10015
+	const expectedLength = 10015
+	if len(sanitized) != expectedLength {
+		t.Errorf("Content length after truncation = %d, expected %d", len(sanitized), expectedLength)
 	}
 	
 	if !strings.HasSuffix(sanitized, "... [truncated]") {
