@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"regexp"
@@ -52,6 +53,18 @@ func New() (*DB, error) {
 	sqlDB.SetMaxIdleConns(5)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
+	return &DB{conn: conn}, nil
+}
+
+// NewFromConn creates a DB from an existing *sql.DB (e.g. from sqlmock for testing).
+// This allows testing actual query logic without a real database.
+func NewFromConn(sqlDB *sql.DB) (*DB, error) {
+	conn, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
 	return &DB{conn: conn}, nil
 }
 
