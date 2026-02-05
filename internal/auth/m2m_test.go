@@ -3,23 +3,13 @@ package auth
 import (
 	"bytes"
 	"log/slog"
-	"os"
 	"strings"
 	"testing"
 )
 
 func TestNewM2MConfig_MultiToken(t *testing.T) {
-	// Save original env vars and restore after test
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
 	// Test multi-token configuration
-	os.Setenv("GRPC_API_KEYS", "token1,token2,token3")
-	os.Unsetenv("GRPC_API_KEY")
+	t.Setenv("GRPC_API_KEYS", "token1,token2,token3")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -48,16 +38,8 @@ func TestNewM2MConfig_MultiToken(t *testing.T) {
 }
 
 func TestNewM2MConfig_MultiTokenWithWhitespace(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
 	// Test with whitespace around tokens
-	os.Setenv("GRPC_API_KEYS", " token1 , token2 ,  token3  ")
-	os.Unsetenv("GRPC_API_KEY")
+	t.Setenv("GRPC_API_KEYS", " token1 , token2 ,  token3  ")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -77,16 +59,8 @@ func TestNewM2MConfig_MultiTokenWithWhitespace(t *testing.T) {
 }
 
 func TestNewM2MConfig_SingleTokenDeprecated(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
 	// Test single token (deprecated) configuration
-	os.Unsetenv("GRPC_API_KEYS")
-	os.Setenv("GRPC_API_KEY", "single-token")
+	t.Setenv("GRPC_API_KEY", "single-token")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -117,16 +91,9 @@ func TestNewM2MConfig_SingleTokenDeprecated(t *testing.T) {
 }
 
 func TestNewM2MConfig_PrioritizesMultiToken(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
 	// If both are set, GRPC_API_KEYS should take precedence
-	os.Setenv("GRPC_API_KEYS", "multi1,multi2")
-	os.Setenv("GRPC_API_KEY", "single-token")
+	t.Setenv("GRPC_API_KEYS", "multi1,multi2")
+	t.Setenv("GRPC_API_KEY", "single-token")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -143,16 +110,7 @@ func TestNewM2MConfig_PrioritizesMultiToken(t *testing.T) {
 }
 
 func TestNewM2MConfig_NoAuth(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
-	// Test with no auth configured
-	os.Unsetenv("GRPC_API_KEYS")
-	os.Unsetenv("GRPC_API_KEY")
+	// Test with no auth configured - t.Setenv ensures clean environment
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -169,15 +127,7 @@ func TestNewM2MConfig_NoAuth(t *testing.T) {
 }
 
 func TestValidateToken_ValidToken(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
-	os.Setenv("GRPC_API_KEYS", "token1,token2,token3")
-	os.Unsetenv("GRPC_API_KEY")
+	t.Setenv("GRPC_API_KEYS", "token1,token2,token3")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -209,15 +159,7 @@ func TestValidateToken_ValidToken(t *testing.T) {
 }
 
 func TestValidateToken_SingleToken(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
-	os.Unsetenv("GRPC_API_KEYS")
-	os.Setenv("GRPC_API_KEY", "my-secret-token")
+	t.Setenv("GRPC_API_KEY", "my-secret-token")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -244,16 +186,8 @@ func TestValidateToken_SingleToken(t *testing.T) {
 }
 
 func TestLogAuthentication(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
 	t.Run("MultiToken", func(t *testing.T) {
-		os.Setenv("GRPC_API_KEYS", "token1,token2")
-		os.Unsetenv("GRPC_API_KEY")
+		t.Setenv("GRPC_API_KEYS", "token1,token2")
 
 		var buf bytes.Buffer
 		logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -273,8 +207,7 @@ func TestLogAuthentication(t *testing.T) {
 	})
 
 	t.Run("SingleTokenDeprecated", func(t *testing.T) {
-		os.Unsetenv("GRPC_API_KEYS")
-		os.Setenv("GRPC_API_KEY", "token")
+		t.Setenv("GRPC_API_KEY", "token")
 
 		var buf bytes.Buffer
 		logger := slog.New(slog.NewTextHandler(&buf, nil))
@@ -295,16 +228,8 @@ func TestLogAuthentication(t *testing.T) {
 }
 
 func TestNewM2MConfig_EmptyTokensIgnored(t *testing.T) {
-	originalKeys := os.Getenv("GRPC_API_KEYS")
-	originalKey := os.Getenv("GRPC_API_KEY")
-	defer func() {
-		os.Setenv("GRPC_API_KEYS", originalKeys)
-		os.Setenv("GRPC_API_KEY", originalKey)
-	}()
-
 	// Test with empty tokens in the list
-	os.Setenv("GRPC_API_KEYS", "token1,,token2,  ,token3")
-	os.Unsetenv("GRPC_API_KEY")
+	t.Setenv("GRPC_API_KEYS", "token1,,token2,  ,token3")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))

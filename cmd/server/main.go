@@ -250,6 +250,9 @@ func authInterceptor(authenticator *auth.Authenticator, log *slog.Logger) grpc.U
 	}
 
 	// Initialize M2M authentication configuration
+	// Note: This is initialized here (inside the interceptor factory) rather than
+	// outside to allow environment variables to be read at server start time,
+	// supporting potential future hot-reload scenarios without server restart.
 	m2mConfig := auth.NewM2MConfig(log)
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
