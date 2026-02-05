@@ -14,7 +14,7 @@ func TestNewFromConn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -30,7 +30,7 @@ func TestGetUser_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -76,7 +76,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestGetUserByEmail_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestDeleteNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -194,7 +194,7 @@ func TestDeleteNote_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -226,7 +226,7 @@ func TestListTags_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -268,7 +268,7 @@ func TestGetNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -328,7 +328,7 @@ func TestListNotes_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -393,7 +393,7 @@ func TestCreateNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -447,7 +447,7 @@ func TestUpdateNote_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -480,7 +480,7 @@ func TestAddImageToNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -517,7 +517,7 @@ func TestRemoveImageFromNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -561,7 +561,7 @@ func TestRemoveImageFromNote_NoteNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -588,7 +588,7 @@ func TestGetNoteImages_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -622,7 +622,7 @@ func TestGetImagesByNoteID_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -656,7 +656,7 @@ func TestAddAudioToNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -693,7 +693,7 @@ func TestRemoveAudioFromNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -737,7 +737,7 @@ func TestRemoveAudioFromNote_NoteNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -764,7 +764,7 @@ func TestGetAudiosByNoteID_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -804,7 +804,7 @@ func TestCreateUser_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -842,7 +842,7 @@ func TestGetUserByStripeCustomerID_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -877,7 +877,7 @@ func TestUpdateUserSubscription_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -919,7 +919,7 @@ func TestCreateApiKey_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -952,7 +952,7 @@ func TestListApiKeys_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -986,7 +986,7 @@ func TestDeleteApiKey_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1018,7 +1018,7 @@ func TestGetApiKeysByPrefix_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1050,7 +1050,7 @@ func TestUpdateApiKeyLastUsed_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1079,7 +1079,7 @@ func TestGetNotesWithFewTags_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1117,7 +1117,7 @@ func TestAddTagsToNote_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1166,7 +1166,7 @@ func TestGetUserSettings_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1200,7 +1200,7 @@ func TestUpdateUserSettings_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1245,7 +1245,7 @@ func TestGetUsersWithNotionKeys_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1276,7 +1276,7 @@ func TestListAllUsers_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1308,7 +1308,7 @@ func TestGetRandomNotes_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
@@ -1349,7 +1349,7 @@ func TestGetStats_SQL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sqlmock.New: %v", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	db, err := NewFromConn(sqlDB)
 	if err != nil {
