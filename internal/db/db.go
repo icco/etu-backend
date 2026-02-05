@@ -868,7 +868,6 @@ func (db *DB) GetRandomNotes(ctx context.Context, userID string, count int) ([]N
 	}
 
 	var notes []Note
-	// Use ORDER BY RANDOM() to get random notes from PostgreSQL
 	err := db.conn.WithContext(ctx).
 		Where(`"userId" = ?`, userID).
 		Order("RANDOM()").

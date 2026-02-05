@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -153,7 +154,7 @@ func (s *mockNotesService) GetRandomNotes(ctx context.Context, req *pb.GetRandom
 		}
 	}
 
-	// Return up to count notes (or all if less than count)
+	// Return up to count notes (or all if less than count), in random order
 	count := int(req.Count)
 	if count <= 0 {
 		count = 5
@@ -162,9 +163,14 @@ func (s *mockNotesService) GetRandomNotes(ctx context.Context, req *pb.GetRandom
 		count = len(userNotes)
 	}
 
+	// Shuffle so we don't always return map/insertion order
+	shuffled := make([]*db.Note, len(userNotes))
+	copy(shuffled, userNotes)
+	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+
 	notes := make([]*pb.Note, count)
 	for i := 0; i < count; i++ {
-		notes[i] = mockNoteToProto(userNotes[i])
+		notes[i] = mockNoteToProto(shuffled[i])
 	}
 
 	return &pb.GetRandomNotesResponse{
@@ -571,4 +577,64 @@ func TestGetRandomNotes(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("returns notes in random order across calls", func(t *testing.T) {
+		// Use a fresh service with enough notes that same order repeatedly is very unlikely
+		svc := newMockNotesService()
+		for i := 1; i <= 10; i++ {
+			_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
+				UserId:  "user-123",
+				Content: fmt.Sprintf("Note %d", i),
+			})
+		}
+
+		// Collect orderings from multiple calls (by note IDs)
+		orderings := make([][]string, 0, 20)
+		for i := 0; i < 20; i++ {
+			resp, err := svc.GetRandomNotes(ctx, &pb.GetRandomNotesRequest{
+				UserId: "user-123",
+				Count:  5,
+			})
+			if err != nil {
+				t.Fatalf("GetRandomNotes: %v", err)
+			}
+			if len(resp.Notes) != 5 {
+				t.Fatalf("expected 5 notes, got %d", len(resp.Notes))
+			}
+			ids := make([]string, len(resp.Notes))
+			for j, n := range resp.Notes {
+				ids[j] = n.Id
+			}
+			orderings = append(orderings, ids)
+		}
+
+		// At least two responses must differ in order (proves we're not always returning same order)
+		var seenDifferent bool
+		for i := 0; i < len(orderings); i++ {
+			for j := i + 1; j < len(orderings); j++ {
+				if !sliceEqual(orderings[i], orderings[j]) {
+					seenDifferent = true
+					break
+				}
+			}
+			if seenDifferent {
+				break
+			}
+		}
+		if !seenDifferent {
+			t.Error("GetRandomNotes returned the same order 20 times in a row; expected random order to vary across calls")
+		}
+	})
+}
+
+func sliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
