@@ -75,7 +75,12 @@ func getKeyFromGCP(secretName string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCP Secret Manager client: %w", err)
 	}
-	defer client.Close()
+	defer func() {
+		if closeErr := client.Close(); closeErr != nil {
+			// Log error but don't fail since we already have the result
+			fmt.Fprintf(os.Stderr, "warning: failed to close GCP Secret Manager client: %v\n", closeErr)
+		}
+	}()
 
 	// Build the request
 	req := &secretmanagerpb.AccessSecretVersionRequest{

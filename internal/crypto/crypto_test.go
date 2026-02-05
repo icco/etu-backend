@@ -28,9 +28,17 @@ func generateTestKey() string {
 func TestEncryptDecrypt(t *testing.T) {
 	// Set up test encryption key
 	testKey := generateTestKey()
-	os.Setenv("ENCRYPTION_KEY", testKey)
-	os.Unsetenv("GCP_SECRET_NAME")
-	defer os.Unsetenv("ENCRYPTION_KEY")
+	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
+		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
+	}
+	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
+		}
+	}()
 	resetEncryptionKeyCache()
 
 	tests := []struct {
@@ -106,9 +114,17 @@ func TestEncryptDecrypt(t *testing.T) {
 func TestEncryptDeterministic(t *testing.T) {
 	// Set up test encryption key
 	testKey := generateTestKey()
-	os.Setenv("ENCRYPTION_KEY", testKey)
-	os.Unsetenv("GCP_SECRET_NAME")
-	defer os.Unsetenv("ENCRYPTION_KEY")
+	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
+		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
+	}
+	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
+		}
+	}()
 	resetEncryptionKeyCache()
 
 	plaintext := "test_secret"
@@ -189,12 +205,22 @@ func TestGetEncryptionKey(t *testing.T) {
 			resetEncryptionKeyCache()
 
 			// Set environment variable
-			os.Unsetenv("GCP_SECRET_NAME")
+			if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+				t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+			}
 			if tt.envValue != "" {
-				os.Setenv("ENCRYPTION_KEY", tt.envValue)
-				defer os.Unsetenv("ENCRYPTION_KEY")
+				if err := os.Setenv("ENCRYPTION_KEY", tt.envValue); err != nil {
+					t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+						t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
+					}
+				}()
 			} else {
-				os.Unsetenv("ENCRYPTION_KEY")
+				if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+					t.Fatalf("Failed to unset ENCRYPTION_KEY: %v", err)
+				}
 			}
 
 			key, err := GetEncryptionKey()
@@ -220,9 +246,17 @@ func TestGetEncryptionKey(t *testing.T) {
 func TestDecryptInvalidData(t *testing.T) {
 	// Set up test encryption key
 	testKey := generateTestKey()
-	os.Setenv("ENCRYPTION_KEY", testKey)
-	os.Unsetenv("GCP_SECRET_NAME")
-	defer os.Unsetenv("ENCRYPTION_KEY")
+	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
+		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
+	}
+	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
+		}
+	}()
 	resetEncryptionKeyCache()
 
 	tests := []struct {
@@ -268,8 +302,12 @@ func TestDecryptInvalidData(t *testing.T) {
 
 func TestEncryptWithoutKey(t *testing.T) {
 	// Ensure no encryption key is set
-	os.Unsetenv("ENCRYPTION_KEY")
-	os.Unsetenv("GCP_SECRET_NAME")
+	if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+		t.Fatalf("Failed to unset ENCRYPTION_KEY: %v", err)
+	}
+	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+	}
 	resetEncryptionKeyCache()
 
 	_, err := Encrypt("test")
@@ -281,8 +319,12 @@ func TestEncryptWithoutKey(t *testing.T) {
 func TestDecryptWithoutKey(t *testing.T) {
 	// First encrypt with a key
 	testKey := generateTestKey()
-	os.Setenv("ENCRYPTION_KEY", testKey)
-	os.Unsetenv("GCP_SECRET_NAME")
+	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
+		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
+	}
+	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+	}
 	resetEncryptionKeyCache()
 	ciphertext, err := Encrypt("test")
 	if err != nil {
@@ -290,7 +332,9 @@ func TestDecryptWithoutKey(t *testing.T) {
 	}
 
 	// Then try to decrypt without key
-	os.Unsetenv("ENCRYPTION_KEY")
+	if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+		t.Fatalf("Failed to unset ENCRYPTION_KEY: %v", err)
+	}
 	resetEncryptionKeyCache()
 
 	_, err = Decrypt(ciphertext)
@@ -302,8 +346,12 @@ func TestDecryptWithoutKey(t *testing.T) {
 func TestDecryptWithDifferentKey(t *testing.T) {
 	// Encrypt with one key
 	testKey1 := generateTestKey()
-	os.Setenv("ENCRYPTION_KEY", testKey1)
-	os.Unsetenv("GCP_SECRET_NAME")
+	if err := os.Setenv("ENCRYPTION_KEY", testKey1); err != nil {
+		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
+	}
+	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+	}
 	resetEncryptionKeyCache()
 	ciphertext, err := Encrypt("test")
 	if err != nil {
@@ -312,8 +360,14 @@ func TestDecryptWithDifferentKey(t *testing.T) {
 
 	// Try to decrypt with a different key
 	testKey2 := generateTestKey()
-	os.Setenv("ENCRYPTION_KEY", testKey2)
-	defer os.Unsetenv("ENCRYPTION_KEY")
+	if err := os.Setenv("ENCRYPTION_KEY", testKey2); err != nil {
+		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
+			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
+		}
+	}()
 	resetEncryptionKeyCache()
 
 	_, err = Decrypt(ciphertext)
