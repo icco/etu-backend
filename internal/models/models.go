@@ -95,7 +95,7 @@ type User struct {
 	SubscriptionEnd    *time.Time `gorm:"column:subscriptionEnd"`
 	CreatedAt          time.Time  `gorm:"column:createdAt"`
 	StripeCustomerID   *string    `gorm:"column:stripeCustomerId"`
-	NotionKey          *string    `gorm:"column:notionKey"` // Notion API key for syncing. TODO: Consider encrypting this field at rest for better security.
+	NotionKey          *string    `gorm:"column:notionKey"` // Notion API key for syncing (encrypted at rest using AES-256-GCM)
 	UpdatedAt          time.Time  `gorm:"column:updatedAt"`
 }
 

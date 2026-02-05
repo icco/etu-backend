@@ -29,6 +29,7 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 - `PORT` - Server port (default: 50051)
 - `NOTION_KEY` - Notion API key (for sync job)
 - `GEMINI_API_KEY` - Gemini API key (for tag generation)
+- `ENCRYPTION_KEY` - Base64-encoded 32-byte key for encrypting sensitive data at rest (optional but recommended for production)
 
 **Run locally:**
 ```bash
@@ -97,6 +98,28 @@ Automatically generates up to 3 tags per note using Google Gemini 1.5 Flash. Onl
 **Flags:** `-dry-run`, `-delay` (default: 2s), `-interval` (e.g., `6h`, `1h`)
 
 **Features:** Prefers reusing existing tags, all tags are lowercase single words, never modifies existing tags.
+
+## Security
+
+### Encryption at Rest
+
+Notion API keys stored in the database are encrypted using AES-256-GCM encryption. To enable encryption:
+
+1. Generate a 32-byte (256-bit) encryption key:
+```bash
+openssl rand -base64 32
+```
+
+2. Set the `ENCRYPTION_KEY` environment variable:
+```bash
+export ENCRYPTION_KEY="<your-base64-encoded-key>"
+```
+
+**Important Notes:**
+- If `ENCRYPTION_KEY` is not set, Notion keys will be stored in plaintext (not recommended for production)
+- Keep your encryption key secure and backed up - losing it means losing access to encrypted data
+- The system handles backwards compatibility: existing plaintext keys are automatically detected and can be decrypted after setting the encryption key
+- Keys are encrypted before storage and decrypted when retrieved, transparently to application code
 
 ## License
 
