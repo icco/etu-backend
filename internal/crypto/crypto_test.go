@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -185,7 +186,7 @@ func TestGetEncryptionKey(t *testing.T) {
 			if tt.wantError {
 				if err == nil {
 					t.Errorf("GetEncryptionKey() expected error containing %q, got nil", tt.errorMsg)
-				} else if tt.errorMsg != "" && !contains(err.Error(), tt.errorMsg) {
+				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
 					t.Errorf("GetEncryptionKey() error = %q, want error containing %q", err.Error(), tt.errorMsg)
 				}
 			} else {
@@ -293,19 +294,4 @@ func TestDecryptWithDifferentKey(t *testing.T) {
 	if err == nil {
 		t.Errorf("Decrypt() with different key should fail")
 	}
-}
-
-// contains checks if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
-		(len(s) > 0 && len(substr) > 0 && containsHelper(s, substr)))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

@@ -118,7 +118,7 @@ export ENCRYPTION_KEY="<your-base64-encoded-key>"
 **Important Notes:**
 - If `ENCRYPTION_KEY` is not set, Notion keys will be stored in plaintext (not recommended for production)
 - Keep your encryption key secure and backed up - losing it means losing access to encrypted data
-- The system handles backwards compatibility: existing plaintext keys are automatically detected and can be decrypted after setting the encryption key
+- **Migration**: Existing plaintext keys will continue to work after setting the encryption key. However, they will remain unencrypted in the database until users update their settings (e.g., by re-saving their Notion key). The system detects plaintext keys during retrieval and handles them transparently.
 - Keys are encrypted before storage and decrypted when retrieved, transparently to application code
 
 ## License
