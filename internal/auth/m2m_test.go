@@ -103,6 +103,31 @@ func TestValidateToken_ValidToken(t *testing.T) {
 	}
 }
 
+func TestValidateToken_NoAuth(t *testing.T) {
+	// Test ValidateToken when M2M auth is disabled (no tokens configured)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+
+	config := NewM2MConfig(logger)
+
+	// Verify M2M auth is disabled
+	if config.IsEnabled() {
+		t.Error("Expected M2M auth to be disabled")
+	}
+
+	// Test that ValidateToken returns false for any token when auth is disabled
+	tests := []string{"any_token", "test", "", "valid-looking-token"}
+	for _, token := range tests {
+		valid, index := config.ValidateToken(token)
+		if valid {
+			t.Errorf("ValidateToken(%q): expected valid=false when M2M auth is disabled, got valid=true", token)
+		}
+		if index != -1 {
+			t.Errorf("ValidateToken(%q): expected index=-1 when M2M auth is disabled, got %d", token, index)
+		}
+	}
+}
+
 func TestLogAuthentication(t *testing.T) {
 	t.Setenv("GRPC_API_KEYS", "token1,token2")
 

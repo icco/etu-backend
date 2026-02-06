@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/subtle"
 	"log/slog"
 	"os"
 	"strings"
@@ -50,9 +51,10 @@ func (c *M2MConfig) IsEnabled() bool {
 
 // ValidateToken checks if the provided token matches any configured M2M token
 // Returns true and the token index if valid, false and -1 otherwise
+// Uses constant-time comparison to prevent timing attacks
 func (c *M2MConfig) ValidateToken(token string) (bool, int) {
 	for i, validToken := range c.tokens {
-		if token == validToken {
+		if subtle.ConstantTimeCompare([]byte(token), []byte(validToken)) == 1 {
 			return true, i
 		}
 	}

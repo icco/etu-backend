@@ -118,9 +118,12 @@ func main() {
 		"imgix_enabled", imgixDomain != "",
 		"imgix_domain", imgixDomain)
 
+	// Initialize M2M authentication configuration
+	m2mConfig := auth.NewM2MConfig(log)
+
 	// Create gRPC server with authentication interceptor
 	server := grpc.NewServer(
-		grpc.UnaryInterceptor(authInterceptor(authenticator, log)),
+		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
 	)
 
 	// Register services
@@ -241,19 +244,13 @@ func newHealthHandler(log *slog.Logger) http.Handler {
 }
 
 // authInterceptor creates a gRPC interceptor that validates API keys and M2M tokens
-func authInterceptor(authenticator *auth.Authenticator, log *slog.Logger) grpc.UnaryServerInterceptor {
+func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfig, log *slog.Logger) grpc.UnaryServerInterceptor {
 	// Methods that don't require authentication
 	publicMethods := map[string]bool{
 		"/etu.AuthService/Register":        true,
 		"/etu.AuthService/Authenticate":    true,
 		"/etu.ApiKeysService/VerifyApiKey": true,
 	}
-
-	// Initialize M2M authentication configuration
-	// Note: This is initialized here (inside the interceptor factory) rather than
-	// outside to allow environment variables to be read at server start time,
-	// supporting potential future hot-reload scenarios without server restart.
-	m2mConfig := auth.NewM2MConfig(log)
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Skip auth for public methods
