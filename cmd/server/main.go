@@ -118,9 +118,12 @@ func main() {
 		"imgix_enabled", imgixDomain != "",
 		"imgix_domain", imgixDomain)
 
+	// Initialize M2M authentication configuration
+	m2mConfig := auth.NewM2MConfig(log)
+
 	// Create gRPC server with authentication interceptor
 	server := grpc.NewServer(
-		grpc.UnaryInterceptor(authInterceptor(authenticator, log)),
+		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
 	)
 
 	// Register services
@@ -241,17 +244,13 @@ func newHealthHandler(log *slog.Logger) http.Handler {
 }
 
 // authInterceptor creates a gRPC interceptor that validates API keys and M2M tokens
-func authInterceptor(authenticator *auth.Authenticator, log *slog.Logger) grpc.UnaryServerInterceptor {
+func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfig, log *slog.Logger) grpc.UnaryServerInterceptor {
 	// Methods that don't require authentication
 	publicMethods := map[string]bool{
 		"/etu.AuthService/Register":        true,
 		"/etu.AuthService/Authenticate":    true,
 		"/etu.ApiKeysService/VerifyApiKey": true,
 	}
-
-	// Load GRPC API key from environment for server-to-server auth
-	grpcApiKey := os.Getenv("GRPC_API_KEY")
-	grpcAuthEnabled := grpcApiKey != ""
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Skip auth for public methods
@@ -274,12 +273,14 @@ func authInterceptor(authenticator *auth.Authenticator, log *slog.Logger) grpc.U
 
 		token := authHeaders[0]
 
-		// Check for GRPC API key (server-to-server auth)
-		if grpcAuthEnabled && token == grpcApiKey {
-			// GRPC API key authentication successful - no user context
-			ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
-			log.Info("authenticated request", "method", info.FullMethod, "auth_type", "m2m")
-			return handler(ctx, req)
+		// Check for M2M token (server-to-server auth)
+		if m2mConfig.IsEnabled() {
+			if valid, tokenIndex := m2mConfig.ValidateToken(token); valid {
+				// M2M authentication successful - no user context
+				ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
+				m2mConfig.LogAuthentication(info.FullMethod, tokenIndex)
+				return handler(ctx, req)
+			}
 		}
 
 		// Fall back to API key verification
