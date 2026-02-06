@@ -25,21 +25,33 @@ func generateTestKey() string {
 	return base64.StdEncoding.EncodeToString(key)
 }
 
+// setTestEncryptionKey sets the encryption key directly for testing purposes
+// This bypasses the GCP Secret Manager check
+func setTestEncryptionKey(keyBase64 string) error {
+	decoded, err := base64.StdEncoding.DecodeString(keyBase64)
+	if err != nil {
+		return err
+	}
+	if len(decoded) != 32 {
+		return nil
+	}
+	
+	// Set the key and mark as initialized
+	encryptionKeyOnce.Do(func() {
+		encryptionKey = decoded
+		encryptionKeyErr = nil
+	})
+	
+	return nil
+}
+
 func TestEncryptDecrypt(t *testing.T) {
-	// Set up test encryption key
+	// Set up test encryption key directly (bypassing GCP)
 	testKey := generateTestKey()
-	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
-		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
-	}
-	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
-		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
-		}
-	}()
 	resetEncryptionKeyCache()
+	if err := setTestEncryptionKey(testKey); err != nil {
+		t.Fatalf("Failed to set test encryption key: %v", err)
+	}
 
 	tests := []struct {
 		name      string
@@ -112,20 +124,12 @@ func TestEncryptDecrypt(t *testing.T) {
 }
 
 func TestEncryptDeterministic(t *testing.T) {
-	// Set up test encryption key
+	// Set up test encryption key directly (bypassing GCP)
 	testKey := generateTestKey()
-	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
-		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
-	}
-	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
-		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
-		}
-	}()
 	resetEncryptionKeyCache()
+	if err := setTestEncryptionKey(testKey); err != nil {
+		t.Fatalf("Failed to set test encryption key: %v", err)
+	}
 
 	plaintext := "test_secret"
 
@@ -162,102 +166,34 @@ func TestEncryptDeterministic(t *testing.T) {
 }
 
 func TestGetEncryptionKey(t *testing.T) {
-	tests := []struct {
-		name      string
-		envValue  string
-		wantError bool
-		errorMsg  string
-	}{
-		{
-			name:      "valid 32-byte key",
-			envValue:  generateTestKey(),
-			wantError: false,
-		},
-		{
-			name:      "missing key",
-			envValue:  "",
-			wantError: true,
-			errorMsg:  "environment variable",
-		},
-		{
-			name:      "invalid base64",
-			envValue:  "not-valid-base64!!!",
-			wantError: true,
-			errorMsg:  "failed to decode ENCRYPTION_KEY",
-		},
-		{
-			name:      "wrong size key (16 bytes)",
-			envValue:  base64.StdEncoding.EncodeToString(make([]byte, 16)),
-			wantError: true,
-			errorMsg:  "ENCRYPTION_KEY must be 32 bytes",
-		},
-		{
-			name:      "wrong size key (64 bytes)",
-			envValue:  base64.StdEncoding.EncodeToString(make([]byte, 64)),
-			wantError: true,
-			errorMsg:  "ENCRYPTION_KEY must be 32 bytes",
-		},
-	}
+	t.Run("missing GCP_SECRET_NAME", func(t *testing.T) {
+		// Reset cache for test
+		resetEncryptionKeyCache()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Reset cache for each test
-			resetEncryptionKeyCache()
+		// Ensure GCP_SECRET_NAME is not set
+		if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+			t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
+		}
 
-			// Set environment variable
-			if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
-				t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
-			}
-			if tt.envValue != "" {
-				if err := os.Setenv("ENCRYPTION_KEY", tt.envValue); err != nil {
-					t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
-				}
-				defer func() {
-					if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-						t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
-					}
-				}()
-			} else {
-				if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-					t.Fatalf("Failed to unset ENCRYPTION_KEY: %v", err)
-				}
-			}
+		_, err := GetEncryptionKey()
+		if err == nil {
+			t.Errorf("GetEncryptionKey() expected error when GCP_SECRET_NAME not set, got nil")
+		} else if !strings.Contains(err.Error(), "GCP_SECRET_NAME") {
+			t.Errorf("GetEncryptionKey() error = %q, want error containing 'GCP_SECRET_NAME'", err.Error())
+		}
+	})
 
-			key, err := GetEncryptionKey()
-
-			if tt.wantError {
-				if err == nil {
-					t.Errorf("GetEncryptionKey() expected error containing %q, got nil", tt.errorMsg)
-				} else if tt.errorMsg != "" && !strings.Contains(err.Error(), tt.errorMsg) {
-					t.Errorf("GetEncryptionKey() error = %q, want error containing %q", err.Error(), tt.errorMsg)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("GetEncryptionKey() unexpected error = %v", err)
-				}
-				if len(key) != 32 {
-					t.Errorf("GetEncryptionKey() returned key of length %d, want 32", len(key))
-				}
-			}
-		})
-	}
+	// Note: Testing actual GCP Secret Manager access requires mocking or integration tests
+	// For unit tests, we use setTestEncryptionKey() to bypass GCP
 }
 
 func TestDecryptInvalidData(t *testing.T) {
-	// Set up test encryption key
+	// Set up test encryption key directly (bypassing GCP)
 	testKey := generateTestKey()
-	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
-		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
-	}
-	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
-		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
-		}
-	}()
 	resetEncryptionKeyCache()
+	if err := setTestEncryptionKey(testKey); err != nil {
+		t.Fatalf("Failed to set test encryption key: %v", err)
+	}
 
 	tests := []struct {
 		name       string
@@ -302,9 +238,6 @@ func TestDecryptInvalidData(t *testing.T) {
 
 func TestEncryptWithoutKey(t *testing.T) {
 	// Ensure no encryption key is set
-	if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-		t.Fatalf("Failed to unset ENCRYPTION_KEY: %v", err)
-	}
 	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
 		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
 	}
@@ -312,47 +245,41 @@ func TestEncryptWithoutKey(t *testing.T) {
 
 	_, err := Encrypt("test")
 	if err == nil {
-		t.Errorf("Encrypt() without ENCRYPTION_KEY should fail")
+		t.Errorf("Encrypt() without GCP_SECRET_NAME should fail")
 	}
 }
 
 func TestDecryptWithoutKey(t *testing.T) {
 	// First encrypt with a key
 	testKey := generateTestKey()
-	if err := os.Setenv("ENCRYPTION_KEY", testKey); err != nil {
-		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
-	}
-	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
-		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
-	}
 	resetEncryptionKeyCache()
+	if err := setTestEncryptionKey(testKey); err != nil {
+		t.Fatalf("Failed to set test encryption key: %v", err)
+	}
 	ciphertext, err := Encrypt("test")
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
 	}
 
 	// Then try to decrypt without key
-	if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-		t.Fatalf("Failed to unset ENCRYPTION_KEY: %v", err)
+	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
+		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
 	}
 	resetEncryptionKeyCache()
 
 	_, err = Decrypt(ciphertext)
 	if err == nil {
-		t.Errorf("Decrypt() without ENCRYPTION_KEY should fail")
+		t.Errorf("Decrypt() without GCP_SECRET_NAME should fail")
 	}
 }
 
 func TestDecryptWithDifferentKey(t *testing.T) {
 	// Encrypt with one key
 	testKey1 := generateTestKey()
-	if err := os.Setenv("ENCRYPTION_KEY", testKey1); err != nil {
-		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
-	}
-	if err := os.Unsetenv("GCP_SECRET_NAME"); err != nil {
-		t.Fatalf("Failed to unset GCP_SECRET_NAME: %v", err)
-	}
 	resetEncryptionKeyCache()
+	if err := setTestEncryptionKey(testKey1); err != nil {
+		t.Fatalf("Failed to set test encryption key: %v", err)
+	}
 	ciphertext, err := Encrypt("test")
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
@@ -360,15 +287,10 @@ func TestDecryptWithDifferentKey(t *testing.T) {
 
 	// Try to decrypt with a different key
 	testKey2 := generateTestKey()
-	if err := os.Setenv("ENCRYPTION_KEY", testKey2); err != nil {
-		t.Fatalf("Failed to set ENCRYPTION_KEY: %v", err)
-	}
-	defer func() {
-		if err := os.Unsetenv("ENCRYPTION_KEY"); err != nil {
-			t.Logf("Failed to unset ENCRYPTION_KEY: %v", err)
-		}
-	}()
 	resetEncryptionKeyCache()
+	if err := setTestEncryptionKey(testKey2); err != nil {
+		t.Fatalf("Failed to set test encryption key: %v", err)
+	}
 
 	_, err = Decrypt(ciphertext)
 	if err == nil {

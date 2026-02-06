@@ -22,43 +22,18 @@ var (
 	encryptionKeyOnce sync.Once
 )
 
-// GetEncryptionKey retrieves the encryption key from GCP Secret Manager or environment.
-// Priority: GCP_SECRET_NAME > ENCRYPTION_KEY environment variable
+// GetEncryptionKey retrieves the encryption key from GCP Secret Manager.
 // The key should be a base64-encoded 32-byte key for AES-256.
 // Results are cached after the first call.
 func GetEncryptionKey() ([]byte, error) {
 	encryptionKeyOnce.Do(func() {
-		// Try GCP Secret Manager first
 		secretName := os.Getenv("GCP_SECRET_NAME")
-		if secretName != "" {
-			encryptionKey, encryptionKeyErr = getKeyFromGCP(secretName)
-			if encryptionKeyErr == nil {
-				return
-			}
-			// Log error but fall through to environment variable
-		}
-
-		// Fall back to environment variable
-		key := os.Getenv("ENCRYPTION_KEY")
-		if key == "" {
-			encryptionKeyErr = errors.New("neither GCP_SECRET_NAME nor ENCRYPTION_KEY environment variable set")
+		if secretName == "" {
+			encryptionKeyErr = errors.New("GCP_SECRET_NAME environment variable not set")
 			return
 		}
 
-		// Decode from base64
-		decoded, err := base64.StdEncoding.DecodeString(key)
-		if err != nil {
-			encryptionKeyErr = fmt.Errorf("failed to decode ENCRYPTION_KEY: %w", err)
-			return
-		}
-
-		// Verify key is 32 bytes for AES-256
-		if len(decoded) != 32 {
-			encryptionKeyErr = fmt.Errorf("ENCRYPTION_KEY must be 32 bytes (256 bits), got %d bytes", len(decoded))
-			return
-		}
-
-		encryptionKey = decoded
+		encryptionKey, encryptionKeyErr = getKeyFromGCP(secretName)
 	})
 
 	return encryptionKey, encryptionKeyErr
