@@ -3,18 +3,22 @@ package syncdb
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
+	"github.com/icco/etu-backend/internal/crypto"
+	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // DB wraps the GORM database connection
 type DB struct {
 	conn *gorm.DB
+	log  *slog.Logger
 }
 
 // Re-export models for backwards compatibility
@@ -24,6 +28,23 @@ type NoteTag = models.NoteTag
 type User = models.User
 type SyncState = models.SyncState
 
+// decryptNotionKey decrypts a Notion API key if it's encrypted.
+// If ENCRYPTION_KEY is not set or decryption fails, it assumes the key is plaintext.
+func (db *DB) decryptNotionKey(encrypted string) string {
+	if encrypted == "" {
+		return ""
+	}
+
+	decrypted, err := crypto.Decrypt(encrypted)
+	if err != nil {
+		// If decryption fails, assume it's plaintext (backwards compatibility)
+		db.log.Warn("failed to decrypt Notion key, assuming plaintext", "error", err)
+		return encrypted
+	}
+
+	return decrypted
+}
+
 // New creates a new GORM database connection
 func New() (*DB, error) {
 	connStr := os.Getenv("DATABASE_URL")
@@ -32,7 +53,7 @@ func New() (*DB, error) {
 	}
 
 	conn, err := gorm.Open(postgres.Open(connStr), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		Logger: gormlogger.Default.LogMode(gormlogger.Warn),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
@@ -48,7 +69,10 @@ func New() (*DB, error) {
 	sqlDB.SetMaxIdleConns(5)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	return &DB{conn: conn}, nil
+	return &DB{
+		conn: conn,
+		log:  logger.New(),
+	}, nil
 }
 
 // Close closes the database connection
@@ -300,6 +324,15 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Decrypt Notion keys for all users
+	for i := range users {
+		if users[i].NotionKey != nil && *users[i].NotionKey != "" {
+			decrypted := db.decryptNotionKey(*users[i].NotionKey)
+			users[i].NotionKey = &decrypted
+		}
+	}
+
 	return users, nil
 }
 
@@ -313,5 +346,12 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 	if result.Error != nil {
 		return nil, result.Error
 	}
+
+	// Decrypt Notion key if present
+	if user.NotionKey != nil && *user.NotionKey != "" {
+		decrypted := db.decryptNotionKey(*user.NotionKey)
+		user.NotionKey = &decrypted
+	}
+
 	return &user, nil
 }

@@ -4,21 +4,25 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/icco/etu-backend/internal/crypto"
+	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // DB wraps the GORM database connection
 type DB struct {
 	conn *gorm.DB
+	log  *slog.Logger
 }
 
 // Re-export models for backwards compatibility
@@ -29,6 +33,40 @@ type ApiKey = models.ApiKey
 type NoteImage = models.NoteImage
 type NoteAudio = models.NoteAudio
 
+// encryptNotionKey encrypts a Notion API key if encryption is available.
+// If ENCRYPTION_KEY is not set, it logs a warning and returns the plaintext.
+func (db *DB) encryptNotionKey(key string) string {
+	if key == "" {
+		return ""
+	}
+
+	encrypted, err := crypto.Encrypt(key)
+	if err != nil {
+		// If encryption fails (e.g., ENCRYPTION_KEY not set), log warning and return plaintext
+		db.log.Warn("failed to encrypt Notion key, storing in plaintext", "error", err)
+		return key
+	}
+
+	return encrypted
+}
+
+// decryptNotionKey decrypts a Notion API key if it's encrypted.
+// If ENCRYPTION_KEY is not set or decryption fails, it assumes the key is plaintext.
+func (db *DB) decryptNotionKey(encrypted string) string {
+	if encrypted == "" {
+		return ""
+	}
+
+	decrypted, err := crypto.Decrypt(encrypted)
+	if err != nil {
+		// If decryption fails, assume it's plaintext (backwards compatibility)
+		db.log.Warn("failed to decrypt Notion key, assuming plaintext", "error", err)
+		return encrypted
+	}
+
+	return decrypted
+}
+
 // New creates a new GORM database connection
 func New() (*DB, error) {
 	connStr := os.Getenv("DATABASE_URL")
@@ -37,7 +75,7 @@ func New() (*DB, error) {
 	}
 
 	conn, err := gorm.Open(postgres.Open(connStr), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
+		Logger: gormlogger.Default.LogMode(gormlogger.Warn),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
@@ -53,19 +91,25 @@ func New() (*DB, error) {
 	sqlDB.SetMaxIdleConns(5)
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
-	return &DB{conn: conn}, nil
+	return &DB{
+		conn: conn,
+		log:  logger.New(),
+	}, nil
 }
 
 // NewFromConn creates a DB from an existing *sql.DB (e.g. from sqlmock for testing).
 // This allows testing actual query logic without a real database.
 func NewFromConn(sqlDB *sql.DB) (*DB, error) {
 	conn, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
-	return &DB{conn: conn}, nil
+	return &DB{
+		conn: conn,
+		log:  logger.New(),
+	}, nil
 }
 
 // Close closes the database connection
@@ -589,6 +633,13 @@ func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", result.Error)
 	}
+
+	// Decrypt Notion key if present
+	if user.NotionKey != nil && *user.NotionKey != "" {
+		decrypted := db.decryptNotionKey(*user.NotionKey)
+		user.NotionKey = &decrypted
+	}
+
 	return &user, nil
 }
 
@@ -602,6 +653,13 @@ func (db *DB) GetUser(ctx context.Context, userID string) (*User, error) {
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", result.Error)
 	}
+
+	// Decrypt Notion key if present
+	if user.NotionKey != nil && *user.NotionKey != "" {
+		decrypted := db.decryptNotionKey(*user.NotionKey)
+		user.NotionKey = &decrypted
+	}
+
 	return &user, nil
 }
 
@@ -615,6 +673,13 @@ func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID st
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", result.Error)
 	}
+
+	// Decrypt Notion key if present
+	if user.NotionKey != nil && *user.NotionKey != "" {
+		decrypted := db.decryptNotionKey(*user.NotionKey)
+		user.NotionKey = &decrypted
+	}
+
 	return &user, nil
 }
 
@@ -803,6 +868,13 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", result.Error)
 	}
+
+	// Decrypt Notion key if present
+	if user.NotionKey != nil && *user.NotionKey != "" {
+		decrypted := db.decryptNotionKey(*user.NotionKey)
+		user.NotionKey = &decrypted
+	}
+
 	return &user, nil
 }
 
@@ -824,7 +896,9 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 		"updatedAt": now,
 	}
 	if notionKey != nil {
-		updates["notionKey"] = *notionKey
+		// Encrypt the Notion key before storing
+		encrypted := db.encryptNotionKey(*notionKey)
+		updates["notionKey"] = encrypted
 	}
 	if name != nil {
 		updates["name"] = *name
@@ -849,6 +923,12 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 		return nil, fmt.Errorf("failed to reload user: %w", err)
 	}
 
+	// Decrypt Notion key if present for return
+	if user.NotionKey != nil && *user.NotionKey != "" {
+		decrypted := db.decryptNotionKey(*user.NotionKey)
+		user.NotionKey = &decrypted
+	}
+
 	return &user, nil
 }
 
@@ -861,6 +941,15 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query users with Notion keys: %w", err)
 	}
+
+	// Decrypt Notion keys for all users
+	for i := range users {
+		if users[i].NotionKey != nil && *users[i].NotionKey != "" {
+			decrypted := db.decryptNotionKey(*users[i].NotionKey)
+			users[i].NotionKey = &decrypted
+		}
+	}
+
 	return users, nil
 }
 
