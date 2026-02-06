@@ -35,13 +35,13 @@ func setTestEncryptionKey(keyBase64 string) error {
 	if len(decoded) != 32 {
 		return nil
 	}
-	
+
 	// Set the key and mark as initialized
 	encryptionKeyOnce.Do(func() {
 		encryptionKey = decoded
 		encryptionKeyErr = nil
 	})
-	
+
 	return nil
 }
 
