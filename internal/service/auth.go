@@ -76,9 +76,28 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 		return &pb.AuthenticateResponse{Success: false}, nil
 	}
 
+	// Check if account is disabled
+	if user.Disabled {
+		return nil, status.Error(codes.PermissionDenied, "account is disabled")
+	}
+
+	// Check if account is locked due to too many failed attempts
+	if user.FailedLoginAttempts >= 10 {
+		return nil, status.Error(codes.PermissionDenied, "account is locked")
+	}
+
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		// Record failed login attempt
+		if recordErr := s.db.RecordFailedLogin(ctx, user.ID); recordErr != nil {
+			return nil, status.Errorf(codes.Internal, "failed to record login attempt: %v", recordErr)
+		}
 		return &pb.AuthenticateResponse{Success: false}, nil
+	}
+
+	// Clear failed login attempts on success
+	if clearErr := s.db.RecordSuccessfulLogin(ctx, user.ID); clearErr != nil {
+		return nil, status.Errorf(codes.Internal, "failed to clear login attempts: %v", clearErr)
 	}
 
 	return &pb.AuthenticateResponse{
@@ -173,6 +192,7 @@ func userToProto(u *db.User) *pb.User {
 		SubscriptionStatus: u.SubscriptionStatus,
 		CreatedAt:          timestamppb.New(u.CreatedAt),
 		UpdatedAt:          timestamppb.New(u.UpdatedAt),
+		Disabled:           u.Disabled,
 	}
 
 	if u.Name != nil {
@@ -190,6 +210,29 @@ func userToProto(u *db.User) *pb.User {
 	if u.NotionKey != nil {
 		pbUser.NotionKey = u.NotionKey
 	}
+	if u.DisabledReason != nil && *u.DisabledReason != "" {
+		// Convert string to enum
+		reason := stringToDisabledReason(*u.DisabledReason)
+		pbUser.DisabledReason = &reason
+	}
 
 	return pbUser
+}
+
+// stringToDisabledReason converts a string reason to the protobuf enum
+func stringToDisabledReason(reason string) pb.DisabledReason {
+	switch reason {
+	case "terms_violation":
+		return pb.DisabledReason_TERMS_VIOLATION
+	case "security_concern":
+		return pb.DisabledReason_SECURITY_CONCERN
+	case "user_request":
+		return pb.DisabledReason_USER_REQUEST
+	case "payment_issue":
+		return pb.DisabledReason_PAYMENT_ISSUE
+	case "other":
+		return pb.DisabledReason_OTHER
+	default:
+		return pb.DisabledReason_UNSPECIFIED
+	}
 }

@@ -55,6 +55,16 @@ message Tag {
   google.protobuf.Timestamp created_at = 4;
 }
 
+// DisabledReason enum for account disable reasons
+enum DisabledReason {
+  UNSPECIFIED = 0;
+  TERMS_VIOLATION = 1;
+  SECURITY_CONCERN = 2;
+  USER_REQUEST = 3;
+  PAYMENT_ISSUE = 4;
+  OTHER = 5;
+}
+
 // User message
 message User {
   string id = 1;
@@ -68,6 +78,8 @@ message User {
   optional string notion_key = 9;
   reserved 10; // was username, use name instead
   google.protobuf.Timestamp updated_at = 11;
+  bool disabled = 12;
+  optional DisabledReason disabled_reason = 13;
 }
 
 // API Key message

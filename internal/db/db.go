@@ -706,6 +706,103 @@ func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionSt
 	return db.GetUser(ctx, userID)
 }
 
+// IsAccountLocked checks if a user account is locked or disabled
+func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) {
+	var user User
+	result := db.conn.WithContext(ctx).Select("disabled, \"failedLoginAttempts\"").Where("id = ?", userID).First(&user)
+	if result.Error == gorm.ErrRecordNotFound {
+		return false, fmt.Errorf("user not found")
+	}
+	if result.Error != nil {
+		return false, fmt.Errorf("failed to get user: %w", result.Error)
+	}
+
+	// Check if disabled
+	if user.Disabled {
+		return true, nil
+	}
+
+	// Check if account is locked due to too many failed attempts
+	if user.FailedLoginAttempts >= 10 {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// RecordFailedLogin increments failed login attempts and locks account if threshold reached
+func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
+	now := time.Now()
+
+	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
+			return fmt.Errorf("failed to get user: %w", err)
+		}
+
+		// Increment failed attempts
+		user.FailedLoginAttempts++
+		user.LastFailedLogin = &now
+
+		if err := tx.Save(&user).Error; err != nil {
+			return fmt.Errorf("failed to update user: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// RecordSuccessfulLogin clears failed login attempts
+func (db *DB) RecordSuccessfulLogin(ctx context.Context, userID string) error {
+	updates := map[string]interface{}{
+		"failedLoginAttempts": 0,
+		"lastFailedLogin":     nil,
+	}
+
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return fmt.Errorf("failed to clear failed login attempts: %w", result.Error)
+	}
+
+	return nil
+}
+
+// DisableUser disables a user account with a reason
+func (db *DB) DisableUser(ctx context.Context, userID string, reason string) error {
+	updates := map[string]interface{}{
+		"disabled":       true,
+		"disabledReason": reason,
+	}
+
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return fmt.Errorf("failed to disable user: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return nil
+}
+
+// EnableUser re-enables a user account
+func (db *DB) EnableUser(ctx context.Context, userID string) error {
+	updates := map[string]interface{}{
+		"disabled":       false,
+		"disabledReason": nil,
+	}
+
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return fmt.Errorf("failed to enable user: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return nil
+}
+
 // CreateApiKey creates a new API key for a user
 func (db *DB) CreateApiKey(ctx context.Context, userID, name, keyPrefix, keyHash string) (*ApiKey, error) {
 	now := time.Now()

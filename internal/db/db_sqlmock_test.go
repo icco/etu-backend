@@ -816,6 +816,7 @@ func TestCreateUser_SQL(t *testing.T) {
 		WithArgs(
 			sqlmock.AnyArg(), "new@example.com", sqlmock.AnyArg(), sqlmock.AnyArg(), "hashed", "free",
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 		).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()

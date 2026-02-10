@@ -97,6 +97,12 @@ type User struct {
 	StripeCustomerID   *string    `gorm:"column:stripeCustomerId"`
 	NotionKey          *string    `gorm:"column:notionKey"` // Notion API key for syncing (encrypted at rest using AES-256-GCM)
 	UpdatedAt          time.Time  `gorm:"column:updatedAt"`
+
+	// Account lockout fields
+	Disabled            bool       `gorm:"column:disabled;default:false"`
+	DisabledReason      *string    `gorm:"column:disabledReason"`
+	FailedLoginAttempts int        `gorm:"column:failedLoginAttempts;default:0"`
+	LastFailedLogin     *time.Time `gorm:"column:lastFailedLogin"`
 }
 
 // TableName specifies the table name for User
