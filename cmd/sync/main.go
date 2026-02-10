@@ -136,7 +136,7 @@ func syncAllUsers(ctx context.Context, log *slog.Logger, database *syncdb.DB, fu
 		}
 
 		// Create Notion client with user's API key and optional database name
-		databaseName := "Journal" // Default
+		databaseName := notion.DefaultDatabaseName
 		if user.NotionDatabaseName != nil && *user.NotionDatabaseName != "" {
 			databaseName = *user.NotionDatabaseName
 		}
