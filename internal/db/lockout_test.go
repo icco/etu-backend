@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -69,11 +68,7 @@ func TestRecordFailedLogin_LockAfterMaxAttempts(t *testing.T) {
 		t.Fatalf("NewFromConn: %v", err)
 	}
 
-	// Set max attempts to 5
-	os.Setenv("LOCKOUT_MAX_ATTEMPTS", "5")
-	defer os.Unsetenv("LOCKOUT_MAX_ATTEMPTS")
-
-	// Test recording failed login that triggers lockout (5th attempt)
+	// Test recording failed login that triggers lockout (10th attempt)
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs("user123", 1).
@@ -82,7 +77,7 @@ func TestRecordFailedLogin_LockAfterMaxAttempts(t *testing.T) {
 			"disabled", "failedLoginAttempts", "lockedUntil", "lastFailedLogin",
 		}).AddRow(
 			"user123", "test@example.com", "hash", "free", time.Now(), time.Now(),
-			false, 4, nil, nil,
+			false, 9, nil, nil,
 		))
 	mock.ExpectExec(`UPDATE "User"`).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),

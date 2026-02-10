@@ -83,18 +83,22 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 
 	// Check if account is locked
 	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
-		return nil, status.Errorf(codes.PermissionDenied, "account is locked until %s", user.LockedUntil.Format(time.RFC3339))
+		return nil, status.Error(codes.PermissionDenied, "account is locked")
 	}
 
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		// Record failed login attempt (ignore errors to avoid exposing internal state)
-		_ = s.db.RecordFailedLogin(ctx, user.ID)
+		// Record failed login attempt
+		if recordErr := s.db.RecordFailedLogin(ctx, user.ID); recordErr != nil {
+			return nil, status.Errorf(codes.Internal, "failed to record login attempt: %v", recordErr)
+		}
 		return &pb.AuthenticateResponse{Success: false}, nil
 	}
 
-	// Clear failed login attempts on success (ignore errors to avoid breaking authentication flow)
-	_ = s.db.RecordSuccessfulLogin(ctx, user.ID)
+	// Clear failed login attempts on success
+	if clearErr := s.db.RecordSuccessfulLogin(ctx, user.ID); clearErr != nil {
+		return nil, status.Errorf(codes.Internal, "failed to clear login attempts: %v", clearErr)
+	}
 
 	return &pb.AuthenticateResponse{
 		Success: true,
@@ -206,12 +210,32 @@ func userToProto(u *db.User) *pb.User {
 	if u.NotionKey != nil {
 		pbUser.NotionKey = u.NotionKey
 	}
-	if u.DisabledReason != nil {
-		pbUser.DisabledReason = u.DisabledReason
+	if u.DisabledReason != nil && *u.DisabledReason != "" {
+		// Convert string to enum
+		reason := stringToDisabledReason(*u.DisabledReason)
+		pbUser.DisabledReason = &reason
 	}
 	if u.LockedUntil != nil {
 		pbUser.LockedUntil = timestamppb.New(*u.LockedUntil)
 	}
 
 	return pbUser
+}
+
+// stringToDisabledReason converts a string reason to the protobuf enum
+func stringToDisabledReason(reason string) pb.DisabledReason {
+	switch reason {
+	case "terms_violation":
+		return pb.DisabledReason_DISABLED_REASON_TERMS_VIOLATION
+	case "security_concern":
+		return pb.DisabledReason_DISABLED_REASON_SECURITY_CONCERN
+	case "user_request":
+		return pb.DisabledReason_DISABLED_REASON_USER_REQUEST
+	case "payment_issue":
+		return pb.DisabledReason_DISABLED_REASON_PAYMENT_ISSUE
+	case "other":
+		return pb.DisabledReason_DISABLED_REASON_OTHER
+	default:
+		return pb.DisabledReason_DISABLED_REASON_UNSPECIFIED
+	}
 }

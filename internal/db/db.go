@@ -733,23 +733,7 @@ func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, *time.T
 // RecordFailedLogin increments failed login attempts and locks account if threshold reached
 func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 	now := time.Now()
-	
-	// Get lockout configuration from environment variables
-	maxAttempts := 5
-	if val := os.Getenv("LOCKOUT_MAX_ATTEMPTS"); val != "" {
-		var parsedAttempts int
-		if parsed, err := fmt.Sscanf(val, "%d", &parsedAttempts); err == nil && parsed == 1 {
-			maxAttempts = parsedAttempts
-		}
-	}
-	
-	lockoutDuration := 15 * time.Minute
-	if val := os.Getenv("LOCKOUT_DURATION_MINUTES"); val != "" {
-		var minutes int
-		if parsed, err := fmt.Sscanf(val, "%d", &minutes); err == nil && parsed == 1 {
-			lockoutDuration = time.Duration(minutes) * time.Minute
-		}
-	}
+	maxAttempts := 10
 
 	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var user User
@@ -761,10 +745,11 @@ func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 		user.FailedLoginAttempts++
 		user.LastFailedLogin = &now
 
-		// Lock account if threshold reached
+		// Lock account permanently if threshold reached (requires manual unlock)
 		if user.FailedLoginAttempts >= maxAttempts {
-			lockedUntil := now.Add(lockoutDuration)
-			user.LockedUntil = &lockedUntil
+			// Set to far future to indicate permanent lock
+			permanentLock := time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
+			user.LockedUntil = &permanentLock
 		}
 
 		if err := tx.Save(&user).Error; err != nil {

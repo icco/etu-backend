@@ -22,6 +22,65 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// DisabledReason enum for account disable reasons
+type DisabledReason int32
+
+const (
+	DisabledReason_DISABLED_REASON_UNSPECIFIED      DisabledReason = 0
+	DisabledReason_DISABLED_REASON_TERMS_VIOLATION  DisabledReason = 1
+	DisabledReason_DISABLED_REASON_SECURITY_CONCERN DisabledReason = 2
+	DisabledReason_DISABLED_REASON_USER_REQUEST     DisabledReason = 3
+	DisabledReason_DISABLED_REASON_PAYMENT_ISSUE    DisabledReason = 4
+	DisabledReason_DISABLED_REASON_OTHER            DisabledReason = 5
+)
+
+// Enum value maps for DisabledReason.
+var (
+	DisabledReason_name = map[int32]string{
+		0: "DISABLED_REASON_UNSPECIFIED",
+		1: "DISABLED_REASON_TERMS_VIOLATION",
+		2: "DISABLED_REASON_SECURITY_CONCERN",
+		3: "DISABLED_REASON_USER_REQUEST",
+		4: "DISABLED_REASON_PAYMENT_ISSUE",
+		5: "DISABLED_REASON_OTHER",
+	}
+	DisabledReason_value = map[string]int32{
+		"DISABLED_REASON_UNSPECIFIED":      0,
+		"DISABLED_REASON_TERMS_VIOLATION":  1,
+		"DISABLED_REASON_SECURITY_CONCERN": 2,
+		"DISABLED_REASON_USER_REQUEST":     3,
+		"DISABLED_REASON_PAYMENT_ISSUE":    4,
+		"DISABLED_REASON_OTHER":            5,
+	}
+)
+
+func (x DisabledReason) Enum() *DisabledReason {
+	p := new(DisabledReason)
+	*p = x
+	return p
+}
+
+func (x DisabledReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DisabledReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_proto_etu_proto_enumTypes[0].Descriptor()
+}
+
+func (DisabledReason) Type() protoreflect.EnumType {
+	return &file_proto_etu_proto_enumTypes[0]
+}
+
+func (x DisabledReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DisabledReason.Descriptor instead.
+func (DisabledReason) EnumDescriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{0}
+}
+
 // ImageUpload message for uploading images (client -> server)
 type ImageUpload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -458,7 +517,7 @@ type User struct {
 	NotionKey          *string                `protobuf:"bytes,9,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
 	UpdatedAt          *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	Disabled           bool                   `protobuf:"varint,12,opt,name=disabled,proto3" json:"disabled,omitempty"`
-	DisabledReason     *string                `protobuf:"bytes,13,opt,name=disabled_reason,json=disabledReason,proto3,oneof" json:"disabled_reason,omitempty"`
+	DisabledReason     *DisabledReason        `protobuf:"varint,13,opt,name=disabled_reason,json=disabledReason,proto3,enum=etu.DisabledReason,oneof" json:"disabled_reason,omitempty"`
 	LockedUntil        *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=locked_until,json=lockedUntil,proto3,oneof" json:"locked_until,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -571,11 +630,11 @@ func (x *User) GetDisabled() bool {
 	return false
 }
 
-func (x *User) GetDisabledReason() string {
+func (x *User) GetDisabledReason() DisabledReason {
 	if x != nil && x.DisabledReason != nil {
 		return *x.DisabledReason
 	}
-	return ""
+	return DisabledReason_DISABLED_REASON_UNSPECIFIED
 }
 
 func (x *User) GetLockedUntil() *timestamppb.Timestamp {
@@ -2678,7 +2737,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb1\x05\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc6\x05\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -2693,8 +2752,8 @@ const file_proto_etu_proto_rawDesc = "" +
 	"notion_key\x18\t \x01(\tH\x04R\tnotionKey\x88\x01\x01\x129\n" +
 	"\n" +
 	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1a\n" +
-	"\bdisabled\x18\f \x01(\bR\bdisabled\x12,\n" +
-	"\x0fdisabled_reason\x18\r \x01(\tH\x05R\x0edisabledReason\x88\x01\x01\x12B\n" +
+	"\bdisabled\x18\f \x01(\bR\bdisabled\x12A\n" +
+	"\x0fdisabled_reason\x18\r \x01(\x0e2\x13.etu.DisabledReasonH\x05R\x0edisabledReason\x88\x01\x01\x12B\n" +
 	"\flocked_until\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampH\x06R\vlockedUntil\x88\x01\x01B\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
@@ -2846,7 +2905,14 @@ const file_proto_etu_proto_rawDesc = "" +
 	"totalBlips\x12\x1f\n" +
 	"\vunique_tags\x18\x02 \x01(\x03R\n" +
 	"uniqueTags\x12#\n" +
-	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten2\x88\x03\n" +
+	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten*\xdc\x01\n" +
+	"\x0eDisabledReason\x12\x1f\n" +
+	"\x1bDISABLED_REASON_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fDISABLED_REASON_TERMS_VIOLATION\x10\x01\x12$\n" +
+	" DISABLED_REASON_SECURITY_CONCERN\x10\x02\x12 \n" +
+	"\x1cDISABLED_REASON_USER_REQUEST\x10\x03\x12!\n" +
+	"\x1dDISABLED_REASON_PAYMENT_ISSUE\x10\x04\x12\x19\n" +
+	"\x15DISABLED_REASON_OTHER\x10\x052\x88\x03\n" +
 	"\fNotesService\x12:\n" +
 	"\tListNotes\x12\x15.etu.ListNotesRequest\x1a\x16.etu.ListNotesResponse\x12=\n" +
 	"\n" +
@@ -2888,133 +2954,136 @@ func file_proto_etu_proto_rawDescGZIP() []byte {
 	return file_proto_etu_proto_rawDescData
 }
 
+var file_proto_etu_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_proto_etu_proto_goTypes = []any{
-	(*ImageUpload)(nil),                       // 0: etu.ImageUpload
-	(*AudioUpload)(nil),                       // 1: etu.AudioUpload
-	(*NoteImage)(nil),                         // 2: etu.NoteImage
-	(*NoteAudio)(nil),                         // 3: etu.NoteAudio
-	(*Note)(nil),                              // 4: etu.Note
-	(*Tag)(nil),                               // 5: etu.Tag
-	(*User)(nil),                              // 6: etu.User
-	(*ApiKey)(nil),                            // 7: etu.ApiKey
-	(*ListNotesRequest)(nil),                  // 8: etu.ListNotesRequest
-	(*ListNotesResponse)(nil),                 // 9: etu.ListNotesResponse
-	(*CreateNoteRequest)(nil),                 // 10: etu.CreateNoteRequest
-	(*CreateNoteResponse)(nil),                // 11: etu.CreateNoteResponse
-	(*GetNoteRequest)(nil),                    // 12: etu.GetNoteRequest
-	(*GetNoteResponse)(nil),                   // 13: etu.GetNoteResponse
-	(*UpdateNoteRequest)(nil),                 // 14: etu.UpdateNoteRequest
-	(*UpdateNoteResponse)(nil),                // 15: etu.UpdateNoteResponse
-	(*DeleteNoteRequest)(nil),                 // 16: etu.DeleteNoteRequest
-	(*DeleteNoteResponse)(nil),                // 17: etu.DeleteNoteResponse
-	(*GetRandomNotesRequest)(nil),             // 18: etu.GetRandomNotesRequest
-	(*GetRandomNotesResponse)(nil),            // 19: etu.GetRandomNotesResponse
-	(*ListTagsRequest)(nil),                   // 20: etu.ListTagsRequest
-	(*ListTagsResponse)(nil),                  // 21: etu.ListTagsResponse
-	(*RegisterRequest)(nil),                   // 22: etu.RegisterRequest
-	(*RegisterResponse)(nil),                  // 23: etu.RegisterResponse
-	(*AuthenticateRequest)(nil),               // 24: etu.AuthenticateRequest
-	(*AuthenticateResponse)(nil),              // 25: etu.AuthenticateResponse
-	(*GetUserRequest)(nil),                    // 26: etu.GetUserRequest
-	(*GetUserResponse)(nil),                   // 27: etu.GetUserResponse
-	(*GetUserByStripeCustomerIdRequest)(nil),  // 28: etu.GetUserByStripeCustomerIdRequest
-	(*GetUserByStripeCustomerIdResponse)(nil), // 29: etu.GetUserByStripeCustomerIdResponse
-	(*UpdateUserSubscriptionRequest)(nil),     // 30: etu.UpdateUserSubscriptionRequest
-	(*UpdateUserSubscriptionResponse)(nil),    // 31: etu.UpdateUserSubscriptionResponse
-	(*CreateApiKeyRequest)(nil),               // 32: etu.CreateApiKeyRequest
-	(*CreateApiKeyResponse)(nil),              // 33: etu.CreateApiKeyResponse
-	(*ListApiKeysRequest)(nil),                // 34: etu.ListApiKeysRequest
-	(*ListApiKeysResponse)(nil),               // 35: etu.ListApiKeysResponse
-	(*DeleteApiKeyRequest)(nil),               // 36: etu.DeleteApiKeyRequest
-	(*DeleteApiKeyResponse)(nil),              // 37: etu.DeleteApiKeyResponse
-	(*VerifyApiKeyRequest)(nil),               // 38: etu.VerifyApiKeyRequest
-	(*VerifyApiKeyResponse)(nil),              // 39: etu.VerifyApiKeyResponse
-	(*GetUserSettingsRequest)(nil),            // 40: etu.GetUserSettingsRequest
-	(*GetUserSettingsResponse)(nil),           // 41: etu.GetUserSettingsResponse
-	(*UpdateUserSettingsRequest)(nil),         // 42: etu.UpdateUserSettingsRequest
-	(*UpdateUserSettingsResponse)(nil),        // 43: etu.UpdateUserSettingsResponse
-	(*GetStatsRequest)(nil),                   // 44: etu.GetStatsRequest
-	(*GetStatsResponse)(nil),                  // 45: etu.GetStatsResponse
-	(*timestamppb.Timestamp)(nil),             // 46: google.protobuf.Timestamp
+	(DisabledReason)(0),                       // 0: etu.DisabledReason
+	(*ImageUpload)(nil),                       // 1: etu.ImageUpload
+	(*AudioUpload)(nil),                       // 2: etu.AudioUpload
+	(*NoteImage)(nil),                         // 3: etu.NoteImage
+	(*NoteAudio)(nil),                         // 4: etu.NoteAudio
+	(*Note)(nil),                              // 5: etu.Note
+	(*Tag)(nil),                               // 6: etu.Tag
+	(*User)(nil),                              // 7: etu.User
+	(*ApiKey)(nil),                            // 8: etu.ApiKey
+	(*ListNotesRequest)(nil),                  // 9: etu.ListNotesRequest
+	(*ListNotesResponse)(nil),                 // 10: etu.ListNotesResponse
+	(*CreateNoteRequest)(nil),                 // 11: etu.CreateNoteRequest
+	(*CreateNoteResponse)(nil),                // 12: etu.CreateNoteResponse
+	(*GetNoteRequest)(nil),                    // 13: etu.GetNoteRequest
+	(*GetNoteResponse)(nil),                   // 14: etu.GetNoteResponse
+	(*UpdateNoteRequest)(nil),                 // 15: etu.UpdateNoteRequest
+	(*UpdateNoteResponse)(nil),                // 16: etu.UpdateNoteResponse
+	(*DeleteNoteRequest)(nil),                 // 17: etu.DeleteNoteRequest
+	(*DeleteNoteResponse)(nil),                // 18: etu.DeleteNoteResponse
+	(*GetRandomNotesRequest)(nil),             // 19: etu.GetRandomNotesRequest
+	(*GetRandomNotesResponse)(nil),            // 20: etu.GetRandomNotesResponse
+	(*ListTagsRequest)(nil),                   // 21: etu.ListTagsRequest
+	(*ListTagsResponse)(nil),                  // 22: etu.ListTagsResponse
+	(*RegisterRequest)(nil),                   // 23: etu.RegisterRequest
+	(*RegisterResponse)(nil),                  // 24: etu.RegisterResponse
+	(*AuthenticateRequest)(nil),               // 25: etu.AuthenticateRequest
+	(*AuthenticateResponse)(nil),              // 26: etu.AuthenticateResponse
+	(*GetUserRequest)(nil),                    // 27: etu.GetUserRequest
+	(*GetUserResponse)(nil),                   // 28: etu.GetUserResponse
+	(*GetUserByStripeCustomerIdRequest)(nil),  // 29: etu.GetUserByStripeCustomerIdRequest
+	(*GetUserByStripeCustomerIdResponse)(nil), // 30: etu.GetUserByStripeCustomerIdResponse
+	(*UpdateUserSubscriptionRequest)(nil),     // 31: etu.UpdateUserSubscriptionRequest
+	(*UpdateUserSubscriptionResponse)(nil),    // 32: etu.UpdateUserSubscriptionResponse
+	(*CreateApiKeyRequest)(nil),               // 33: etu.CreateApiKeyRequest
+	(*CreateApiKeyResponse)(nil),              // 34: etu.CreateApiKeyResponse
+	(*ListApiKeysRequest)(nil),                // 35: etu.ListApiKeysRequest
+	(*ListApiKeysResponse)(nil),               // 36: etu.ListApiKeysResponse
+	(*DeleteApiKeyRequest)(nil),               // 37: etu.DeleteApiKeyRequest
+	(*DeleteApiKeyResponse)(nil),              // 38: etu.DeleteApiKeyResponse
+	(*VerifyApiKeyRequest)(nil),               // 39: etu.VerifyApiKeyRequest
+	(*VerifyApiKeyResponse)(nil),              // 40: etu.VerifyApiKeyResponse
+	(*GetUserSettingsRequest)(nil),            // 41: etu.GetUserSettingsRequest
+	(*GetUserSettingsResponse)(nil),           // 42: etu.GetUserSettingsResponse
+	(*UpdateUserSettingsRequest)(nil),         // 43: etu.UpdateUserSettingsRequest
+	(*UpdateUserSettingsResponse)(nil),        // 44: etu.UpdateUserSettingsResponse
+	(*GetStatsRequest)(nil),                   // 45: etu.GetStatsRequest
+	(*GetStatsResponse)(nil),                  // 46: etu.GetStatsResponse
+	(*timestamppb.Timestamp)(nil),             // 47: google.protobuf.Timestamp
 }
 var file_proto_etu_proto_depIdxs = []int32{
-	46, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
-	46, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
-	46, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
-	46, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
-	2,  // 4: etu.Note.images:type_name -> etu.NoteImage
-	3,  // 5: etu.Note.audios:type_name -> etu.NoteAudio
-	46, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
-	46, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
-	46, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
-	46, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
-	46, // 10: etu.User.locked_until:type_name -> google.protobuf.Timestamp
-	46, // 11: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
-	46, // 12: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
-	4,  // 13: etu.ListNotesResponse.notes:type_name -> etu.Note
-	0,  // 14: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
-	1,  // 15: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
-	4,  // 16: etu.CreateNoteResponse.note:type_name -> etu.Note
-	4,  // 17: etu.GetNoteResponse.note:type_name -> etu.Note
-	0,  // 18: etu.UpdateNoteRequest.add_images:type_name -> etu.ImageUpload
-	1,  // 19: etu.UpdateNoteRequest.add_audios:type_name -> etu.AudioUpload
-	4,  // 20: etu.UpdateNoteResponse.note:type_name -> etu.Note
-	4,  // 21: etu.GetRandomNotesResponse.notes:type_name -> etu.Note
-	5,  // 22: etu.ListTagsResponse.tags:type_name -> etu.Tag
-	6,  // 23: etu.RegisterResponse.user:type_name -> etu.User
-	6,  // 24: etu.AuthenticateResponse.user:type_name -> etu.User
-	6,  // 25: etu.GetUserResponse.user:type_name -> etu.User
-	6,  // 26: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	46, // 27: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
-	6,  // 28: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
-	7,  // 29: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
-	7,  // 30: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
-	6,  // 31: etu.GetUserSettingsResponse.user:type_name -> etu.User
-	6,  // 32: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
-	8,  // 33: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	10, // 34: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	12, // 35: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	14, // 36: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	16, // 37: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	18, // 38: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
-	20, // 39: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	22, // 40: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	24, // 41: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	26, // 42: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	28, // 43: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	30, // 44: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	32, // 45: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	34, // 46: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	36, // 47: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	38, // 48: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	40, // 49: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	42, // 50: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	44, // 51: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
-	9,  // 52: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	11, // 53: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	13, // 54: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	15, // 55: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	17, // 56: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	19, // 57: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
-	21, // 58: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	23, // 59: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	25, // 60: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	27, // 61: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	29, // 62: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	31, // 63: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	33, // 64: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	35, // 65: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	37, // 66: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	39, // 67: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	41, // 68: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	43, // 69: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	45, // 70: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
-	52, // [52:71] is the sub-list for method output_type
-	33, // [33:52] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	47, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
+	47, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
+	47, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
+	47, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
+	3,  // 4: etu.Note.images:type_name -> etu.NoteImage
+	4,  // 5: etu.Note.audios:type_name -> etu.NoteAudio
+	47, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
+	47, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
+	47, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
+	47, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 10: etu.User.disabled_reason:type_name -> etu.DisabledReason
+	47, // 11: etu.User.locked_until:type_name -> google.protobuf.Timestamp
+	47, // 12: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
+	47, // 13: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
+	5,  // 14: etu.ListNotesResponse.notes:type_name -> etu.Note
+	1,  // 15: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
+	2,  // 16: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
+	5,  // 17: etu.CreateNoteResponse.note:type_name -> etu.Note
+	5,  // 18: etu.GetNoteResponse.note:type_name -> etu.Note
+	1,  // 19: etu.UpdateNoteRequest.add_images:type_name -> etu.ImageUpload
+	2,  // 20: etu.UpdateNoteRequest.add_audios:type_name -> etu.AudioUpload
+	5,  // 21: etu.UpdateNoteResponse.note:type_name -> etu.Note
+	5,  // 22: etu.GetRandomNotesResponse.notes:type_name -> etu.Note
+	6,  // 23: etu.ListTagsResponse.tags:type_name -> etu.Tag
+	7,  // 24: etu.RegisterResponse.user:type_name -> etu.User
+	7,  // 25: etu.AuthenticateResponse.user:type_name -> etu.User
+	7,  // 26: etu.GetUserResponse.user:type_name -> etu.User
+	7,  // 27: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
+	47, // 28: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
+	7,  // 29: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
+	8,  // 30: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
+	8,  // 31: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
+	7,  // 32: etu.GetUserSettingsResponse.user:type_name -> etu.User
+	7,  // 33: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
+	9,  // 34: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	11, // 35: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	13, // 36: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	15, // 37: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	17, // 38: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	19, // 39: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
+	21, // 40: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	23, // 41: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	25, // 42: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	27, // 43: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	29, // 44: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	31, // 45: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	33, // 46: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	35, // 47: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	37, // 48: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	39, // 49: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	41, // 50: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	43, // 51: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	45, // 52: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
+	10, // 53: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	12, // 54: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	14, // 55: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	16, // 56: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	18, // 57: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	20, // 58: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
+	22, // 59: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	24, // 60: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	26, // 61: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	28, // 62: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	30, // 63: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	32, // 64: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	34, // 65: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	36, // 66: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	38, // 67: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	40, // 68: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	42, // 69: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	44, // 70: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	46, // 71: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
+	53, // [53:72] is the sub-list for method output_type
+	34, // [34:53] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }
@@ -3035,13 +3104,14 @@ func file_proto_etu_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_etu_proto_rawDesc), len(file_proto_etu_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   6,
 		},
 		GoTypes:           file_proto_etu_proto_goTypes,
 		DependencyIndexes: file_proto_etu_proto_depIdxs,
+		EnumInfos:         file_proto_etu_proto_enumTypes,
 		MessageInfos:      file_proto_etu_proto_msgTypes,
 	}.Build()
 	File_proto_etu_proto = out.File
