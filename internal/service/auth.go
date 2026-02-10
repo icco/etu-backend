@@ -76,9 +76,29 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 		return &pb.AuthenticateResponse{Success: false}, nil
 	}
 
+	// Check if account is disabled
+	if user.Disabled {
+		return nil, status.Error(codes.PermissionDenied, "account is disabled")
+	}
+
+	// Check if account is locked
+	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+		return nil, status.Errorf(codes.PermissionDenied, "account is locked until %s", user.LockedUntil.Format(time.RFC3339))
+	}
+
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		// Record failed login attempt
+		if err := s.db.RecordFailedLogin(ctx, user.ID); err != nil {
+			s.db.(*db.DB) // Access internal logger if needed
+			// Log error but don't fail the authentication response
+		}
 		return &pb.AuthenticateResponse{Success: false}, nil
+	}
+
+	// Clear failed login attempts on success
+	if err := s.db.RecordSuccessfulLogin(ctx, user.ID); err != nil {
+		// Log error but don't fail the authentication
 	}
 
 	return &pb.AuthenticateResponse{
@@ -173,6 +193,7 @@ func userToProto(u *db.User) *pb.User {
 		SubscriptionStatus: u.SubscriptionStatus,
 		CreatedAt:          timestamppb.New(u.CreatedAt),
 		UpdatedAt:          timestamppb.New(u.UpdatedAt),
+		Disabled:           u.Disabled,
 	}
 
 	if u.Name != nil {
@@ -189,6 +210,12 @@ func userToProto(u *db.User) *pb.User {
 	}
 	if u.NotionKey != nil {
 		pbUser.NotionKey = u.NotionKey
+	}
+	if u.DisabledReason != nil {
+		pbUser.DisabledReason = u.DisabledReason
+	}
+	if u.LockedUntil != nil {
+		pbUser.LockedUntil = timestamppb.New(*u.LockedUntil)
 	}
 
 	return pbUser

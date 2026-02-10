@@ -706,6 +706,126 @@ func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionSt
 	return db.GetUser(ctx, userID)
 }
 
+// IsAccountLocked checks if a user account is locked or disabled
+func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, *time.Time, error) {
+	var user User
+	result := db.conn.WithContext(ctx).Select("disabled, \"lockedUntil\"").Where("id = ?", userID).First(&user)
+	if result.Error == gorm.ErrRecordNotFound {
+		return false, nil, fmt.Errorf("user not found")
+	}
+	if result.Error != nil {
+		return false, nil, fmt.Errorf("failed to get user: %w", result.Error)
+	}
+
+	// Check if disabled
+	if user.Disabled {
+		return true, nil, nil
+	}
+
+	// Check if locked until time is in the future
+	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+		return true, user.LockedUntil, nil
+	}
+
+	return false, nil, nil
+}
+
+// RecordFailedLogin increments failed login attempts and locks account if threshold reached
+func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
+	now := time.Now()
+	
+	// Get lockout configuration from environment variables
+	maxAttempts := 5
+	if val := os.Getenv("LOCKOUT_MAX_ATTEMPTS"); val != "" {
+		if parsed, err := fmt.Sscanf(val, "%d", &maxAttempts); err == nil && parsed == 1 {
+			// Successfully parsed
+		}
+	}
+	
+	lockoutDuration := 15 * time.Minute
+	if val := os.Getenv("LOCKOUT_DURATION_MINUTES"); val != "" {
+		var minutes int
+		if parsed, err := fmt.Sscanf(val, "%d", &minutes); err == nil && parsed == 1 {
+			lockoutDuration = time.Duration(minutes) * time.Minute
+		}
+	}
+
+	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var user User
+		if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
+			return fmt.Errorf("failed to get user: %w", err)
+		}
+
+		// Increment failed attempts
+		user.FailedLoginAttempts++
+		user.LastFailedLogin = &now
+
+		// Lock account if threshold reached
+		if user.FailedLoginAttempts >= maxAttempts {
+			lockedUntil := now.Add(lockoutDuration)
+			user.LockedUntil = &lockedUntil
+		}
+
+		if err := tx.Save(&user).Error; err != nil {
+			return fmt.Errorf("failed to update user: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// RecordSuccessfulLogin clears failed login attempts
+func (db *DB) RecordSuccessfulLogin(ctx context.Context, userID string) error {
+	updates := map[string]interface{}{
+		"failedLoginAttempts": 0,
+		"lockedUntil":         nil,
+		"lastFailedLogin":     nil,
+	}
+
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return fmt.Errorf("failed to clear failed login attempts: %w", result.Error)
+	}
+
+	return nil
+}
+
+// DisableUser disables a user account with a reason
+func (db *DB) DisableUser(ctx context.Context, userID string, reason string) error {
+	updates := map[string]interface{}{
+		"disabled":       true,
+		"disabledReason": reason,
+	}
+
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return fmt.Errorf("failed to disable user: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return nil
+}
+
+// EnableUser re-enables a user account
+func (db *DB) EnableUser(ctx context.Context, userID string) error {
+	updates := map[string]interface{}{
+		"disabled":       false,
+		"disabledReason": nil,
+	}
+
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return fmt.Errorf("failed to enable user: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+
+	return nil
+}
+
 // CreateApiKey creates a new API key for a user
 func (db *DB) CreateApiKey(ctx context.Context, userID, name, keyPrefix, keyHash string) (*ApiKey, error) {
 	now := time.Now()

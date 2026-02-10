@@ -68,6 +68,9 @@ message User {
   optional string notion_key = 9;
   reserved 10; // was username, use name instead
   google.protobuf.Timestamp updated_at = 11;
+  bool disabled = 12;
+  optional string disabled_reason = 13;
+  optional google.protobuf.Timestamp locked_until = 14;
 }
 
 // API Key message
