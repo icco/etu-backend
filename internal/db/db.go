@@ -737,8 +737,9 @@ func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 	// Get lockout configuration from environment variables
 	maxAttempts := 5
 	if val := os.Getenv("LOCKOUT_MAX_ATTEMPTS"); val != "" {
-		if parsed, err := fmt.Sscanf(val, "%d", &maxAttempts); err == nil && parsed == 1 {
-			// Successfully parsed
+		var parsedAttempts int
+		if parsed, err := fmt.Sscanf(val, "%d", &parsedAttempts); err == nil && parsed == 1 {
+			maxAttempts = parsedAttempts
 		}
 	}
 	

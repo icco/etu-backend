@@ -9,6 +9,12 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+// timePtr is a helper to create a pointer to a time value offset by duration
+func timePtr(d time.Duration) *time.Time {
+	t := time.Now().Add(d)
+	return &t
+}
+
 func TestRecordFailedLogin(t *testing.T) {
 	sqlDB, mock, err := sqlmock.New()
 	if err != nil {
@@ -155,13 +161,13 @@ func TestIsAccountLocked(t *testing.T) {
 		{
 			name:         "account locked (future time)",
 			disabled:     false,
-			lockedUntil:  func() *time.Time { t := time.Now().Add(10 * time.Minute); return &t }(),
+			lockedUntil:  timePtr(10 * time.Minute),
 			expectLocked: true,
 		},
 		{
 			name:         "account not locked (past time)",
 			disabled:     false,
-			lockedUntil:  func() *time.Time { t := time.Now().Add(-10 * time.Minute); return &t }(),
+			lockedUntil:  timePtr(-10 * time.Minute),
 			expectLocked: false,
 			expectUntil:  nil,
 		},
