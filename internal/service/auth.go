@@ -90,7 +90,6 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		// Record failed login attempt
 		if err := s.db.RecordFailedLogin(ctx, user.ID); err != nil {
-			s.db.(*db.DB) // Access internal logger if needed
 			// Log error but don't fail the authentication response
 		}
 		return &pb.AuthenticateResponse{Success: false}, nil
