@@ -41,10 +41,15 @@ func NewClient() (*Client, error) {
 }
 
 // NewClientWithKey creates a new Notion client with a specific API key.
-func NewClientWithKey(notionKey string) *Client {
+// If databaseName is empty, defaults to "Journal".
+func NewClientWithKey(notionKey string, databaseName ...string) *Client {
+	dbName := "Journal" // Default value
+	if len(databaseName) > 0 && databaseName[0] != "" {
+		dbName = databaseName[0]
+	}
 	return &Client{
 		notionKey: notionKey,
-		rootPage:  "Journal",
+		rootPage:  dbName,
 	}
 }
 

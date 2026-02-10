@@ -135,8 +135,12 @@ func syncAllUsers(ctx context.Context, log *slog.Logger, database *syncdb.DB, fu
 			continue
 		}
 
-		// Create Notion client with user's API key
-		notionClient := notion.NewClientWithKey(*user.NotionKey)
+		// Create Notion client with user's API key and optional database name
+		databaseName := "Journal" // Default
+		if user.NotionDatabaseName != nil && *user.NotionDatabaseName != "" {
+			databaseName = *user.NotionDatabaseName
+		}
+		notionClient := notion.NewClientWithKey(*user.NotionKey, databaseName)
 		syncer := sync.NewSyncer(database, notionClient)
 
 		// Try to sync and track success/failure

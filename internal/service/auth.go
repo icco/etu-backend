@@ -210,6 +210,9 @@ func userToProto(u *db.User) *pb.User {
 	if u.NotionKey != nil {
 		pbUser.NotionKey = u.NotionKey
 	}
+	if u.NotionDatabaseName != nil {
+		pbUser.NotionDatabaseName = u.NotionDatabaseName
+	}
 	if u.DisabledReason != nil && *u.DisabledReason != "" {
 		// Convert string to enum
 		reason := stringToDisabledReason(*u.DisabledReason)
