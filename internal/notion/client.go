@@ -11,6 +11,11 @@ import (
 	"github.com/jomei/notionapi"
 )
 
+const (
+	// DefaultDatabaseName is the default Notion database name to sync with
+	DefaultDatabaseName = "Journal"
+)
+
 // Post represents a journal entry from Notion.
 type Post struct {
 	ID         string    // Unique identifier (UUID stored in Notion)
@@ -37,14 +42,17 @@ func NewClient() (*Client, error) {
 		return nil, fmt.Errorf("NOTION_KEY environment variable is required")
 	}
 
-	return NewClientWithKey(notionKey), nil
+	return NewClientWithKey(notionKey, DefaultDatabaseName), nil
 }
 
-// NewClientWithKey creates a new Notion client with a specific API key.
-func NewClientWithKey(notionKey string) *Client {
+// NewClientWithKey creates a new Notion client with a specific API key and database name.
+func NewClientWithKey(notionKey string, databaseName string) *Client {
+	if databaseName == "" {
+		databaseName = DefaultDatabaseName
+	}
 	return &Client{
 		notionKey: notionKey,
-		rootPage:  "Journal",
+		rootPage:  databaseName,
 	}
 }
 

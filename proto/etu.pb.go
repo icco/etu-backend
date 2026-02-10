@@ -518,6 +518,7 @@ type User struct {
 	UpdatedAt          *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	Disabled           bool                   `protobuf:"varint,12,opt,name=disabled,proto3" json:"disabled,omitempty"`
 	DisabledReason     *DisabledReason        `protobuf:"varint,13,opt,name=disabled_reason,json=disabledReason,proto3,enum=etu.DisabledReason,oneof" json:"disabled_reason,omitempty"`
+	NotionDatabaseName *string                `protobuf:"bytes,14,opt,name=notion_database_name,json=notionDatabaseName,proto3,oneof" json:"notion_database_name,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -634,6 +635,13 @@ func (x *User) GetDisabledReason() DisabledReason {
 		return *x.DisabledReason
 	}
 	return DisabledReason_UNSPECIFIED
+}
+
+func (x *User) GetNotionDatabaseName() string {
+	if x != nil && x.NotionDatabaseName != nil {
+		return *x.NotionDatabaseName
+	}
+	return ""
 }
 
 // API Key message
@@ -2466,14 +2474,15 @@ func (x *GetUserSettingsResponse) GetUser() *User {
 }
 
 type UpdateUserSettingsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	NotionKey     *string                `protobuf:"bytes,2,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
-	Name          *string                `protobuf:"bytes,4,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	Image         *string                `protobuf:"bytes,5,opt,name=image,proto3,oneof" json:"image,omitempty"`
-	Password      *string                `protobuf:"bytes,6,opt,name=password,proto3,oneof" json:"password,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	UserId             string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NotionKey          *string                `protobuf:"bytes,2,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
+	Name               *string                `protobuf:"bytes,4,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Image              *string                `protobuf:"bytes,5,opt,name=image,proto3,oneof" json:"image,omitempty"`
+	Password           *string                `protobuf:"bytes,6,opt,name=password,proto3,oneof" json:"password,omitempty"`
+	NotionDatabaseName *string                `protobuf:"bytes,7,opt,name=notion_database_name,json=notionDatabaseName,proto3,oneof" json:"notion_database_name,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *UpdateUserSettingsRequest) Reset() {
@@ -2537,6 +2546,13 @@ func (x *UpdateUserSettingsRequest) GetImage() string {
 func (x *UpdateUserSettingsRequest) GetPassword() string {
 	if x != nil && x.Password != nil {
 		return *x.Password
+	}
+	return ""
+}
+
+func (x *UpdateUserSettingsRequest) GetNotionDatabaseName() string {
+	if x != nil && x.NotionDatabaseName != nil {
+		return *x.NotionDatabaseName
 	}
 	return ""
 }
@@ -2729,7 +2745,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xf1\x04\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc1\x05\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -2745,13 +2761,15 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1a\n" +
 	"\bdisabled\x18\f \x01(\bR\bdisabled\x12A\n" +
-	"\x0fdisabled_reason\x18\r \x01(\x0e2\x13.etu.DisabledReasonH\x05R\x0edisabledReason\x88\x01\x01B\a\n" +
+	"\x0fdisabled_reason\x18\r \x01(\x0e2\x13.etu.DisabledReasonH\x05R\x0edisabledReason\x88\x01\x01\x125\n" +
+	"\x14notion_database_name\x18\x0e \x01(\tH\x06R\x12notionDatabaseName\x88\x01\x01B\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
 	"\x13_stripe_customer_idB\r\n" +
 	"\v_notion_keyB\x12\n" +
-	"\x10_disabled_reasonJ\x04\b\n" +
+	"\x10_disabled_reasonB\x17\n" +
+	"\x15_notion_database_nameJ\x04\b\n" +
 	"\x10\v\"\xd2\x01\n" +
 	"\x06ApiKey\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -2874,18 +2892,20 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x16GetUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\">\n" +
 	"\x17GetUserSettingsResponse\x12\x1d\n" +
-	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xe2\x01\n" +
+	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xb2\x02\n" +
 	"\x19UpdateUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
 	"\n" +
 	"notion_key\x18\x02 \x01(\tH\x00R\tnotionKey\x88\x01\x01\x12\x17\n" +
 	"\x04name\x18\x04 \x01(\tH\x01R\x04name\x88\x01\x01\x12\x19\n" +
 	"\x05image\x18\x05 \x01(\tH\x02R\x05image\x88\x01\x01\x12\x1f\n" +
-	"\bpassword\x18\x06 \x01(\tH\x03R\bpassword\x88\x01\x01B\r\n" +
+	"\bpassword\x18\x06 \x01(\tH\x03R\bpassword\x88\x01\x01\x125\n" +
+	"\x14notion_database_name\x18\a \x01(\tH\x04R\x12notionDatabaseName\x88\x01\x01B\r\n" +
 	"\v_notion_keyB\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\v\n" +
-	"\t_passwordJ\x04\b\x03\x10\x04\"A\n" +
+	"\t_passwordB\x17\n" +
+	"\x15_notion_database_nameJ\x04\b\x03\x10\x04\"A\n" +
 	"\x1aUpdateUserSettingsResponse\x12\x1d\n" +
 	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"*\n" +
 	"\x0fGetStatsRequest\x12\x17\n" +
