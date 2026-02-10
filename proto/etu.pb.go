@@ -26,31 +26,31 @@ const (
 type DisabledReason int32
 
 const (
-	DisabledReason_DISABLED_REASON_UNSPECIFIED      DisabledReason = 0
-	DisabledReason_DISABLED_REASON_TERMS_VIOLATION  DisabledReason = 1
-	DisabledReason_DISABLED_REASON_SECURITY_CONCERN DisabledReason = 2
-	DisabledReason_DISABLED_REASON_USER_REQUEST     DisabledReason = 3
-	DisabledReason_DISABLED_REASON_PAYMENT_ISSUE    DisabledReason = 4
-	DisabledReason_DISABLED_REASON_OTHER            DisabledReason = 5
+	DisabledReason_UNSPECIFIED      DisabledReason = 0
+	DisabledReason_TERMS_VIOLATION  DisabledReason = 1
+	DisabledReason_SECURITY_CONCERN DisabledReason = 2
+	DisabledReason_USER_REQUEST     DisabledReason = 3
+	DisabledReason_PAYMENT_ISSUE    DisabledReason = 4
+	DisabledReason_OTHER            DisabledReason = 5
 )
 
 // Enum value maps for DisabledReason.
 var (
 	DisabledReason_name = map[int32]string{
-		0: "DISABLED_REASON_UNSPECIFIED",
-		1: "DISABLED_REASON_TERMS_VIOLATION",
-		2: "DISABLED_REASON_SECURITY_CONCERN",
-		3: "DISABLED_REASON_USER_REQUEST",
-		4: "DISABLED_REASON_PAYMENT_ISSUE",
-		5: "DISABLED_REASON_OTHER",
+		0: "UNSPECIFIED",
+		1: "TERMS_VIOLATION",
+		2: "SECURITY_CONCERN",
+		3: "USER_REQUEST",
+		4: "PAYMENT_ISSUE",
+		5: "OTHER",
 	}
 	DisabledReason_value = map[string]int32{
-		"DISABLED_REASON_UNSPECIFIED":      0,
-		"DISABLED_REASON_TERMS_VIOLATION":  1,
-		"DISABLED_REASON_SECURITY_CONCERN": 2,
-		"DISABLED_REASON_USER_REQUEST":     3,
-		"DISABLED_REASON_PAYMENT_ISSUE":    4,
-		"DISABLED_REASON_OTHER":            5,
+		"UNSPECIFIED":      0,
+		"TERMS_VIOLATION":  1,
+		"SECURITY_CONCERN": 2,
+		"USER_REQUEST":     3,
+		"PAYMENT_ISSUE":    4,
+		"OTHER":            5,
 	}
 )
 
@@ -518,7 +518,6 @@ type User struct {
 	UpdatedAt          *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	Disabled           bool                   `protobuf:"varint,12,opt,name=disabled,proto3" json:"disabled,omitempty"`
 	DisabledReason     *DisabledReason        `protobuf:"varint,13,opt,name=disabled_reason,json=disabledReason,proto3,enum=etu.DisabledReason,oneof" json:"disabled_reason,omitempty"`
-	LockedUntil        *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=locked_until,json=lockedUntil,proto3,oneof" json:"locked_until,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -634,14 +633,7 @@ func (x *User) GetDisabledReason() DisabledReason {
 	if x != nil && x.DisabledReason != nil {
 		return *x.DisabledReason
 	}
-	return DisabledReason_DISABLED_REASON_UNSPECIFIED
-}
-
-func (x *User) GetLockedUntil() *timestamppb.Timestamp {
-	if x != nil {
-		return x.LockedUntil
-	}
-	return nil
+	return DisabledReason_UNSPECIFIED
 }
 
 // API Key message
@@ -2737,7 +2729,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc6\x05\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xf1\x04\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -2753,15 +2745,13 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1a\n" +
 	"\bdisabled\x18\f \x01(\bR\bdisabled\x12A\n" +
-	"\x0fdisabled_reason\x18\r \x01(\x0e2\x13.etu.DisabledReasonH\x05R\x0edisabledReason\x88\x01\x01\x12B\n" +
-	"\flocked_until\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampH\x06R\vlockedUntil\x88\x01\x01B\a\n" +
+	"\x0fdisabled_reason\x18\r \x01(\x0e2\x13.etu.DisabledReasonH\x05R\x0edisabledReason\x88\x01\x01B\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
 	"\x13_stripe_customer_idB\r\n" +
 	"\v_notion_keyB\x12\n" +
-	"\x10_disabled_reasonB\x0f\n" +
-	"\r_locked_untilJ\x04\b\n" +
+	"\x10_disabled_reasonJ\x04\b\n" +
 	"\x10\v\"\xd2\x01\n" +
 	"\x06ApiKey\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -2905,14 +2895,14 @@ const file_proto_etu_proto_rawDesc = "" +
 	"totalBlips\x12\x1f\n" +
 	"\vunique_tags\x18\x02 \x01(\x03R\n" +
 	"uniqueTags\x12#\n" +
-	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten*\xdc\x01\n" +
-	"\x0eDisabledReason\x12\x1f\n" +
-	"\x1bDISABLED_REASON_UNSPECIFIED\x10\x00\x12#\n" +
-	"\x1fDISABLED_REASON_TERMS_VIOLATION\x10\x01\x12$\n" +
-	" DISABLED_REASON_SECURITY_CONCERN\x10\x02\x12 \n" +
-	"\x1cDISABLED_REASON_USER_REQUEST\x10\x03\x12!\n" +
-	"\x1dDISABLED_REASON_PAYMENT_ISSUE\x10\x04\x12\x19\n" +
-	"\x15DISABLED_REASON_OTHER\x10\x052\x88\x03\n" +
+	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten*|\n" +
+	"\x0eDisabledReason\x12\x0f\n" +
+	"\vUNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fTERMS_VIOLATION\x10\x01\x12\x14\n" +
+	"\x10SECURITY_CONCERN\x10\x02\x12\x10\n" +
+	"\fUSER_REQUEST\x10\x03\x12\x11\n" +
+	"\rPAYMENT_ISSUE\x10\x04\x12\t\n" +
+	"\x05OTHER\x10\x052\x88\x03\n" +
 	"\fNotesService\x12:\n" +
 	"\tListNotes\x12\x15.etu.ListNotesRequest\x1a\x16.etu.ListNotesResponse\x12=\n" +
 	"\n" +
@@ -3018,72 +3008,71 @@ var file_proto_etu_proto_depIdxs = []int32{
 	47, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
 	47, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 10: etu.User.disabled_reason:type_name -> etu.DisabledReason
-	47, // 11: etu.User.locked_until:type_name -> google.protobuf.Timestamp
-	47, // 12: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
-	47, // 13: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
-	5,  // 14: etu.ListNotesResponse.notes:type_name -> etu.Note
-	1,  // 15: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
-	2,  // 16: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
-	5,  // 17: etu.CreateNoteResponse.note:type_name -> etu.Note
-	5,  // 18: etu.GetNoteResponse.note:type_name -> etu.Note
-	1,  // 19: etu.UpdateNoteRequest.add_images:type_name -> etu.ImageUpload
-	2,  // 20: etu.UpdateNoteRequest.add_audios:type_name -> etu.AudioUpload
-	5,  // 21: etu.UpdateNoteResponse.note:type_name -> etu.Note
-	5,  // 22: etu.GetRandomNotesResponse.notes:type_name -> etu.Note
-	6,  // 23: etu.ListTagsResponse.tags:type_name -> etu.Tag
-	7,  // 24: etu.RegisterResponse.user:type_name -> etu.User
-	7,  // 25: etu.AuthenticateResponse.user:type_name -> etu.User
-	7,  // 26: etu.GetUserResponse.user:type_name -> etu.User
-	7,  // 27: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	47, // 28: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
-	7,  // 29: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
-	8,  // 30: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
-	8,  // 31: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
-	7,  // 32: etu.GetUserSettingsResponse.user:type_name -> etu.User
-	7,  // 33: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
-	9,  // 34: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	11, // 35: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	13, // 36: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	15, // 37: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	17, // 38: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	19, // 39: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
-	21, // 40: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	23, // 41: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	25, // 42: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	27, // 43: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	29, // 44: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	31, // 45: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	33, // 46: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	35, // 47: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	37, // 48: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	39, // 49: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	41, // 50: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	43, // 51: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	45, // 52: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
-	10, // 53: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	12, // 54: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	14, // 55: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	16, // 56: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	18, // 57: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	20, // 58: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
-	22, // 59: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	24, // 60: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	26, // 61: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	28, // 62: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	30, // 63: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	32, // 64: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	34, // 65: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	36, // 66: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	38, // 67: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	40, // 68: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	42, // 69: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	44, // 70: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	46, // 71: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
-	53, // [53:72] is the sub-list for method output_type
-	34, // [34:53] is the sub-list for method input_type
-	34, // [34:34] is the sub-list for extension type_name
-	34, // [34:34] is the sub-list for extension extendee
-	0,  // [0:34] is the sub-list for field type_name
+	47, // 11: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
+	47, // 12: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
+	5,  // 13: etu.ListNotesResponse.notes:type_name -> etu.Note
+	1,  // 14: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
+	2,  // 15: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
+	5,  // 16: etu.CreateNoteResponse.note:type_name -> etu.Note
+	5,  // 17: etu.GetNoteResponse.note:type_name -> etu.Note
+	1,  // 18: etu.UpdateNoteRequest.add_images:type_name -> etu.ImageUpload
+	2,  // 19: etu.UpdateNoteRequest.add_audios:type_name -> etu.AudioUpload
+	5,  // 20: etu.UpdateNoteResponse.note:type_name -> etu.Note
+	5,  // 21: etu.GetRandomNotesResponse.notes:type_name -> etu.Note
+	6,  // 22: etu.ListTagsResponse.tags:type_name -> etu.Tag
+	7,  // 23: etu.RegisterResponse.user:type_name -> etu.User
+	7,  // 24: etu.AuthenticateResponse.user:type_name -> etu.User
+	7,  // 25: etu.GetUserResponse.user:type_name -> etu.User
+	7,  // 26: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
+	47, // 27: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
+	7,  // 28: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
+	8,  // 29: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
+	8,  // 30: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
+	7,  // 31: etu.GetUserSettingsResponse.user:type_name -> etu.User
+	7,  // 32: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
+	9,  // 33: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	11, // 34: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	13, // 35: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	15, // 36: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	17, // 37: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	19, // 38: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
+	21, // 39: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	23, // 40: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	25, // 41: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	27, // 42: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	29, // 43: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	31, // 44: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	33, // 45: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	35, // 46: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	37, // 47: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	39, // 48: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	41, // 49: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	43, // 50: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	45, // 51: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
+	10, // 52: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	12, // 53: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	14, // 54: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	16, // 55: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	18, // 56: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	20, // 57: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
+	22, // 58: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	24, // 59: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	26, // 60: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	28, // 61: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	30, // 62: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	32, // 63: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	34, // 64: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	36, // 65: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	38, // 66: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	40, // 67: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	42, // 68: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	44, // 69: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	46, // 70: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
+	52, // [52:71] is the sub-list for method output_type
+	33, // [33:52] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }

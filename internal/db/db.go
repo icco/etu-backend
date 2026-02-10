@@ -707,33 +707,32 @@ func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionSt
 }
 
 // IsAccountLocked checks if a user account is locked or disabled
-func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, *time.Time, error) {
+func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) {
 	var user User
-	result := db.conn.WithContext(ctx).Select("disabled, \"lockedUntil\"").Where("id = ?", userID).First(&user)
+	result := db.conn.WithContext(ctx).Select("disabled, \"failedLoginAttempts\"").Where("id = ?", userID).First(&user)
 	if result.Error == gorm.ErrRecordNotFound {
-		return false, nil, fmt.Errorf("user not found")
+		return false, fmt.Errorf("user not found")
 	}
 	if result.Error != nil {
-		return false, nil, fmt.Errorf("failed to get user: %w", result.Error)
+		return false, fmt.Errorf("failed to get user: %w", result.Error)
 	}
 
 	// Check if disabled
 	if user.Disabled {
-		return true, nil, nil
+		return true, nil
 	}
 
-	// Check if locked until time is in the future
-	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
-		return true, user.LockedUntil, nil
+	// Check if account is locked due to too many failed attempts
+	if user.FailedLoginAttempts >= 10 {
+		return true, nil
 	}
 
-	return false, nil, nil
+	return false, nil
 }
 
 // RecordFailedLogin increments failed login attempts and locks account if threshold reached
 func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 	now := time.Now()
-	maxAttempts := 10
 
 	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var user User
@@ -744,13 +743,6 @@ func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 		// Increment failed attempts
 		user.FailedLoginAttempts++
 		user.LastFailedLogin = &now
-
-		// Lock account permanently if threshold reached (requires manual unlock)
-		if user.FailedLoginAttempts >= maxAttempts {
-			// Set to far future to indicate permanent lock
-			permanentLock := time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
-			user.LockedUntil = &permanentLock
-		}
 
 		if err := tx.Save(&user).Error; err != nil {
 			return fmt.Errorf("failed to update user: %w", err)
@@ -764,7 +756,6 @@ func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 func (db *DB) RecordSuccessfulLogin(ctx context.Context, userID string) error {
 	updates := map[string]interface{}{
 		"failedLoginAttempts": 0,
-		"lockedUntil":         nil,
 		"lastFailedLogin":     nil,
 	}
 

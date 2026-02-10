@@ -8,12 +8,6 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
-// timePtr is a helper to create a pointer to a time value offset by duration
-func timePtr(d time.Duration) *time.Time {
-	t := time.Now().Add(d)
-	return &t
-}
-
 func TestRecordFailedLogin(t *testing.T) {
 	sqlDB, mock, err := sqlmock.New()
 	if err != nil {
@@ -32,16 +26,16 @@ func TestRecordFailedLogin(t *testing.T) {
 		WithArgs("user123", 1).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "email", "passwordHash", "subscriptionStatus", "createdAt", "updatedAt",
-			"disabled", "failedLoginAttempts", "lockedUntil", "lastFailedLogin",
+			"disabled", "failedLoginAttempts", "lastFailedLogin",
 		}).AddRow(
 			"user123", "test@example.com", "hash", "free", time.Now(), time.Now(),
-			false, 0, nil, nil,
+			false, 0, nil,
 		))
 	mock.ExpectExec(`UPDATE "User"`).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), "user123").
+			sqlmock.AnyArg(), sqlmock.AnyArg(), "user123").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -74,16 +68,16 @@ func TestRecordFailedLogin_LockAfterMaxAttempts(t *testing.T) {
 		WithArgs("user123", 1).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "email", "passwordHash", "subscriptionStatus", "createdAt", "updatedAt",
-			"disabled", "failedLoginAttempts", "lockedUntil", "lastFailedLogin",
+			"disabled", "failedLoginAttempts", "lastFailedLogin",
 		}).AddRow(
 			"user123", "test@example.com", "hash", "free", time.Now(), time.Now(),
-			false, 9, nil, nil,
+			false, 9, nil,
 		))
 	mock.ExpectExec(`UPDATE "User"`).
 		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), "user123").
+			sqlmock.AnyArg(), sqlmock.AnyArg(), "user123").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -112,7 +106,7 @@ func TestRecordSuccessfulLogin(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`UPDATE "User"`).
-		WithArgs(0, nil, nil, sqlmock.AnyArg(), "user123").
+		WithArgs(0, nil, sqlmock.AnyArg(), "user123").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -140,68 +134,60 @@ func TestIsAccountLocked(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		disabled      bool
-		lockedUntil   *time.Time
-		expectLocked  bool
-		expectUntil   *time.Time
+		name                string
+		disabled            bool
+		failedLoginAttempts int
+		expectLocked        bool
 	}{
 		{
-			name:         "account disabled",
-			disabled:     true,
-			lockedUntil:  nil,
-			expectLocked: true,
-			expectUntil:  nil,
+			name:                "account disabled",
+			disabled:            true,
+			failedLoginAttempts: 0,
+			expectLocked:        true,
 		},
 		{
-			name:         "account locked (future time)",
-			disabled:     false,
-			lockedUntil:  timePtr(10 * time.Minute),
-			expectLocked: true,
+			name:                "account locked (10 failed attempts)",
+			disabled:            false,
+			failedLoginAttempts: 10,
+			expectLocked:        true,
 		},
 		{
-			name:         "account not locked (past time)",
-			disabled:     false,
-			lockedUntil:  timePtr(-10 * time.Minute),
-			expectLocked: false,
-			expectUntil:  nil,
+			name:                "account locked (more than 10 failed attempts)",
+			disabled:            false,
+			failedLoginAttempts: 15,
+			expectLocked:        true,
 		},
 		{
-			name:         "account not locked or disabled",
-			disabled:     false,
-			lockedUntil:  nil,
-			expectLocked: false,
-			expectUntil:  nil,
+			name:                "account not locked (9 failed attempts)",
+			disabled:            false,
+			failedLoginAttempts: 9,
+			expectLocked:        false,
+		},
+		{
+			name:                "account not locked or disabled",
+			disabled:            false,
+			failedLoginAttempts: 0,
+			expectLocked:        false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rows := sqlmock.NewRows([]string{"disabled", "lockedUntil"})
-			if tt.lockedUntil != nil {
-				rows.AddRow(tt.disabled, *tt.lockedUntil)
-			} else {
-				rows.AddRow(tt.disabled, nil)
-			}
+			rows := sqlmock.NewRows([]string{"disabled", "failedLoginAttempts"})
+			rows.AddRow(tt.disabled, tt.failedLoginAttempts)
 
-			mock.ExpectQuery(`SELECT disabled, "lockedUntil" FROM "User"`).
+			mock.ExpectQuery(`SELECT disabled, "failedLoginAttempts" FROM "User"`).
 				WithArgs("user123", 1).
 				WillReturnRows(rows)
 
 			ctx := context.Background()
-			locked, until, err := db.IsAccountLocked(ctx, "user123")
+			locked, err := db.IsAccountLocked(ctx, "user123")
 			if err != nil {
 				t.Fatalf("IsAccountLocked: %v", err)
 			}
 
 			if locked != tt.expectLocked {
 				t.Errorf("expected locked=%v, got %v", tt.expectLocked, locked)
-			}
-
-			if tt.expectLocked && tt.lockedUntil != nil {
-				if until == nil {
-					t.Error("expected non-nil until time")
-				}
 			}
 		})
 	}

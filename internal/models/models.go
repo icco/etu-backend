@@ -102,7 +102,6 @@ type User struct {
 	Disabled            bool       `gorm:"column:disabled;default:false"`
 	DisabledReason      *string    `gorm:"column:disabledReason"`
 	FailedLoginAttempts int        `gorm:"column:failedLoginAttempts;default:0"`
-	LockedUntil         *time.Time `gorm:"column:lockedUntil"`
 	LastFailedLogin     *time.Time `gorm:"column:lastFailedLogin"`
 }
 

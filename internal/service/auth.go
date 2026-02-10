@@ -81,8 +81,8 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 		return nil, status.Error(codes.PermissionDenied, "account is disabled")
 	}
 
-	// Check if account is locked
-	if user.LockedUntil != nil && user.LockedUntil.After(time.Now()) {
+	// Check if account is locked due to too many failed attempts
+	if user.FailedLoginAttempts >= 10 {
 		return nil, status.Error(codes.PermissionDenied, "account is locked")
 	}
 
@@ -215,9 +215,6 @@ func userToProto(u *db.User) *pb.User {
 		reason := stringToDisabledReason(*u.DisabledReason)
 		pbUser.DisabledReason = &reason
 	}
-	if u.LockedUntil != nil {
-		pbUser.LockedUntil = timestamppb.New(*u.LockedUntil)
-	}
 
 	return pbUser
 }
@@ -226,16 +223,16 @@ func userToProto(u *db.User) *pb.User {
 func stringToDisabledReason(reason string) pb.DisabledReason {
 	switch reason {
 	case "terms_violation":
-		return pb.DisabledReason_DISABLED_REASON_TERMS_VIOLATION
+		return pb.DisabledReason_TERMS_VIOLATION
 	case "security_concern":
-		return pb.DisabledReason_DISABLED_REASON_SECURITY_CONCERN
+		return pb.DisabledReason_SECURITY_CONCERN
 	case "user_request":
-		return pb.DisabledReason_DISABLED_REASON_USER_REQUEST
+		return pb.DisabledReason_USER_REQUEST
 	case "payment_issue":
-		return pb.DisabledReason_DISABLED_REASON_PAYMENT_ISSUE
+		return pb.DisabledReason_PAYMENT_ISSUE
 	case "other":
-		return pb.DisabledReason_DISABLED_REASON_OTHER
+		return pb.DisabledReason_OTHER
 	default:
-		return pb.DisabledReason_DISABLED_REASON_UNSPECIFIED
+		return pb.DisabledReason_UNSPECIFIED
 	}
 }

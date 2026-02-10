@@ -57,12 +57,12 @@ message Tag {
 
 // DisabledReason enum for account disable reasons
 enum DisabledReason {
-  DISABLED_REASON_UNSPECIFIED = 0;
-  DISABLED_REASON_TERMS_VIOLATION = 1;
-  DISABLED_REASON_SECURITY_CONCERN = 2;
-  DISABLED_REASON_USER_REQUEST = 3;
-  DISABLED_REASON_PAYMENT_ISSUE = 4;
-  DISABLED_REASON_OTHER = 5;
+  UNSPECIFIED = 0;
+  TERMS_VIOLATION = 1;
+  SECURITY_CONCERN = 2;
+  USER_REQUEST = 3;
+  PAYMENT_ISSUE = 4;
+  OTHER = 5;
 }
 
 // User message
@@ -80,7 +80,6 @@ message User {
   google.protobuf.Timestamp updated_at = 11;
   bool disabled = 12;
   optional DisabledReason disabled_reason = 13;
-  optional google.protobuf.Timestamp locked_until = 14;
 }
 
 // API Key message
