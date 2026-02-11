@@ -133,8 +133,8 @@ Requires `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/ap
 - **Tag Generation**: Prefers reusing existing tags, all tags are lowercase single words, never modifies existing tags
 - **OCR**: Processes images uploaded to notes where `extractedText` is empty
 - **Audio Transcription**: Processes audio files uploaded to notes where `transcribedText` is empty
-- **Rate Limiting**: Configurable delay between API calls to avoid rate limits
-- All three tasks run in sequence during each processing cycle
+- **Rate Limiting**: Configurable delay between API calls to avoid rate limits (shared across all tasks)
+- All three tasks run in parallel during each processing cycle
 
 ## Security
 
