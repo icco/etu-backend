@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -166,30 +167,56 @@ type ProcessResult struct {
 	Duration        time.Duration
 }
 
-// processAllTasks runs all AI processing tasks: tag generation, OCR, and audio transcription
+// processAllTasks runs all AI processing tasks in parallel: tag generation, OCR, and audio transcription
 func processAllTasks(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, delay time.Duration) (*ProcessResult, error) {
 	start := time.Now()
 	result := &ProcessResult{}
 
+	var wg sync.WaitGroup
+	var mu sync.Mutex // Protect result updates
+
 	// Task 1: Generate tags for notes
-	tagResult, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, delay)
-	if err != nil {
-		return nil, err
-	}
-	result.UsersProcessed = tagResult.UsersProcessed
-	result.NotesProcessed = tagResult.NotesProcessed
-	result.TagsAdded = tagResult.TagsAdded
-	result.Errors += tagResult.Errors
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		tagResult, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, delay)
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			log.Error("tag generation failed", "error", err)
+			result.Errors++
+		} else {
+			result.UsersProcessed = tagResult.UsersProcessed
+			result.NotesProcessed = tagResult.NotesProcessed
+			result.TagsAdded = tagResult.TagsAdded
+			result.Errors += tagResult.Errors
+		}
+	}()
 
 	// Task 2: Process images without extracted text
-	imagesProcessed, imageErrors := processImagesWithoutText(ctx, log, database, aiClient, storageClient, dryRun, delay)
-	result.ImagesProcessed = imagesProcessed
-	result.Errors += imageErrors
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		imagesProcessed, imageErrors := processImagesWithoutText(ctx, log, database, aiClient, storageClient, dryRun, delay)
+		mu.Lock()
+		defer mu.Unlock()
+		result.ImagesProcessed = imagesProcessed
+		result.Errors += imageErrors
+	}()
 
 	// Task 3: Process audio files without transcription
-	audiosProcessed, audioErrors := processAudiosWithoutTranscription(ctx, log, database, aiClient, storageClient, dryRun, delay)
-	result.AudiosProcessed = audiosProcessed
-	result.Errors += audioErrors
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		audiosProcessed, audioErrors := processAudiosWithoutTranscription(ctx, log, database, aiClient, storageClient, dryRun, delay)
+		mu.Lock()
+		defer mu.Unlock()
+		result.AudiosProcessed = audiosProcessed
+		result.Errors += audioErrors
+	}()
+
+	// Wait for all tasks to complete
+	wg.Wait()
 
 	result.Duration = time.Since(start)
 	return result, nil
