@@ -277,7 +277,7 @@ func processAudiosWithoutTranscription(ctx context.Context, log *slog.Logger, da
 
 		log.Info("processing audio for transcription", "audio_id", audio.ID, "note_id", audio.NoteID)
 
-		// Download audio from GCS
+		// Download audio from GCS (using GetImage which works for any file type)
 		audioData, err := storageClient.GetImage(ctx, audio.GCSObjectName)
 		if err != nil {
 			log.Error("failed to download audio", "audio_id", audio.ID, "error", err)
