@@ -65,7 +65,6 @@ func main() {
 
 	log.Info("starting AI processing job (tag generation, OCR, audio transcription)",
 		"dry_run", *dryRun,
-		"rate_limit", "1 per second",
 		"continuous", *interval > 0,
 		"interval", intervalStr)
 
