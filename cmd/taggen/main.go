@@ -7,12 +7,15 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/icco/etu-backend/internal/ai"
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/logger"
+	"github.com/icco/etu-backend/internal/storage"
+	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -21,12 +24,17 @@ func main() {
 	// Parse command line flags
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
 	dryRun := flag.Bool("dry-run", false, "Run without actually adding tags (for testing)")
-	delay := flag.Duration("delay", 2*time.Second, "Delay between processing notes to avoid rate limiting (e.g., 2s)")
 	flag.Parse()
 
 	geminiKey := os.Getenv("GEMINI_API_KEY")
 	if geminiKey == "" {
 		log.Error("GEMINI_API_KEY environment variable not set")
+		os.Exit(1)
+	}
+
+	gcsBucket := os.Getenv("GCS_BUCKET")
+	if gcsBucket == "" {
+		log.Error("GCS_BUCKET environment variable not set")
 		os.Exit(1)
 	}
 
@@ -37,14 +45,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize storage client
+	ctx := context.Background()
+	storageClient, err := storage.New(ctx, gcsBucket)
+	if err != nil {
+		log.Error("failed to initialize storage client", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := storageClient.Close(); err != nil {
+			log.Error("error closing storage client", "error", err)
+		}
+	}()
+
 	intervalStr := "once"
 	if *interval > 0 {
 		intervalStr = interval.String()
 	}
 
-	log.Info("starting Gemini tag generation job",
+	log.Info("starting AI processing job (tag generation, OCR, audio transcription)",
 		"dry_run", *dryRun,
-		"delay", delay.String(),
 		"continuous", *interval > 0,
 		"interval", intervalStr)
 
@@ -62,7 +82,7 @@ func main() {
 	log.Info("database connected")
 
 	// Handle graceful shutdown
-	ctx, cancel := context.WithCancel(context.Background())
+	processCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	sigCh := make(chan os.Signal, 1)
@@ -74,65 +94,243 @@ func main() {
 		cancel()
 	}()
 
+	// Create rate limiter: 1 API call per second shared across all tasks
+	rateLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
+
 	if *interval > 0 {
-		// Run continuously
-		runContinuously(ctx, log, database, aiClient, *dryRun, *delay, *interval)
-	} else {
-		// Run once
-		runOnce(ctx, log, database, aiClient, *dryRun, *delay)
-	}
-}
+		// Run continuously at the specified interval
+		ticker := time.NewTicker(*interval)
+		defer ticker.Stop()
 
-func runOnce(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration) {
-	result, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, delay)
-	if err != nil {
-		log.Error("tag generation failed", "error", err)
-		os.Exit(1)
-	}
+		// Run immediately on start
+		processOnce(processCtx, log, database, aiClient, storageClient, *dryRun, rateLimiter)
 
-	log.Info("tag generation completed",
-		"duration", result.Duration.String(),
-		"users_processed", result.UsersProcessed,
-		"notes_processed", result.NotesProcessed,
-		"tags_added", result.TagsAdded,
-		"errors", result.Errors)
-}
-
-func runContinuously(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration, interval time.Duration) {
-	// Run immediately on start
-	performTagGeneration(ctx, log, database, aiClient, dryRun, delay)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info("shutting down tag generation job")
-			return
-		case <-ticker.C:
-			performTagGeneration(ctx, log, database, aiClient, dryRun, delay)
+		for {
+			select {
+			case <-processCtx.Done():
+				log.Info("shutting down AI processing job")
+				return
+			case <-ticker.C:
+				processOnce(processCtx, log, database, aiClient, storageClient, *dryRun, rateLimiter)
+			}
 		}
+	} else {
+		// Run once and exit
+		processOnce(processCtx, log, database, aiClient, storageClient, *dryRun, rateLimiter)
 	}
 }
 
-func performTagGeneration(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration) {
-	result, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, delay)
+func processOnce(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) {
+	result, err := processAllTasks(ctx, log, database, aiClient, storageClient, dryRun, rateLimiter)
 	if err != nil {
-		log.Error("tag generation failed", "error", err)
+		log.Error("AI processing failed", "error", err)
 		return
 	}
 
-	log.Info("tag generation completed",
+	log.Info("AI processing completed",
 		"duration", result.Duration.String(),
 		"users_processed", result.UsersProcessed,
 		"notes_processed", result.NotesProcessed,
 		"tags_added", result.TagsAdded,
+		"images_processed", result.ImagesProcessed,
+		"audios_processed", result.AudiosProcessed,
 		"errors", result.Errors)
 }
 
+// ProcessResult holds the results of processing run
+type ProcessResult struct {
+	UsersProcessed  int
+	NotesProcessed  int
+	TagsAdded       int
+	ImagesProcessed int
+	AudiosProcessed int
+	Errors          int
+	Duration        time.Duration
+}
+
+// processAllTasks runs all AI processing tasks in parallel: tag generation, OCR, and audio transcription
+func processAllTasks(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) (*ProcessResult, error) {
+	start := time.Now()
+	result := &ProcessResult{}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex // Protect result updates
+
+	// Task 1: Generate tags for notes
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		tagResult, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, rateLimiter)
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			log.Error("tag generation failed", "error", err)
+			result.Errors++
+		} else {
+			result.UsersProcessed = tagResult.UsersProcessed
+			result.NotesProcessed = tagResult.NotesProcessed
+			result.TagsAdded = tagResult.TagsAdded
+			result.Errors += tagResult.Errors
+		}
+	}()
+
+	// Task 2: Process images without extracted text
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		imagesProcessed, imageErrors := processImagesWithoutText(ctx, log, database, aiClient, storageClient, dryRun, rateLimiter)
+		mu.Lock()
+		defer mu.Unlock()
+		result.ImagesProcessed = imagesProcessed
+		result.Errors += imageErrors
+	}()
+
+	// Task 3: Process audio files without transcription
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		audiosProcessed, audioErrors := processAudiosWithoutTranscription(ctx, log, database, aiClient, storageClient, dryRun, rateLimiter)
+		mu.Lock()
+		defer mu.Unlock()
+		result.AudiosProcessed = audiosProcessed
+		result.Errors += audioErrors
+	}()
+
+	// Wait for all tasks to complete
+	wg.Wait()
+
+	result.Duration = time.Since(start)
+	return result, nil
+}
+
+// processImagesWithoutText processes all images that don't have extracted text yet
+func processImagesWithoutText(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter) (int, int) {
+	images, err := database.GetImagesWithoutExtractedText(ctx)
+	if err != nil {
+		log.Error("failed to get images without extracted text", "error", err)
+		return 0, 1
+	}
+
+	log.Info("found images without extracted text", "count", len(images))
+
+	processed := 0
+	errors := 0
+
+	for _, image := range images {
+		select {
+		case <-ctx.Done():
+			return processed, errors
+		default:
+		}
+
+		log.Info("processing image for OCR", "image_id", image.ID, "note_id", image.NoteID)
+
+		// Wait for rate limiter before making API call
+		if limiter != nil {
+			if err := limiter.Wait(ctx); err != nil {
+				log.Error("rate limiter error", "error", err)
+				return processed, errors
+			}
+		}
+
+		// Download image from GCS
+		imageData, err := storageClient.GetImage(ctx, image.GCSObjectName)
+		if err != nil {
+			log.Error("failed to download image", "image_id", image.ID, "error", err)
+			errors++
+			continue
+		}
+
+		// Extract text from image
+		extractedText, err := aiClient.ExtractTextFromImage(ctx, imageData, image.MimeType)
+		if err != nil {
+			log.Error("failed to extract text from image", "image_id", image.ID, "error", err)
+			errors++
+			continue
+		}
+
+		log.Info("extracted text from image", "image_id", image.ID, "text_length", len(extractedText))
+
+		if !dryRun {
+			// Update database with extracted text
+			if err := database.UpdateImageExtractedText(ctx, image.ID, extractedText); err != nil {
+				log.Error("failed to update image extracted text", "image_id", image.ID, "error", err)
+				errors++
+				continue
+			}
+		}
+
+		processed++
+	}
+
+	return processed, errors
+}
+
+// processAudiosWithoutTranscription processes all audio files that don't have transcribed text yet
+func processAudiosWithoutTranscription(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter) (int, int) {
+	audios, err := database.GetAudiosWithoutTranscription(ctx)
+	if err != nil {
+		log.Error("failed to get audios without transcription", "error", err)
+		return 0, 1
+	}
+
+	log.Info("found audios without transcription", "count", len(audios))
+
+	processed := 0
+	errors := 0
+
+	for _, audio := range audios {
+		select {
+		case <-ctx.Done():
+			return processed, errors
+		default:
+		}
+
+		log.Info("processing audio for transcription", "audio_id", audio.ID, "note_id", audio.NoteID)
+
+		// Wait for rate limiter before making API call
+		if limiter != nil {
+			if err := limiter.Wait(ctx); err != nil {
+				log.Error("rate limiter error", "error", err)
+				return processed, errors
+			}
+		}
+
+		// Download audio from GCS (using GetImage which works for any file type)
+		audioData, err := storageClient.GetImage(ctx, audio.GCSObjectName)
+		if err != nil {
+			log.Error("failed to download audio", "audio_id", audio.ID, "error", err)
+			errors++
+			continue
+		}
+
+		// Transcribe audio
+		transcribedText, err := aiClient.TranscribeAudio(ctx, audioData, audio.MimeType)
+		if err != nil {
+			log.Error("failed to transcribe audio", "audio_id", audio.ID, "error", err)
+			errors++
+			continue
+		}
+
+		log.Info("transcribed audio", "audio_id", audio.ID, "text_length", len(transcribedText))
+
+		if !dryRun {
+			// Update database with transcribed text
+			if err := database.UpdateAudioTranscribedText(ctx, audio.ID, transcribedText); err != nil {
+				log.Error("failed to update audio transcribed text", "audio_id", audio.ID, "error", err)
+				errors++
+				continue
+			}
+		}
+
+		processed++
+	}
+
+	return processed, errors
+}
+
 // generateTagsForAllUsers generates tags for all users in the database
-func generateTagsForAllUsers(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, delay time.Duration) (*TagGenResult, error) {
+func generateTagsForAllUsers(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter) (*TagGenResult, error) {
 	start := time.Now()
 	result := &TagGenResult{}
 
@@ -152,7 +350,7 @@ func generateTagsForAllUsers(ctx context.Context, log *slog.Logger, database *db
 		default:
 		}
 
-		userResult, err := generateTagsForUser(ctx, log, database, user.ID, aiClient, dryRun, delay)
+		userResult, err := generateTagsForUser(ctx, log, database, user.ID, aiClient, dryRun, limiter)
 		if err != nil {
 			log.Error("failed to generate tags for user", "user_id", user.ID, "error", err)
 			result.Errors++
@@ -178,7 +376,7 @@ type TagGenResult struct {
 	Duration       time.Duration
 }
 
-func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB, userID string, aiClient *ai.Client, dryRun bool, delay time.Duration) (*TagGenResult, error) {
+func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB, userID string, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter) (*TagGenResult, error) {
 	result := &TagGenResult{}
 
 	// Fetch all existing tags for the user to prefer reusing them
@@ -216,6 +414,14 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 
 		if maxNewTags <= 0 {
 			continue
+		}
+
+		// Wait for rate limiter before making API call
+		if limiter != nil {
+			if err := limiter.Wait(ctx); err != nil {
+				log.Error("rate limiter error", "error", err)
+				return result, err
+			}
 		}
 
 		// Generate tags using Gemini, passing existing tags
@@ -279,11 +485,6 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 		}
 
 		result.TagsAdded += len(newTags)
-
-		// Add a delay to avoid rate limiting
-		if delay > 0 {
-			time.Sleep(delay)
-		}
 	}
 
 	return result, nil

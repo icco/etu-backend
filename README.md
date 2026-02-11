@@ -13,10 +13,14 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 ## Features
 
 - CRUD operations for notes with tagging
+- Image and audio file attachments for notes
 - Search and filter by tags, date ranges, and content
 - API key authentication with PostgreSQL backend
 - Notion sync job for importing journal entries
-- AI tag generation using Google Gemini
+- AI-powered features using Google Gemini:
+  - Automatic tag generation for notes
+  - OCR text extraction from images
+  - Audio transcription
 
 **Tech Stack:** Go 1.25, gRPC, Protocol Buffers, PostgreSQL, Docker
 
@@ -28,7 +32,8 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `PORT` - Server port (default: 50051)
 - `GRPC_API_KEYS` - Comma-separated list of M2M tokens for server-to-server auth (supports rotation)
-- `GEMINI_API_KEY` - Gemini API key (for tag generation)
+- `GEMINI_API_KEY` - Gemini API key (for AI processing: tag generation, OCR, audio transcription)
+- `GCS_BUCKET` - Google Cloud Storage bucket name (for image and audio file access)
 - `GCP_SECRET_NAME` - GCP Secret Manager secret name for encryption key (required for encryption, format: `projects/PROJECT_ID/secrets/SECRET_NAME/versions/VERSION`)
 
 **Run locally:**
@@ -105,20 +110,31 @@ Syncs journal entries from a Notion database to PostgreSQL. Automatically syncs 
 
 **Flags:** `-full`, `-interval` (e.g., `1h`, `30m`), `-direction` (from-notion, to-notion, bidirectional)
 
-## AI Tag Generation Job
+## AI Processing Job
 
-Automatically generates up to 3 tags per note using Google Gemini 1.5 Flash. Only processes notes with fewer than 3 tags. Requires `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/app/apikey).
+Automatically processes notes using Google Gemini AI for three tasks:
+
+1. **Tag Generation**: Generates up to 3 tags per note (only for notes with fewer than 3 tags)
+2. **Image OCR**: Extracts text from uploaded images
+3. **Audio Transcription**: Transcribes uploaded audio files
+
+Requires `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/app/apikey) and `GCS_BUCKET` for accessing uploaded files.
 
 **Usage:**
 ```bash
-./bin/taggen                        # One-time generation
-./bin/taggen -dry-run               # Test without adding tags
+./bin/taggen                        # One-time processing
+./bin/taggen -dry-run               # Test without updating database
 ./bin/taggen -interval 6h           # Continuous (every 6 hours)
 ```
 
-**Flags:** `-dry-run`, `-delay` (default: 2s), `-interval` (e.g., `6h`, `1h`)
+**Flags:** `-dry-run`, `-interval` (e.g., `6h`, `1h`)
 
-**Features:** Prefers reusing existing tags, all tags are lowercase single words, never modifies existing tags.
+**Features:**
+- **Tag Generation**: Prefers reusing existing tags, all tags are lowercase single words, never modifies existing tags
+- **OCR**: Processes images uploaded to notes where `extractedText` is empty
+- **Audio Transcription**: Processes audio files uploaded to notes where `transcribedText` is empty
+- **Rate Limiting**: Fixed at 1 API call per second (shared across all tasks)
+- All three tasks run in parallel during each processing cycle
 
 ## Security
 

@@ -589,6 +589,50 @@ func (db *DB) GetAudiosByNoteID(ctx context.Context, noteID string) ([]NoteAudio
 	return audios, nil
 }
 
+// GetImagesWithoutExtractedText returns all images that don't have extracted text yet
+func (db *DB) GetImagesWithoutExtractedText(ctx context.Context) ([]NoteImage, error) {
+	var images []NoteImage
+	err := db.conn.WithContext(ctx).Where(`"extractedText" = ?`, "").Find(&images).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get images without extracted text: %w", err)
+	}
+	return images, nil
+}
+
+// UpdateImageExtractedText updates the extracted text for an image
+func (db *DB) UpdateImageExtractedText(ctx context.Context, imageID string, extractedText string) error {
+	result := db.conn.WithContext(ctx).Model(&NoteImage{}).Where("id = ?", imageID).Update("extractedText", extractedText)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update image extracted text: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("image not found")
+	}
+	return nil
+}
+
+// GetAudiosWithoutTranscription returns all audio files that don't have transcribed text yet
+func (db *DB) GetAudiosWithoutTranscription(ctx context.Context) ([]NoteAudio, error) {
+	var audios []NoteAudio
+	err := db.conn.WithContext(ctx).Where(`"transcribedText" = ?`, "").Find(&audios).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get audios without transcription: %w", err)
+	}
+	return audios, nil
+}
+
+// UpdateAudioTranscribedText updates the transcribed text for an audio file
+func (db *DB) UpdateAudioTranscribedText(ctx context.Context, audioID string, transcribedText string) error {
+	result := db.conn.WithContext(ctx).Model(&NoteAudio{}).Where("id = ?", audioID).Update("transcribedText", transcribedText)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update audio transcribed text: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("audio not found")
+	}
+	return nil
+}
+
 // ListTags retrieves all tags for a user with usage counts
 func (db *DB) ListTags(ctx context.Context, userID string) ([]Tag, error) {
 	var tags []Tag

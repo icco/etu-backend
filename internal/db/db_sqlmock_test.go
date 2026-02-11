@@ -1382,3 +1382,205 @@ func TestGetStats_SQL(t *testing.T) {
 		t.Errorf("unfulfilled mock expectations: %v", err)
 	}
 }
+
+func TestGetImagesWithoutExtractedText(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	db, err := NewFromConn(sqlDB)
+	if err != nil {
+		t.Fatalf("NewFromConn: %v", err)
+	}
+
+	now := time.Now().UTC()
+	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage" WHERE "extractedText" = (.+)`).
+		WithArgs("").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt",
+		}).AddRow(
+			"img-1", "note-1", "https://example.com/img1.jpg", "images/img1.jpg", "", "image/jpeg", now,
+		).AddRow(
+			"img-2", "note-2", "https://example.com/img2.png", "images/img2.png", "", "image/png", now,
+		))
+
+	ctx := context.Background()
+	images, err := db.GetImagesWithoutExtractedText(ctx)
+	if err != nil {
+		t.Fatalf("GetImagesWithoutExtractedText: %v", err)
+	}
+	if len(images) != 2 {
+		t.Errorf("GetImagesWithoutExtractedText: got %d images, want 2", len(images))
+	}
+	if images[0].ID != "img-1" || images[1].ID != "img-2" {
+		t.Errorf("GetImagesWithoutExtractedText: unexpected image IDs")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestUpdateImageExtractedText(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	db, err := NewFromConn(sqlDB)
+	if err != nil {
+		t.Fatalf("NewFromConn: %v", err)
+	}
+
+	imageID := "img-123"
+	extractedText := "This is extracted text from the image"
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "NoteImage" SET "extractedText"=\$1 WHERE id = \$2`).
+		WithArgs(extractedText, imageID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	ctx := context.Background()
+	err = db.UpdateImageExtractedText(ctx, imageID, extractedText)
+	if err != nil {
+		t.Fatalf("UpdateImageExtractedText: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestUpdateImageExtractedText_NotFound(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	db, err := NewFromConn(sqlDB)
+	if err != nil {
+		t.Fatalf("NewFromConn: %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "NoteImage" SET "extractedText"=\$1 WHERE id = \$2`).
+		WithArgs("text", "nonexistent").
+		WillReturnResult(sqlmock.NewResult(0, 0)) // No rows affected
+	mock.ExpectCommit()
+
+	ctx := context.Background()
+	err = db.UpdateImageExtractedText(ctx, "nonexistent", "text")
+	if err == nil {
+		t.Fatal("UpdateImageExtractedText: expected error for non-existent image, got nil")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestGetAudiosWithoutTranscription(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	db, err := NewFromConn(sqlDB)
+	if err != nil {
+		t.Fatalf("NewFromConn: %v", err)
+	}
+
+	now := time.Now().UTC()
+	mock.ExpectQuery(`SELECT (.+) FROM "NoteAudio" WHERE "transcribedText" = (.+)`).
+		WithArgs("").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "noteId", "url", "gcsObjectName", "transcribedText", "mimeType", "createdAt",
+		}).AddRow(
+			"audio-1", "note-1", "https://example.com/audio1.mp3", "audio/audio1.mp3", "", "audio/mpeg", now,
+		).AddRow(
+			"audio-2", "note-2", "https://example.com/audio2.wav", "audio/audio2.wav", "", "audio/wav", now,
+		))
+
+	ctx := context.Background()
+	audios, err := db.GetAudiosWithoutTranscription(ctx)
+	if err != nil {
+		t.Fatalf("GetAudiosWithoutTranscription: %v", err)
+	}
+	if len(audios) != 2 {
+		t.Errorf("GetAudiosWithoutTranscription: got %d audios, want 2", len(audios))
+	}
+	if audios[0].ID != "audio-1" || audios[1].ID != "audio-2" {
+		t.Errorf("GetAudiosWithoutTranscription: unexpected audio IDs")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestUpdateAudioTranscribedText(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	db, err := NewFromConn(sqlDB)
+	if err != nil {
+		t.Fatalf("NewFromConn: %v", err)
+	}
+
+	audioID := "audio-123"
+	transcribedText := "This is the transcribed text from the audio file"
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "NoteAudio" SET "transcribedText"=\$1 WHERE id = \$2`).
+		WithArgs(transcribedText, audioID).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	ctx := context.Background()
+	err = db.UpdateAudioTranscribedText(ctx, audioID, transcribedText)
+	if err != nil {
+		t.Fatalf("UpdateAudioTranscribedText: %v", err)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestUpdateAudioTranscribedText_NotFound(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+
+	db, err := NewFromConn(sqlDB)
+	if err != nil {
+		t.Fatalf("NewFromConn: %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "NoteAudio" SET "transcribedText"=\$1 WHERE id = \$2`).
+		WithArgs("text", "nonexistent").
+		WillReturnResult(sqlmock.NewResult(0, 0)) // No rows affected
+	mock.ExpectCommit()
+
+	ctx := context.Background()
+	err = db.UpdateAudioTranscribedText(ctx, "nonexistent", "text")
+	if err == nil {
+		t.Fatal("UpdateAudioTranscribedText: expected error for non-existent audio, got nil")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
