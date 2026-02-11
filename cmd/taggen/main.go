@@ -24,7 +24,6 @@ func main() {
 	// Parse command line flags
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
 	dryRun := flag.Bool("dry-run", false, "Run without actually adding tags (for testing)")
-	delay := flag.Duration("delay", 2*time.Second, "Delay between processing notes to avoid rate limiting (e.g., 2s)")
 	flag.Parse()
 
 	geminiKey := os.Getenv("GEMINI_API_KEY")
@@ -66,7 +65,7 @@ func main() {
 
 	log.Info("starting AI processing job (tag generation, OCR, audio transcription)",
 		"dry_run", *dryRun,
-		"delay", delay.String(),
+		"rate_limit", "1 per second",
 		"continuous", *interval > 0,
 		"interval", intervalStr)
 
@@ -96,52 +95,34 @@ func main() {
 		cancel()
 	}()
 
+	// Create rate limiter: 1 API call per second shared across all tasks
+	rateLimiter := rate.NewLimiter(rate.Every(1*time.Second), 1)
+
 	if *interval > 0 {
-		// Run continuously
-		runContinuously(processCtx, log, database, aiClient, storageClient, *dryRun, *delay, *interval)
-	} else {
-		// Run once
-		runOnce(processCtx, log, database, aiClient, storageClient, *dryRun, *delay)
-	}
-}
+		// Run continuously at the specified interval
+		ticker := time.NewTicker(*interval)
+		defer ticker.Stop()
 
-func runOnce(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, delay time.Duration) {
-	result, err := processAllTasks(ctx, log, database, aiClient, storageClient, dryRun, delay)
-	if err != nil {
-		log.Error("AI processing failed", "error", err)
-		os.Exit(1)
-	}
+		// Run immediately on start
+		processOnce(processCtx, log, database, aiClient, storageClient, *dryRun, rateLimiter)
 
-	log.Info("AI processing completed",
-		"duration", result.Duration.String(),
-		"users_processed", result.UsersProcessed,
-		"notes_processed", result.NotesProcessed,
-		"tags_added", result.TagsAdded,
-		"images_processed", result.ImagesProcessed,
-		"audios_processed", result.AudiosProcessed,
-		"errors", result.Errors)
-}
-
-func runContinuously(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, delay time.Duration, interval time.Duration) {
-	// Run immediately on start
-	performProcessing(ctx, log, database, aiClient, storageClient, dryRun, delay)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Info("shutting down AI processing job")
-			return
-		case <-ticker.C:
-			performProcessing(ctx, log, database, aiClient, storageClient, dryRun, delay)
+		for {
+			select {
+			case <-processCtx.Done():
+				log.Info("shutting down AI processing job")
+				return
+			case <-ticker.C:
+				processOnce(processCtx, log, database, aiClient, storageClient, *dryRun, rateLimiter)
+			}
 		}
+	} else {
+		// Run once and exit
+		processOnce(processCtx, log, database, aiClient, storageClient, *dryRun, rateLimiter)
 	}
 }
 
-func performProcessing(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, delay time.Duration) {
-	result, err := processAllTasks(ctx, log, database, aiClient, storageClient, dryRun, delay)
+func processOnce(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) {
+	result, err := processAllTasks(ctx, log, database, aiClient, storageClient, dryRun, rateLimiter)
 	if err != nil {
 		log.Error("AI processing failed", "error", err)
 		return
@@ -169,16 +150,9 @@ type ProcessResult struct {
 }
 
 // processAllTasks runs all AI processing tasks in parallel: tag generation, OCR, and audio transcription
-func processAllTasks(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, delay time.Duration) (*ProcessResult, error) {
+func processAllTasks(ctx context.Context, log *slog.Logger, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) (*ProcessResult, error) {
 	start := time.Now()
 	result := &ProcessResult{}
-
-	// Create a shared rate limiter to control API calls across all tasks
-	// The limiter allows one API call per delay period, shared across all goroutines
-	var limiter *rate.Limiter
-	if delay > 0 {
-		limiter = rate.NewLimiter(rate.Every(delay), 1)
-	}
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex // Protect result updates
@@ -187,7 +161,7 @@ func processAllTasks(ctx context.Context, log *slog.Logger, database *db.DB, aiC
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		tagResult, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, limiter)
+		tagResult, err := generateTagsForAllUsers(ctx, log, database, aiClient, dryRun, rateLimiter)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -205,7 +179,7 @@ func processAllTasks(ctx context.Context, log *slog.Logger, database *db.DB, aiC
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		imagesProcessed, imageErrors := processImagesWithoutText(ctx, log, database, aiClient, storageClient, dryRun, limiter)
+		imagesProcessed, imageErrors := processImagesWithoutText(ctx, log, database, aiClient, storageClient, dryRun, rateLimiter)
 		mu.Lock()
 		defer mu.Unlock()
 		result.ImagesProcessed = imagesProcessed
@@ -216,7 +190,7 @@ func processAllTasks(ctx context.Context, log *slog.Logger, database *db.DB, aiC
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		audiosProcessed, audioErrors := processAudiosWithoutTranscription(ctx, log, database, aiClient, storageClient, dryRun, limiter)
+		audiosProcessed, audioErrors := processAudiosWithoutTranscription(ctx, log, database, aiClient, storageClient, dryRun, rateLimiter)
 		mu.Lock()
 		defer mu.Unlock()
 		result.AudiosProcessed = audiosProcessed

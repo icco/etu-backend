@@ -127,13 +127,13 @@ Requires `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/ap
 ./bin/taggen -interval 6h           # Continuous (every 6 hours)
 ```
 
-**Flags:** `-dry-run`, `-delay` (default: 2s), `-interval` (e.g., `6h`, `1h`)
+**Flags:** `-dry-run`, `-interval` (e.g., `6h`, `1h`)
 
 **Features:**
 - **Tag Generation**: Prefers reusing existing tags, all tags are lowercase single words, never modifies existing tags
 - **OCR**: Processes images uploaded to notes where `extractedText` is empty
 - **Audio Transcription**: Processes audio files uploaded to notes where `transcribedText` is empty
-- **Rate Limiting**: Configurable delay between API calls to avoid rate limits (shared across all tasks)
+- **Rate Limiting**: Fixed at 1 API call per second (shared across all tasks)
 - All three tasks run in parallel during each processing cycle
 
 ## Security
