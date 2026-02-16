@@ -6,211 +6,321 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/icco/etu-backend/proto";
 
-// ImageUpload message for uploading images (client -> server)
+// etu defines the public gRPC API for ETU notes, auth, tags, and settings.
+//
+// Comments in this file are written for generated client documentation. They
+// describe behavior, constraints, and semantics rather than restating names.
+
+// ImageUpload contains raw image bytes provided by the client for upload.
 message ImageUpload {
+  // data is the raw binary payload of the image file.
   bytes data = 1;
+  // mime_type is the image media type, for example "image/jpeg".
   string mime_type = 2;
 }
 
-// AudioUpload message for uploading audio files (client -> server)
+// AudioUpload contains raw audio bytes provided by the client for upload.
 message AudioUpload {
+  // data is the raw binary payload of the audio file.
   bytes data = 1;
+  // mime_type is the audio media type, for example "audio/mpeg".
   string mime_type = 2;
 }
 
-// NoteImage message for images attached to notes (server -> client)
+// NoteImage represents an image attachment associated with a note.
 message NoteImage {
+  // id is the unique identifier of the note image.
   string id = 1;
+  // url is the publicly accessible URL for the stored image object.
   string url = 2;
+  // extracted_text contains OCR output for the image when available.
   string extracted_text = 3;
+  // mime_type is the media type of the stored image.
   string mime_type = 4;
+  // created_at is when the image attachment was created.
   google.protobuf.Timestamp created_at = 5;
 }
 
-// NoteAudio message for audio files attached to notes (server -> client)
+// NoteAudio represents an audio attachment associated with a note.
 message NoteAudio {
+  // id is the unique identifier of the note audio attachment.
   string id = 1;
+  // url is the publicly accessible URL for the stored audio object.
   string url = 2;
+  // transcribed_text contains transcription output when available.
   string transcribed_text = 3;
+  // mime_type is the media type of the stored audio.
   string mime_type = 4;
+  // created_at is when the audio attachment was created.
   google.protobuf.Timestamp created_at = 5;
 }
 
-// Note message
+// Note represents a user-authored note and its associated metadata.
 message Note {
+  // id is the unique identifier of the note.
   string id = 1;
+  // content is the note body text.
   string content = 2;
+  // tags lists normalized tag names associated with the note.
   repeated string tags = 3;
+  // created_at is when the note was created.
   google.protobuf.Timestamp created_at = 4;
+  // updated_at is when the note was last modified.
   google.protobuf.Timestamp updated_at = 5;
+  // images lists image attachments associated with the note.
   repeated NoteImage images = 6;
+  // audios lists audio attachments associated with the note.
   repeated NoteAudio audios = 7;
 }
 
-// Tag message
+// Tag represents a user tag and optional usage count in list responses.
 message Tag {
+  // id is the unique identifier of the tag.
   string id = 1;
+  // name is the normalized tag name.
   string name = 2;
+  // count is the number of notes currently using the tag.
   int32 count = 3;
+  // created_at is when the tag was created.
   google.protobuf.Timestamp created_at = 4;
 }
 
-// DisabledReason enum for account disable reasons
+// DisabledReason describes why an account was disabled.
 enum DisabledReason {
+  // UNSPECIFIED indicates no disable reason was provided.
   UNSPECIFIED = 0;
+  // TERMS_VIOLATION indicates the account was disabled for policy violations.
   TERMS_VIOLATION = 1;
+  // SECURITY_CONCERN indicates suspicious or unsafe account activity.
   SECURITY_CONCERN = 2;
+  // USER_REQUEST indicates the user requested account disablement.
   USER_REQUEST = 3;
+  // PAYMENT_ISSUE indicates account disablement due to billing problems.
   PAYMENT_ISSUE = 4;
+  // OTHER indicates a disable reason not covered by predefined values.
   OTHER = 5;
 }
 
-// User message
+// User represents account profile and subscription settings.
 message User {
+  // id is the unique identifier of the user.
   string id = 1;
+  // email is the user's primary login email.
   string email = 2;
+  // name is the user's display name when set.
   optional string name = 3;
+  // image is an optional avatar URL.
   optional string image = 4;
+  // subscription_status is the billing tier, such as "free" or "pro".
   string subscription_status = 5;
+  // subscription_end is when the current subscription period ends.
   optional google.protobuf.Timestamp subscription_end = 6;
+  // created_at is when the user account was created.
   google.protobuf.Timestamp created_at = 7;
+  // stripe_customer_id links the user to a Stripe customer record.
   optional string stripe_customer_id = 8;
+  // notion_key is an optional Notion API token for sync features.
   optional string notion_key = 9;
   reserved 10; // was username, use name instead
+  // updated_at is when the user record was last updated.
   google.protobuf.Timestamp updated_at = 11;
+  // disabled reports whether account access is currently disabled.
   bool disabled = 12;
+  // disabled_reason explains why the account is disabled when disabled is true.
   optional DisabledReason disabled_reason = 13;
+  // notion_database_name is the Notion database used for sync.
   optional string notion_database_name = 14;
 }
 
-// API Key message
+// ApiKey represents API key metadata returned to clients.
 message ApiKey {
+  // id is the unique identifier of the API key record.
   string id = 1;
+  // name is a client-defined label for the API key.
   string name = 2;
+  // key_prefix is the non-secret prefix used for lookup and display.
   string key_prefix = 3;
+  // created_at is when the API key was created.
   google.protobuf.Timestamp created_at = 4;
+  // last_used is when the API key was most recently used.
   optional google.protobuf.Timestamp last_used = 5;
 }
 
-// Request/Response messages for Notes
-
+// ListNotesRequest defines filters and pagination for listing notes.
+//
+// user_id is currently accepted for compatibility but is expected to match the
+// authenticated principal from server auth context.
 message ListNotesRequest {
-  string user_id = 1;      // Required for auth context
+  // user_id is the target user identifier.
+  string user_id = 1;
+  // search is free-text search input and may include tag: filters.
   string search = 2;
+  // tags are additional tag names to filter by.
   repeated string tags = 3;
-  string start_date = 4;   // ISO 8601 format
-  string end_date = 5;     // ISO 8601 format
+  // start_date is an inclusive lower bound timestamp in ISO 8601 format.
+  string start_date = 4;
+  // end_date is an inclusive upper bound timestamp in ISO 8601 format.
+  string end_date = 5;
+  // limit is the maximum number of results to return.
   int32 limit = 6;
+  // offset is the number of results to skip before returning rows.
   int32 offset = 7;
 }
 
+// ListNotesResponse returns a page of notes and paging metadata.
 message ListNotesResponse {
+  // notes is the requested page of notes.
   repeated Note notes = 1;
+  // total is the total result count across all pages.
   int32 total = 2;
+  // limit echoes the effective page size.
   int32 limit = 3;
+  // offset echoes the page offset.
   int32 offset = 4;
 }
 
+// CreateNoteRequest defines payload required to create a note.
 message CreateNoteRequest {
-  string user_id = 1;      // Required for auth context
+  // user_id is the target user identifier.
+  string user_id = 1;
+  // content is the note body text to store.
   string content = 2;
+  // tags are initial tag names to associate with the note.
   repeated string tags = 3;
+  // images are image files to attach during note creation.
   repeated ImageUpload images = 4;
+  // audios are audio files to attach during note creation.
   repeated AudioUpload audios = 5;
 }
 
+// CreateNoteResponse returns the created note.
 message CreateNoteResponse {
   Note note = 1;
 }
 
+// GetNoteRequest identifies a note to fetch by id.
 message GetNoteRequest {
-  string user_id = 1;      // Required for auth context
+  // user_id is the target user identifier.
+  string user_id = 1;
+  // id is the unique identifier of the note to fetch.
   string id = 2;
 }
 
+// GetNoteResponse returns the requested note when found.
 message GetNoteResponse {
   Note note = 1;
 }
 
+// UpdateNoteRequest defines partial note updates and attachment additions.
 message UpdateNoteRequest {
-  string user_id = 1;      // Required for auth context
+  // user_id is the target user identifier.
+  string user_id = 1;
+  // id is the unique identifier of the note to update.
   string id = 2;
+  // content updates the note body when provided.
   optional string content = 3;
+  // tags is the tag list used when update_tags is true.
   repeated string tags = 4;
-  bool update_tags = 5;    // Flag to indicate if tags should be updated
+  // update_tags controls whether existing tags are replaced from tags.
+  bool update_tags = 5;
+  // add_images appends new image attachments to the note.
   repeated ImageUpload add_images = 6;
+  // add_audios appends new audio attachments to the note.
   repeated AudioUpload add_audios = 7;
 }
 
+// UpdateNoteResponse returns the updated note.
 message UpdateNoteResponse {
   Note note = 1;
 }
 
+// DeleteNoteRequest identifies a note to delete.
 message DeleteNoteRequest {
-  string user_id = 1;      // Required for auth context
+  // user_id is the target user identifier.
+  string user_id = 1;
+  // id is the unique identifier of the note to delete.
   string id = 2;
 }
 
+// DeleteNoteResponse reports whether a note deletion occurred.
 message DeleteNoteResponse {
   bool success = 1;
 }
 
+// GetRandomNotesRequest requests a random sample of notes.
 message GetRandomNotesRequest {
-  string user_id = 1;      // Required for auth context
-  int32 count = 2;         // Number of random notes to return (default: 5)
+  // user_id is the target user identifier.
+  string user_id = 1;
+  // count is the number of random notes requested.
+  int32 count = 2;
 }
 
+// GetRandomNotesResponse returns a random sample of notes.
 message GetRandomNotesResponse {
   repeated Note notes = 1;
 }
 
-// Request/Response messages for Tags
-
+// ListTagsRequest requests all tags for a user.
 message ListTagsRequest {
-  string user_id = 1;      // Required for auth context
+  // user_id is the target user identifier.
+  string user_id = 1;
 }
 
+// ListTagsResponse returns all tags for a user.
 message ListTagsResponse {
   repeated Tag tags = 1;
 }
 
-// Auth request/response messages
-
+// RegisterRequest contains account registration credentials.
 message RegisterRequest {
+  // email is the unique email for the new account.
   string email = 1;
+  // password is the plaintext password supplied at registration.
   string password = 2;
 }
 
+// RegisterResponse returns the created user record.
 message RegisterResponse {
   User user = 1;
 }
 
+// AuthenticateRequest contains login credentials.
 message AuthenticateRequest {
+  // email is the account email used for authentication.
   string email = 1;
+  // password is the plaintext password supplied for verification.
   string password = 2;
 }
 
+// AuthenticateResponse reports authentication status and user context.
 message AuthenticateResponse {
+  // success indicates whether authentication succeeded.
   bool success = 1;
+  // user is set when authentication succeeds and user data is returned.
   optional User user = 2;
 }
 
+// GetUserRequest fetches a user by id.
 message GetUserRequest {
   string user_id = 1;
 }
 
+// GetUserResponse returns a user record.
 message GetUserResponse {
   User user = 1;
 }
 
+// GetUserByStripeCustomerIdRequest fetches a user by Stripe customer id.
 message GetUserByStripeCustomerIdRequest {
   string stripe_customer_id = 1;
 }
 
+// GetUserByStripeCustomerIdResponse returns the matching user when found.
 message GetUserByStripeCustomerIdResponse {
   optional User user = 1;
 }
 
+// UpdateUserSubscriptionRequest updates subscription billing fields.
 message UpdateUserSubscriptionRequest {
   string user_id = 1;
   string subscription_status = 2;
@@ -218,59 +328,68 @@ message UpdateUserSubscriptionRequest {
   optional google.protobuf.Timestamp subscription_end = 4;
 }
 
+// UpdateUserSubscriptionResponse returns the updated user record.
 message UpdateUserSubscriptionResponse {
   User user = 1;
 }
 
-// API Keys request/response messages
-
+// CreateApiKeyRequest creates a named API key for a user.
 message CreateApiKeyRequest {
   string user_id = 1;
   string name = 2;
 }
 
+// CreateApiKeyResponse returns key metadata and a one-time raw key value.
 message CreateApiKeyResponse {
   ApiKey api_key = 1;
+  // raw_key is only returned at creation time and should be stored securely.
   string raw_key = 2;
 }
 
+// ListApiKeysRequest requests API keys for a user.
 message ListApiKeysRequest {
   string user_id = 1;
 }
 
+// ListApiKeysResponse returns all API key metadata for a user.
 message ListApiKeysResponse {
   repeated ApiKey api_keys = 1;
 }
 
+// DeleteApiKeyRequest identifies an API key to revoke.
 message DeleteApiKeyRequest {
   string user_id = 1;
   string key_id = 2;
 }
 
+// DeleteApiKeyResponse reports whether an API key deletion occurred.
 message DeleteApiKeyResponse {
   bool success = 1;
 }
 
+// VerifyApiKeyRequest verifies a raw API key value.
 message VerifyApiKeyRequest {
   string raw_key = 1;
 }
 
+// VerifyApiKeyResponse reports verification status and associated user.
 message VerifyApiKeyResponse {
   bool valid = 1;
   optional string user_id = 2;
 }
 
-// UserSettings request/response messages
-
+// GetUserSettingsRequest fetches mutable user settings fields.
 message GetUserSettingsRequest {
   string user_id = 1;
 }
 
+// GetUserSettingsResponse returns settings on the User message.
 message GetUserSettingsResponse {
   reserved 1; // was settings (UserSettings), use user instead
   User user = 2;
 }
 
+// UpdateUserSettingsRequest updates profile and integration settings.
 message UpdateUserSettingsRequest {
   string user_id = 1;
   optional string notion_key = 2;
@@ -281,58 +400,86 @@ message UpdateUserSettingsRequest {
   optional string notion_database_name = 7;
 }
 
+// UpdateUserSettingsResponse returns the updated user settings view.
 message UpdateUserSettingsResponse {
   reserved 1; // was settings (UserSettings), use user instead
   User user = 2;
 }
 
-// Stats request/response messages
-
+// GetStatsRequest requests aggregate statistics.
 message GetStatsRequest {
-  string user_id = 1;  // If empty or omitted, returns stats for all users
+  // user_id scopes stats to a single user when provided.
+  string user_id = 1;
 }
 
+// GetStatsResponse contains aggregate note and tag metrics.
 message GetStatsResponse {
-  int64 total_blips = 1;      // Total number of notes (blips)
-  int64 unique_tags = 2;      // Number of unique tags
-  int64 words_written = 3;    // Total word count across all notes
+  // total_blips is the total number of notes.
+  int64 total_blips = 1;
+  // unique_tags is the number of distinct tags.
+  int64 unique_tags = 2;
+  // words_written is the total word count across matching notes.
+  int64 words_written = 3;
 }
 
-// Service definitions
-
+// NotesService manages note CRUD, attachment uploads, and note queries.
 service NotesService {
+  // ListNotes returns notes matching filters and pagination options.
   rpc ListNotes(ListNotesRequest) returns (ListNotesResponse);
+  // CreateNote creates a new note with optional tags and attachments.
   rpc CreateNote(CreateNoteRequest) returns (CreateNoteResponse);
+  // GetNote returns one note by id.
   rpc GetNote(GetNoteRequest) returns (GetNoteResponse);
+  // UpdateNote updates note content, tags, and adds attachments.
   rpc UpdateNote(UpdateNoteRequest) returns (UpdateNoteResponse);
+  // DeleteNote deletes one note by id.
   rpc DeleteNote(DeleteNoteRequest) returns (DeleteNoteResponse);
+  // GetRandomNotes returns a random sample of notes.
   rpc GetRandomNotes(GetRandomNotesRequest) returns (GetRandomNotesResponse);
 }
 
+// TagsService provides tag listing for notes.
 service TagsService {
+  // ListTags returns all tags for a user.
   rpc ListTags(ListTagsRequest) returns (ListTagsResponse);
 }
 
+// AuthService manages user auth, identity lookups, and subscription updates.
 service AuthService {
+  // Register creates a new user account.
   rpc Register(RegisterRequest) returns (RegisterResponse);
+  // Authenticate validates credentials and returns user context.
   rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+  // GetUser fetches a user by id.
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  // GetUserByStripeCustomerId fetches a user by Stripe customer id.
   rpc GetUserByStripeCustomerId(GetUserByStripeCustomerIdRequest) returns (GetUserByStripeCustomerIdResponse);
+  // UpdateUserSubscription updates billing-related subscription state.
   rpc UpdateUserSubscription(UpdateUserSubscriptionRequest) returns (UpdateUserSubscriptionResponse);
 }
 
+// ApiKeysService manages API key lifecycle and verification.
 service ApiKeysService {
+  // CreateApiKey creates a new API key.
   rpc CreateApiKey(CreateApiKeyRequest) returns (CreateApiKeyResponse);
+  // ListApiKeys lists API keys for a user.
   rpc ListApiKeys(ListApiKeysRequest) returns (ListApiKeysResponse);
+  // DeleteApiKey revokes an API key.
   rpc DeleteApiKey(DeleteApiKeyRequest) returns (DeleteApiKeyResponse);
+  // VerifyApiKey validates an API key and resolves its user.
   rpc VerifyApiKey(VerifyApiKeyRequest) returns (VerifyApiKeyResponse);
 }
 
+// UserSettingsService reads and updates profile and integration settings.
 service UserSettingsService {
+  // GetUserSettings returns settings represented in the User message.
   rpc GetUserSettings(GetUserSettingsRequest) returns (GetUserSettingsResponse);
+  // UpdateUserSettings updates mutable user settings fields.
   rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (UpdateUserSettingsResponse);
 }
 
+// StatsService provides aggregate usage metrics.
 service StatsService {
+  // GetStats returns aggregate note, tag, and word-count statistics.
   rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
 }
