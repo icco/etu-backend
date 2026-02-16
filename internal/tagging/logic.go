@@ -7,6 +7,7 @@ import (
 
 var hashtagRegex = regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9]*)`)
 
+// BuildExistingTagContext normalizes tag names and returns both a set and an ordered list.
 func BuildExistingTagContext(tags []string) (map[string]bool, []string) {
 	existingTagNames := make(map[string]bool, len(tags))
 	existingTagList := make([]string, 0, len(tags))
@@ -21,6 +22,7 @@ func BuildExistingTagContext(tags []string) (map[string]bool, []string) {
 	return existingTagNames, existingTagList
 }
 
+// BuildExistingTagSet normalizes tag names and returns them as a deduplicated set.
 func BuildExistingTagSet(tags []string) map[string]bool {
 	existing := make(map[string]bool, len(tags))
 	for _, tag := range tags {
@@ -52,6 +54,7 @@ func ExtractHashtags(content string) []string {
 	return tags
 }
 
+// SelectHashtagsToAdd returns new hashtags from content up to maxNewTags.
 func SelectHashtagsToAdd(content string, existingNoteTagNames map[string]bool, maxNewTags int) []string {
 	if maxNewTags <= 0 {
 		return nil
@@ -72,6 +75,7 @@ func SelectHashtagsToAdd(content string, existingNoteTagNames map[string]bool, m
 	return tagsToAdd
 }
 
+// SelectGeneratedTags prioritizes existing tags and returns up to maxNewTags new tags.
 func SelectGeneratedTags(generatedTags []string, existingNoteTagNames map[string]bool, existingTagNames map[string]bool, maxNewTags int) []string {
 	if maxNewTags <= 0 {
 		return nil
