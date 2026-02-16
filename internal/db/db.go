@@ -144,13 +144,13 @@ func (db *DB) ListNotes(ctx context.Context, userID, search string, tags []strin
 
 	// Parse tag: syntax from search string
 	searchTags, remainingSearch := parseTagSearch(search)
-	allTags := append(tags, searchTags...)
+	allTags := normalizeTagNames(append(tags, searchTags...))
 
 	// Tag filtering
 	if len(allTags) > 0 {
 		query = query.Joins(`JOIN "NoteTag" ON "Note".id = "NoteTag"."noteId"`).
 			Joins(`JOIN "Tag" ON "NoteTag"."tagId" = "Tag".id`).
-			Where(`"Tag".name IN ?`, allTags).
+			Where(`LOWER("Tag".name) IN ?`, allTags).
 			Distinct()
 	}
 
@@ -334,12 +334,13 @@ func (db *DB) CreateNote(ctx context.Context, userID, content string, tagNames [
 
 		// Create tags and link them
 		for _, tagName := range tagNames {
+			tagName = strings.ToLower(strings.TrimSpace(tagName))
 			if tagName == "" {
 				continue
 			}
 
 			var tag models.Tag
-			result := tx.Where(`"userId" = ? AND name = ?`, userID, tagName).First(&tag)
+			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
 			if result.Error == gorm.ErrRecordNotFound {
 				tag = models.Tag{
 					ID:        models.GenerateCUID(),
@@ -417,12 +418,13 @@ func (db *DB) UpdateNote(ctx context.Context, userID, noteID string, content *st
 
 			// Add new tags
 			for _, tagName := range tagNames {
+				tagName = strings.ToLower(strings.TrimSpace(tagName))
 				if tagName == "" {
 					continue
 				}
 
 				var tag models.Tag
-				result := tx.Where(`"userId" = ? AND name = ?`, userID, tagName).First(&tag)
+				result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
 				if result.Error == gorm.ErrRecordNotFound {
 					tag = models.Tag{
 						ID:        models.GenerateCUID(),
@@ -952,13 +954,14 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 
 		// Add new tags
 		for _, tagName := range tagNames {
+			tagName = strings.ToLower(strings.TrimSpace(tagName))
 			if tagName == "" {
 				continue
 			}
 
 			// Find or create the tag
 			var tag models.Tag
-			result := tx.Where(`"userId" = ? AND name = ?`, userID, tagName).First(&tag)
+			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
 			if result.Error == gorm.ErrRecordNotFound {
 				tag = models.Tag{
 					ID:        models.GenerateCUID(),
@@ -1173,6 +1176,22 @@ func parseTagSearch(search string) (tags []string, remaining string) {
 	remaining = regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " ")
 
 	return tags, remaining
+}
+
+func normalizeTagNames(tagNames []string) []string {
+	if len(tagNames) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, 0, len(tagNames))
+	for _, tagName := range tagNames {
+		tagName = strings.ToLower(strings.TrimSpace(tagName))
+		if tagName == "" {
+			continue
+		}
+		normalized = append(normalized, tagName)
+	}
+	return normalized
 }
 
 // GetStats retrieves statistics for a user or all users

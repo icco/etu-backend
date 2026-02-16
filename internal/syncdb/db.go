@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/icco/etu-backend/internal/crypto"
@@ -176,12 +177,13 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 
 		// Create/find tags and associate them
 		for _, tagName := range tagNames {
+			tagName = strings.ToLower(strings.TrimSpace(tagName))
 			if tagName == "" {
 				continue
 			}
 
 			var tag Tag
-			result := tx.Where(`"userId" = ? AND name = ?`, userID, tagName).First(&tag)
+			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
 			if result.Error == gorm.ErrRecordNotFound {
 				// Create new tag
 				tag = Tag{

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/storage"
+	"github.com/icco/etu-backend/internal/tagging"
 	"golang.org/x/time/rate"
 )
 
@@ -385,14 +385,11 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 		return nil, err
 	}
 
-	// Create a map of existing tag names (lowercase) for easy lookup
-	existingTagNames := make(map[string]bool)
-	existingTagList := make([]string, 0, len(existingTags))
+	existingTagValues := make([]string, 0, len(existingTags))
 	for _, tag := range existingTags {
-		lowerName := strings.ToLower(tag.Name)
-		existingTagNames[lowerName] = true
-		existingTagList = append(existingTagList, lowerName)
+		existingTagValues = append(existingTagValues, tag.Name)
 	}
+	existingTagNames, existingTagList := tagging.BuildExistingTagContext(existingTagValues)
 
 	// Fetch notes with less than 3 tags
 	notes, err := database.GetNotesWithFewTags(ctx, userID, 3)
@@ -416,6 +413,36 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 			continue
 		}
 
+		existingNoteTagValues := make([]string, 0, len(note.Tags))
+		for _, tag := range note.Tags {
+			existingNoteTagValues = append(existingNoteTagValues, tag.Name)
+		}
+		existingNoteTagNames := tagging.BuildExistingTagSet(existingNoteTagValues)
+
+		// Extract hashtags from note content and add them first
+		hashtagsToAdd := tagging.SelectHashtagsToAdd(note.Content, existingNoteTagNames, maxNewTags)
+
+		if len(hashtagsToAdd) > 0 {
+			log.Info("adding hashtags to note",
+				"note_id", note.ID,
+				"hashtags", hashtagsToAdd,
+				"dry_run", dryRun)
+
+			if !dryRun {
+				if err := database.AddTagsToNote(ctx, userID, note.ID, hashtagsToAdd); err != nil {
+					log.Error("failed to add hashtags to note", "note_id", note.ID, "error", err)
+					result.Errors++
+					continue
+				}
+			}
+			result.TagsAdded += len(hashtagsToAdd)
+			maxNewTags -= len(hashtagsToAdd)
+		}
+
+		if maxNewTags <= 0 {
+			continue
+		}
+
 		// Wait for rate limiter before making API call
 		if limiter != nil {
 			if err := limiter.Wait(ctx); err != nil {
@@ -432,38 +459,7 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 			continue
 		}
 
-		// Filter out tags that already exist on this note
-		var newTags []string
-		existingNoteTagNames := make(map[string]bool)
-		for _, tag := range note.Tags {
-			existingNoteTagNames[strings.ToLower(tag.Name)] = true
-		}
-
-		// Prefer existing tags over new ones
-		var preferredTags []string
-		var otherTags []string
-
-		for _, tag := range generatedTags {
-			tag = strings.ToLower(tag)
-			if existingNoteTagNames[tag] {
-				// Skip tags already on this note
-				continue
-			}
-			if existingTagNames[tag] {
-				preferredTags = append(preferredTags, tag)
-			} else {
-				otherTags = append(otherTags, tag)
-			}
-		}
-
-		// Add preferred tags first, then other tags
-		newTags = append(newTags, preferredTags...)
-		newTags = append(newTags, otherTags...)
-
-		// Limit to maxNewTags
-		if len(newTags) > maxNewTags {
-			newTags = newTags[:maxNewTags]
-		}
+		newTags := tagging.SelectGeneratedTags(generatedTags, existingNoteTagNames, existingTagNames, maxNewTags)
 
 		if len(newTags) == 0 {
 			continue
