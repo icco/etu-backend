@@ -1,19 +1,17 @@
-package main
+package tagging
 
 import (
 	"regexp"
 	"strings"
-
-	"github.com/icco/etu-backend/internal/db"
 )
 
 var hashtagRegex = regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9]*)`)
 
-func buildExistingTagContext(tags []db.Tag) (map[string]bool, []string) {
+func BuildExistingTagContext(tags []string) (map[string]bool, []string) {
 	existingTagNames := make(map[string]bool, len(tags))
 	existingTagList := make([]string, 0, len(tags))
 	for _, tag := range tags {
-		lowerName := strings.ToLower(strings.TrimSpace(tag.Name))
+		lowerName := strings.ToLower(strings.TrimSpace(tag))
 		if lowerName == "" || existingTagNames[lowerName] {
 			continue
 		}
@@ -23,10 +21,10 @@ func buildExistingTagContext(tags []db.Tag) (map[string]bool, []string) {
 	return existingTagNames, existingTagList
 }
 
-func buildExistingNoteTagSet(tags []db.Tag) map[string]bool {
+func BuildExistingTagSet(tags []string) map[string]bool {
 	existing := make(map[string]bool, len(tags))
 	for _, tag := range tags {
-		name := strings.ToLower(strings.TrimSpace(tag.Name))
+		name := strings.ToLower(strings.TrimSpace(tag))
 		if name == "" {
 			continue
 		}
@@ -35,8 +33,8 @@ func buildExistingNoteTagSet(tags []db.Tag) map[string]bool {
 	return existing
 }
 
-// extractHashtags extracts hashtags from note content and returns them as lowercase tag names.
-func extractHashtags(content string) []string {
+// ExtractHashtags extracts hashtags from note content and returns them as lowercase tag names.
+func ExtractHashtags(content string) []string {
 	matches := hashtagRegex.FindAllStringSubmatch(content, -1)
 	seen := make(map[string]bool)
 	tags := make([]string, 0, len(matches))
@@ -54,12 +52,12 @@ func extractHashtags(content string) []string {
 	return tags
 }
 
-func selectHashtagsToAdd(content string, existingNoteTagNames map[string]bool, maxNewTags int) []string {
+func SelectHashtagsToAdd(content string, existingNoteTagNames map[string]bool, maxNewTags int) []string {
 	if maxNewTags <= 0 {
 		return nil
 	}
 
-	hashtags := extractHashtags(content)
+	hashtags := ExtractHashtags(content)
 	tagsToAdd := make([]string, 0, len(hashtags))
 	for _, ht := range hashtags {
 		if existingNoteTagNames[ht] {
@@ -74,7 +72,7 @@ func selectHashtagsToAdd(content string, existingNoteTagNames map[string]bool, m
 	return tagsToAdd
 }
 
-func selectGeneratedTags(generatedTags []string, existingNoteTagNames map[string]bool, existingTagNames map[string]bool, maxNewTags int) []string {
+func SelectGeneratedTags(generatedTags []string, existingNoteTagNames map[string]bool, existingTagNames map[string]bool, maxNewTags int) []string {
 	if maxNewTags <= 0 {
 		return nil
 	}

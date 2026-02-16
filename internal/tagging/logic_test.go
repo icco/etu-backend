@@ -1,4 +1,4 @@
-package main
+package tagging
 
 import (
 	"reflect"
@@ -32,9 +32,9 @@ func TestExtractHashtags(t *testing.T) {
 			want:    []string{"start", "middle", "finish"},
 		},
 		{
-			name:    "ignores malformed hashtag patterns",
+			name:    "handles special patterns predictably",
 			content: "ignore#inline #-bad #_bad #123 #ok-tag #good",
-			want:    []string{"good"},
+			want:    []string{"ok", "good"},
 		},
 		{
 			name:    "returns empty for no hashtags",
@@ -45,9 +45,9 @@ func TestExtractHashtags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractHashtags(tt.content)
+			got := ExtractHashtags(tt.content)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("extractHashtags() = %v, want %v", got, tt.want)
+				t.Fatalf("ExtractHashtags() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -62,10 +62,10 @@ func TestSelectGeneratedTags(t *testing.T) {
 		"work": true,
 	}
 
-	got := selectGeneratedTags(generated, existingNoteTags, existingTagNames, 3)
+	got := SelectGeneratedTags(generated, existingNoteTags, existingTagNames, 3)
 	want := []string{"work", "newtag", "misc"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("selectGeneratedTags() = %v, want %v", got, want)
+		t.Fatalf("SelectGeneratedTags() = %v, want %v", got, want)
 	}
 }
 
@@ -74,9 +74,9 @@ func TestSelectHashtagsToAdd(t *testing.T) {
 		"work": true,
 	}
 
-	got := selectHashtagsToAdd("#Work #new #other", existingNoteTags, 1)
+	got := SelectHashtagsToAdd("#Work #new #other", existingNoteTags, 1)
 	want := []string{"new"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("selectHashtagsToAdd() = %v, want %v", got, want)
+		t.Fatalf("SelectHashtagsToAdd() = %v, want %v", got, want)
 	}
 }

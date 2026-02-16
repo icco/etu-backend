@@ -14,6 +14,7 @@ import (
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/storage"
+	"github.com/icco/etu-backend/internal/tagging"
 	"golang.org/x/time/rate"
 )
 
@@ -384,7 +385,11 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 		return nil, err
 	}
 
-	existingTagNames, existingTagList := buildExistingTagContext(existingTags)
+	existingTagValues := make([]string, 0, len(existingTags))
+	for _, tag := range existingTags {
+		existingTagValues = append(existingTagValues, tag.Name)
+	}
+	existingTagNames, existingTagList := tagging.BuildExistingTagContext(existingTagValues)
 
 	// Fetch notes with less than 3 tags
 	notes, err := database.GetNotesWithFewTags(ctx, userID, 3)
@@ -408,10 +413,14 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 			continue
 		}
 
-		existingNoteTagNames := buildExistingNoteTagSet(note.Tags)
+		existingNoteTagValues := make([]string, 0, len(note.Tags))
+		for _, tag := range note.Tags {
+			existingNoteTagValues = append(existingNoteTagValues, tag.Name)
+		}
+		existingNoteTagNames := tagging.BuildExistingTagSet(existingNoteTagValues)
 
 		// Extract hashtags from note content and add them first
-		hashtagsToAdd := selectHashtagsToAdd(note.Content, existingNoteTagNames, maxNewTags)
+		hashtagsToAdd := tagging.SelectHashtagsToAdd(note.Content, existingNoteTagNames, maxNewTags)
 
 		if len(hashtagsToAdd) > 0 {
 			log.Info("adding hashtags to note",
@@ -450,7 +459,7 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 			continue
 		}
 
-		newTags := selectGeneratedTags(generatedTags, existingNoteTagNames, existingTagNames, maxNewTags)
+		newTags := tagging.SelectGeneratedTags(generatedTags, existingNoteTagNames, existingTagNames, maxNewTags)
 
 		if len(newTags) == 0 {
 			continue
