@@ -144,7 +144,7 @@ func (db *DB) ListNotes(ctx context.Context, userID, search string, tags []strin
 
 	// Parse tag: syntax from search string
 	searchTags, remainingSearch := parseTagSearch(search)
-	allTags := append(tags, searchTags...)
+	allTags := normalizeTagNames(append(tags, searchTags...))
 
 	// Tag filtering
 	if len(allTags) > 0 {
@@ -1176,6 +1176,22 @@ func parseTagSearch(search string) (tags []string, remaining string) {
 	remaining = regexp.MustCompile(`\s+`).ReplaceAllString(remaining, " ")
 
 	return tags, remaining
+}
+
+func normalizeTagNames(tagNames []string) []string {
+	if len(tagNames) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, 0, len(tagNames))
+	for _, tagName := range tagNames {
+		tagName = strings.ToLower(strings.TrimSpace(tagName))
+		if tagName == "" {
+			continue
+		}
+		normalized = append(normalized, tagName)
+	}
+	return normalized
 }
 
 // GetStats retrieves statistics for a user or all users

@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"regexp"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -386,14 +384,7 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 		return nil, err
 	}
 
-	// Create a map of existing tag names (lowercase) for easy lookup
-	existingTagNames := make(map[string]bool)
-	existingTagList := make([]string, 0, len(existingTags))
-	for _, tag := range existingTags {
-		lowerName := strings.ToLower(tag.Name)
-		existingTagNames[lowerName] = true
-		existingTagList = append(existingTagList, lowerName)
-	}
+	existingTagNames, existingTagList := buildExistingTagContext(existingTags)
 
 	// Fetch notes with less than 3 tags
 	notes, err := database.GetNotesWithFewTags(ctx, userID, 3)
@@ -417,23 +408,10 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 			continue
 		}
 
-		existingNoteTagNames := make(map[string]bool)
-		for _, tag := range note.Tags {
-			existingNoteTagNames[strings.ToLower(tag.Name)] = true
-		}
+		existingNoteTagNames := buildExistingNoteTagSet(note.Tags)
 
 		// Extract hashtags from note content and add them first
-		hashtags := extractHashtags(note.Content)
-		var hashtagsToAdd []string
-		for _, ht := range hashtags {
-			if !existingNoteTagNames[ht] {
-				hashtagsToAdd = append(hashtagsToAdd, ht)
-				existingNoteTagNames[ht] = true
-			}
-		}
-		if len(hashtagsToAdd) > maxNewTags {
-			hashtagsToAdd = hashtagsToAdd[:maxNewTags]
-		}
+		hashtagsToAdd := selectHashtagsToAdd(note.Content, existingNoteTagNames, maxNewTags)
 
 		if len(hashtagsToAdd) > 0 {
 			log.Info("adding hashtags to note",
@@ -472,34 +450,7 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 			continue
 		}
 
-		// Filter out tags that already exist on this note
-		var newTags []string
-
-		// Prefer existing tags over new ones
-		var preferredTags []string
-		var otherTags []string
-
-		for _, tag := range generatedTags {
-			tag = strings.ToLower(tag)
-			if existingNoteTagNames[tag] {
-				// Skip tags already on this note
-				continue
-			}
-			if existingTagNames[tag] {
-				preferredTags = append(preferredTags, tag)
-			} else {
-				otherTags = append(otherTags, tag)
-			}
-		}
-
-		// Add preferred tags first, then other tags
-		newTags = append(newTags, preferredTags...)
-		newTags = append(newTags, otherTags...)
-
-		// Limit to maxNewTags
-		if len(newTags) > maxNewTags {
-			newTags = newTags[:maxNewTags]
-		}
+		newTags := selectGeneratedTags(generatedTags, existingNoteTagNames, existingTagNames, maxNewTags)
 
 		if len(newTags) == 0 {
 			continue
@@ -524,23 +475,4 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 	}
 
 	return result, nil
-}
-
-var hashtagRegex = regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9]*)`)
-
-// extractHashtags extracts hashtags from note content and returns them as lowercase tag names.
-func extractHashtags(content string) []string {
-	matches := hashtagRegex.FindAllStringSubmatch(content, -1)
-	seen := make(map[string]bool)
-	var tags []string
-	for _, match := range matches {
-		if len(match) > 1 {
-			tag := strings.ToLower(match[1])
-			if !seen[tag] {
-				seen[tag] = true
-				tags = append(tags, tag)
-			}
-		}
-	}
-	return tags
 }

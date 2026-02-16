@@ -1,6 +1,7 @@
 package db
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -141,6 +142,39 @@ func TestCountWords(t *testing.T) {
 			got := countWords(tt.input)
 			if got != tt.want {
 				t.Errorf("countWords(%q) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeTagNames(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{
+			name: "lowercases and trims values",
+			in:   []string{" Work ", "PERSONAL"},
+			want: []string{"work", "personal"},
+		},
+		{
+			name: "drops empty tags after normalization",
+			in:   []string{"", "   ", "\n", "valid"},
+			want: []string{"valid"},
+		},
+		{
+			name: "returns nil for empty input",
+			in:   []string{},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeTagNames(tt.in)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("normalizeTagNames() = %v, want %v", got, tt.want)
 			}
 		})
 	}
