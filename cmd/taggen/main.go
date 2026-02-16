@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"sync"
 	"syscall"
@@ -416,6 +417,45 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 			continue
 		}
 
+		existingNoteTagNames := make(map[string]bool)
+		for _, tag := range note.Tags {
+			existingNoteTagNames[strings.ToLower(tag.Name)] = true
+		}
+
+		// Extract hashtags from note content and add them first
+		hashtags := extractHashtags(note.Content)
+		var hashtagsToAdd []string
+		for _, ht := range hashtags {
+			if !existingNoteTagNames[ht] {
+				hashtagsToAdd = append(hashtagsToAdd, ht)
+				existingNoteTagNames[ht] = true
+			}
+		}
+		if len(hashtagsToAdd) > maxNewTags {
+			hashtagsToAdd = hashtagsToAdd[:maxNewTags]
+		}
+
+		if len(hashtagsToAdd) > 0 {
+			log.Info("adding hashtags to note",
+				"note_id", note.ID,
+				"hashtags", hashtagsToAdd,
+				"dry_run", dryRun)
+
+			if !dryRun {
+				if err := database.AddTagsToNote(ctx, userID, note.ID, hashtagsToAdd); err != nil {
+					log.Error("failed to add hashtags to note", "note_id", note.ID, "error", err)
+					result.Errors++
+					continue
+				}
+			}
+			result.TagsAdded += len(hashtagsToAdd)
+			maxNewTags -= len(hashtagsToAdd)
+		}
+
+		if maxNewTags <= 0 {
+			continue
+		}
+
 		// Wait for rate limiter before making API call
 		if limiter != nil {
 			if err := limiter.Wait(ctx); err != nil {
@@ -434,10 +474,6 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 
 		// Filter out tags that already exist on this note
 		var newTags []string
-		existingNoteTagNames := make(map[string]bool)
-		for _, tag := range note.Tags {
-			existingNoteTagNames[strings.ToLower(tag.Name)] = true
-		}
 
 		// Prefer existing tags over new ones
 		var preferredTags []string
@@ -488,4 +524,23 @@ func generateTagsForUser(ctx context.Context, log *slog.Logger, database *db.DB,
 	}
 
 	return result, nil
+}
+
+var hashtagRegex = regexp.MustCompile(`(?:^|\s)#([a-zA-Z][a-zA-Z0-9]*)`)
+
+// extractHashtags extracts hashtags from note content and returns them as lowercase tag names.
+func extractHashtags(content string) []string {
+	matches := hashtagRegex.FindAllStringSubmatch(content, -1)
+	seen := make(map[string]bool)
+	var tags []string
+	for _, match := range matches {
+		if len(match) > 1 {
+			tag := strings.ToLower(match[1])
+			if !seen[tag] {
+				seen[tag] = true
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
 }
