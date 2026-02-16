@@ -65,7 +65,7 @@ type Tag struct {
 	Name      string    `gorm:"column:name"`
 	CreatedAt time.Time `gorm:"column:createdAt"`
 	UserID    string    `gorm:"column:userId;index"`
-	Count     int       `gorm:"-"` // Computed field, not stored in DB
+	Count     int       `gorm:"->"` // Computed field, read-only (not stored in DB but scannable from queries)
 }
 
 // TableName specifies the table name for Tag

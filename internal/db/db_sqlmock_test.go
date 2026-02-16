@@ -254,8 +254,14 @@ func TestListTags_SQL(t *testing.T) {
 	if tags[0].Name != "work" {
 		t.Errorf("tags[0].Name = %q, want work", tags[0].Name)
 	}
+	if tags[0].Count != 3 {
+		t.Errorf("tags[0].Count = %d, want 3", tags[0].Count)
+	}
 	if tags[1].Name != "personal" {
 		t.Errorf("tags[1].Name = %q, want personal", tags[1].Name)
+	}
+	if tags[1].Count != 1 {
+		t.Errorf("tags[1].Count = %d, want 1", tags[1].Count)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
