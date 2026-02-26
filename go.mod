@@ -11,7 +11,7 @@ require (
 	github.com/lib/pq v1.11.2
 	golang.org/x/crypto v0.48.0
 	golang.org/x/time v0.14.0
-	google.golang.org/genai v1.46.0
+	google.golang.org/genai v1.48.0
 	google.golang.org/grpc v1.79.1
 	google.golang.org/protobuf v1.36.11
 	gorm.io/driver/postgres v1.6.0
