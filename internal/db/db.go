@@ -1023,7 +1023,7 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 }
 
 // UpdateUserSettings updates or creates user settings
-func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name, image, password, notionDatabaseName *string) (*User, error) {
+func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name, image, password, notionDatabaseName, profileImageGCSObject *string) (*User, error) {
 	now := time.Now()
 
 	var user User
@@ -1059,6 +1059,9 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	}
 	if notionDatabaseName != nil {
 		updates["notionDatabaseName"] = *notionDatabaseName
+	}
+	if profileImageGCSObject != nil {
+		updates["profileImageGCSObject"] = *profileImageGCSObject
 	}
 
 	if err := db.conn.WithContext(ctx).Model(&user).Updates(updates).Error; err != nil {

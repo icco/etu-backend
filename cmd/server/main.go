@@ -131,7 +131,7 @@ func main() {
 	tagsService := service.NewTagsService(database)
 	authService := service.NewAuthService(database)
 	apiKeysService := service.NewApiKeysService(database)
-	userSettingsService := service.NewUserSettingsService(database)
+	userSettingsService := service.NewUserSettingsService(database, storageClient, imgixDomain)
 	statsService := service.NewStatsService(database)
 
 	pb.RegisterNotesServiceServer(server, notesService)

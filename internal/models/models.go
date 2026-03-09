@@ -95,9 +95,10 @@ type User struct {
 	SubscriptionEnd    *time.Time `gorm:"column:subscriptionEnd"`
 	CreatedAt          time.Time  `gorm:"column:createdAt"`
 	StripeCustomerID   *string    `gorm:"column:stripeCustomerId"`
-	NotionKey          *string    `gorm:"column:notionKey"`          // Notion API key for syncing (encrypted at rest using AES-256-GCM)
-	NotionDatabaseName *string    `gorm:"column:notionDatabaseName"` // Notion database name to sync (defaults to "Journal")
-	UpdatedAt          time.Time  `gorm:"column:updatedAt"`
+	NotionKey              *string    `gorm:"column:notionKey"`              // Notion API key for syncing (encrypted at rest using AES-256-GCM)
+	NotionDatabaseName     *string    `gorm:"column:notionDatabaseName"`     // Notion database name to sync (defaults to "Journal")
+	ProfileImageGCSObject  *string    `gorm:"column:profileImageGCSObject"`  // GCS object name for uploaded profile image
+	UpdatedAt              time.Time  `gorm:"column:updatedAt"`
 
 	// Account lockout fields
 	Disabled            bool       `gorm:"column:disabled;default:false"`
