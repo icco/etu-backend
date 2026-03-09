@@ -395,9 +395,11 @@ message UpdateUserSettingsRequest {
   optional string notion_key = 2;
   reserved 3; // was username, use name instead
   optional string name = 4;
-  optional string image = 5;
+  reserved 5; // was image (URL-based), use profile_image_upload instead
   optional string password = 6;
   optional string notion_database_name = 7;
+  optional ImageUpload profile_image_upload = 8;
+  optional bool clear_profile_image = 9;
 }
 
 // UpdateUserSettingsResponse returns the updated user settings view.

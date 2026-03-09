@@ -823,6 +823,7 @@ func TestCreateUser_SQL(t *testing.T) {
 			sqlmock.AnyArg(), "new@example.com", sqlmock.AnyArg(), sqlmock.AnyArg(), "hashed", "free",
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
 		).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -1234,7 +1235,7 @@ func TestUpdateUserSettings_SQL(t *testing.T) {
 			AddRow(userID, "u@ex.com", &name, nil, "hash", "free", nil, now, nil, nil, nil, now))
 
 	ctx := context.Background()
-	user, err := db.UpdateUserSettings(ctx, userID, nil, &name, nil, nil, nil)
+	user, err := db.UpdateUserSettings(ctx, userID, nil, &name, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("UpdateUserSettings: %v", err)
 	}
