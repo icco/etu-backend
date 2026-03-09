@@ -93,10 +93,9 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 
 		image = &url
 		profileImageGCSObject = &objectName
-	} else if req.Image != nil {
-		image = req.Image
-		// Clear GCS object if user is setting a URL directly
+	} else if req.ClearProfileImage != nil && *req.ClearProfileImage {
 		empty := ""
+		image = &empty
 		profileImageGCSObject = &empty
 	}
 

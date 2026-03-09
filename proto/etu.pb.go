@@ -2602,10 +2602,10 @@ type UpdateUserSettingsRequest struct {
 	UserId             string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	NotionKey          *string                `protobuf:"bytes,2,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
 	Name               *string                `protobuf:"bytes,4,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	Image              *string                `protobuf:"bytes,5,opt,name=image,proto3,oneof" json:"image,omitempty"`
 	Password           *string                `protobuf:"bytes,6,opt,name=password,proto3,oneof" json:"password,omitempty"`
 	NotionDatabaseName *string                `protobuf:"bytes,7,opt,name=notion_database_name,json=notionDatabaseName,proto3,oneof" json:"notion_database_name,omitempty"`
-	ProfileImageUpload *ImageUpload           `protobuf:"bytes,8,opt,name=profile_image_upload,json=profileImageUpload,proto3" json:"profile_image_upload,omitempty"`
+	ProfileImageUpload *ImageUpload           `protobuf:"bytes,8,opt,name=profile_image_upload,json=profileImageUpload,proto3,oneof" json:"profile_image_upload,omitempty"`
+	ClearProfileImage  *bool                  `protobuf:"varint,9,opt,name=clear_profile_image,json=clearProfileImage,proto3,oneof" json:"clear_profile_image,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -2661,13 +2661,6 @@ func (x *UpdateUserSettingsRequest) GetName() string {
 	return ""
 }
 
-func (x *UpdateUserSettingsRequest) GetImage() string {
-	if x != nil && x.Image != nil {
-		return *x.Image
-	}
-	return ""
-}
-
 func (x *UpdateUserSettingsRequest) GetPassword() string {
 	if x != nil && x.Password != nil {
 		return *x.Password
@@ -2687,6 +2680,13 @@ func (x *UpdateUserSettingsRequest) GetProfileImageUpload() *ImageUpload {
 		return x.ProfileImageUpload
 	}
 	return nil
+}
+
+func (x *UpdateUserSettingsRequest) GetClearProfileImage() bool {
+	if x != nil && x.ClearProfileImage != nil {
+		return *x.ClearProfileImage
+	}
+	return false
 }
 
 // UpdateUserSettingsResponse returns the updated user settings view.
@@ -3031,21 +3031,22 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x16GetUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\">\n" +
 	"\x17GetUserSettingsResponse\x12\x1d\n" +
-	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xf6\x02\n" +
+	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xc2\x03\n" +
 	"\x19UpdateUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
 	"\n" +
 	"notion_key\x18\x02 \x01(\tH\x00R\tnotionKey\x88\x01\x01\x12\x17\n" +
-	"\x04name\x18\x04 \x01(\tH\x01R\x04name\x88\x01\x01\x12\x19\n" +
-	"\x05image\x18\x05 \x01(\tH\x02R\x05image\x88\x01\x01\x12\x1f\n" +
-	"\bpassword\x18\x06 \x01(\tH\x03R\bpassword\x88\x01\x01\x125\n" +
-	"\x14notion_database_name\x18\a \x01(\tH\x04R\x12notionDatabaseName\x88\x01\x01\x12B\n" +
-	"\x14profile_image_upload\x18\b \x01(\v2\x10.etu.ImageUploadR\x12profileImageUploadB\r\n" +
+	"\x04name\x18\x04 \x01(\tH\x01R\x04name\x88\x01\x01\x12\x1f\n" +
+	"\bpassword\x18\x06 \x01(\tH\x02R\bpassword\x88\x01\x01\x125\n" +
+	"\x14notion_database_name\x18\a \x01(\tH\x03R\x12notionDatabaseName\x88\x01\x01\x12G\n" +
+	"\x14profile_image_upload\x18\b \x01(\v2\x10.etu.ImageUploadH\x04R\x12profileImageUpload\x88\x01\x01\x123\n" +
+	"\x13clear_profile_image\x18\t \x01(\bH\x05R\x11clearProfileImage\x88\x01\x01B\r\n" +
 	"\v_notion_keyB\a\n" +
-	"\x05_nameB\b\n" +
-	"\x06_imageB\v\n" +
+	"\x05_nameB\v\n" +
 	"\t_passwordB\x17\n" +
-	"\x15_notion_database_nameJ\x04\b\x03\x10\x04\"A\n" +
+	"\x15_notion_database_nameB\x17\n" +
+	"\x15_profile_image_uploadB\x16\n" +
+	"\x14_clear_profile_imageJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06\"A\n" +
 	"\x1aUpdateUserSettingsResponse\x12\x1d\n" +
 	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"*\n" +
 	"\x0fGetStatsRequest\x12\x17\n" +
