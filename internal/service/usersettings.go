@@ -84,18 +84,7 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 			return nil, status.Errorf(codes.InvalidArgument, "invalid profile image: %v", err)
 		}
 
-		// Delete old GCS object if exists
-		existingUser, err := s.db.GetUserSettings(ctx, req.UserId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
-		}
-		if existingUser != nil && existingUser.ProfileImageGCSObject != nil && *existingUser.ProfileImageGCSObject != "" {
-			if delErr := s.storage.DeleteImage(ctx, *existingUser.ProfileImageGCSObject); delErr != nil {
-				s.log.Warn("failed to delete old profile image", "error", delErr, "object", *existingUser.ProfileImageGCSObject)
-			}
-		}
-
-		// Upload new image
+		// Upload to fixed path — overwrites any existing object at this path
 		objectName := fmt.Sprintf("profiles/%s/avatar", req.UserId)
 		url, err := s.storage.UploadImage(ctx, objectName, req.ProfileImageUpload.Data, req.ProfileImageUpload.MimeType)
 		if err != nil {
