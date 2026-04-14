@@ -1,7 +1,9 @@
 FROM golang:1.26-bookworm AS builder
 
-RUN curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | bash
-RUN apt-get update && apt-get install -y task git && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install task via go install to avoid supply-chain risk from curl|bash.
+# The Go module proxy verifies the checksum of the downloaded module.
+RUN go install github.com/go-task/task/v3/cmd/task@latest
+RUN apt-get update && apt-get install -y git && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
