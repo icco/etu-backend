@@ -19,14 +19,20 @@ COPY . .
 
 # Build the binary
 RUN task build
+
 # Final image
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
+# Create a non-root user.
+RUN groupadd -r app && useradd -r -u 1001 -g app app
+
 WORKDIR /app
 
-COPY --from=builder /app/bin/ /app/bin/
+COPY --from=builder --chown=app:app /app/bin/ /app/bin/
+
+USER app
 
 EXPOSE 8080 50051
 
