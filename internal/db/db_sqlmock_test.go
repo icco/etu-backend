@@ -436,6 +436,7 @@ func TestCreateNote_SQL(t *testing.T) {
 	}
 	if note == nil {
 		t.Fatal("CreateNote returned nil note")
+		return
 	}
 	if note.Content != "hello" || note.UserID != userID {
 		t.Errorf("CreateNote: note = %+v", note)
@@ -838,6 +839,7 @@ func TestCreateUser_SQL(t *testing.T) {
 	}
 	if user == nil {
 		t.Fatal("CreateUser returned nil user")
+		return
 	}
 	if user.Email != "new@example.com" || user.PasswordHash != "hashed" || user.SubscriptionStatus != "free" {
 		t.Errorf("CreateUser: user = %+v", user)
