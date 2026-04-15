@@ -86,8 +86,12 @@ Return ONLY a JSON array of strings, nothing else. Example: ["tag1", "tag2", "ta
 	resp, err := client.Models.GenerateContent(ctx, "gemini-3-flash-preview", []*genai.Content{
 		genai.NewContentFromText(prompt, genai.RoleUser),
 	}, &genai.GenerateContentConfig{
-		Temperature:      genai.Ptr(float32(0.3)), // Lower temperature for more consistent results
+		Temperature:      genai.Ptr(float32(0.3)),
 		ResponseMIMEType: "application/json",
+		ResponseSchema: &genai.Schema{
+			Type:  genai.TypeArray,
+			Items: &genai.Schema{Type: genai.TypeString},
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tags: %w", err)
