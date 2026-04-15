@@ -56,7 +56,7 @@ Return ONLY the extracted text, nothing else.`
 		},
 	}
 
-	resp, err := client.Models.GenerateContent(ctx, "gemini-3-flash-preview", []*genai.Content{content}, &genai.GenerateContentConfig{
+	resp, err := client.Models.GenerateContent(ctx, "gemini-2.5-flash-lite", []*genai.Content{content}, &genai.GenerateContentConfig{
 		Temperature: genai.Ptr(float32(0.1)), // Very low temperature for accurate extraction
 	})
 	if err != nil {
