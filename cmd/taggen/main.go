@@ -26,9 +26,9 @@ func main() {
 	dryRun := flag.Bool("dry-run", false, "Run without actually adding tags (for testing)")
 	flag.Parse()
 
-	geminiKey := os.Getenv("GEMINI_API_KEY")
-	if geminiKey == "" {
-		log.Error("GEMINI_API_KEY environment variable not set")
+	geminiProject := os.Getenv("GEMINI_PROJECT")
+	if geminiProject == "" {
+		log.Error("GEMINI_PROJECT environment variable not set")
 		os.Exit(1)
 	}
 
@@ -39,7 +39,7 @@ func main() {
 	}
 
 	// Initialize AI client
-	aiClient, err := ai.NewClient(geminiKey)
+	aiClient, err := ai.NewClient(geminiProject, os.Getenv("GEMINI_LOCATION"))
 	if err != nil {
 		log.Error("failed to initialize AI client", "error", err)
 		os.Exit(1)

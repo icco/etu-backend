@@ -96,11 +96,11 @@ func main() {
 		log.Info("GCS storage not configured, image uploads will be disabled")
 	}
 
-	// Get Gemini API key for AI operations (optional)
+	// Get Gemini project for AI operations via Vertex AI (optional)
 	var aiClient *ai.Client
-	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	if geminiAPIKey != "" {
-		aiClient, err = ai.NewClient(geminiAPIKey)
+	geminiProject := os.Getenv("GEMINI_PROJECT")
+	if geminiProject != "" {
+		aiClient, err = ai.NewClient(geminiProject, os.Getenv("GEMINI_LOCATION"))
 		if err != nil {
 			log.Warn("failed to initialize AI client", "error", err)
 		} else {
