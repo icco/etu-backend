@@ -58,6 +58,7 @@ func TestGetUser_SQL(t *testing.T) {
 	}
 	if user == nil {
 		t.Fatal("GetUser returned nil user")
+		return
 	}
 	if user.ID != userID {
 		t.Errorf("user.ID = %q, want %q", user.ID, userID)
@@ -139,6 +140,7 @@ func TestGetUserByEmail_SQL(t *testing.T) {
 	}
 	if user == nil {
 		t.Fatal("GetUserByEmail returned nil user")
+		return
 	}
 	if user.Email != email {
 		t.Errorf("user.Email = %q, want %q", user.Email, email)
@@ -313,6 +315,7 @@ func TestGetNote_SQL(t *testing.T) {
 	}
 	if note == nil {
 		t.Fatal("GetNote returned nil note")
+		return
 	}
 	if note.ID != noteID || note.Content != "hello world" {
 		t.Errorf("note = %+v", note)
