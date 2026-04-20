@@ -151,12 +151,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create HTTP server for health checks
+	// Create HTTP server for health checks.
+	// ReadHeaderTimeout is set to protect against slow-loris connections that
+	// trickle HTTP request headers without ever completing them. Without it,
+	// ReadTimeout alone does not bound header-only connections because
+	// ReadTimeout begins only after the first body byte arrives.
 	httpServer := &http.Server{
-		Addr:         ":" + httpPort,
-		Handler:      newHealthHandler(log),
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 5 * time.Second,
+		Addr:              ":" + httpPort,
+		Handler:           newHealthHandler(log),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      5 * time.Second,
 	}
 
 	// Start HTTP server in goroutine
