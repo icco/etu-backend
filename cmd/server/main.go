@@ -239,7 +239,9 @@ func newHealthHandler(log *slog.Logger) http.Handler {
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, "User-agent: *\nDisallow: /\n")
+		if _, err := fmt.Fprint(w, "User-agent: *\nDisallow: /\n"); err != nil {
+			log.Error("error writing robots", "error", err)
+		}
 	})
 
 	// Readiness check (could add DB checks here if needed)
