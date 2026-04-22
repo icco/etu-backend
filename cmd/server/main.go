@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -232,6 +233,13 @@ func newHealthHandler(log *slog.Logger) http.Handler {
 		}); err != nil {
 			log.Error("error encoding health response", "error", err)
 		}
+	})
+
+	// Block all crawlers
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "User-agent: *\nDisallow: /\n")
 	})
 
 	// Readiness check (could add DB checks here if needed)
