@@ -7,6 +7,7 @@ import (
 
 	"github.com/icco/etu-backend/internal/db"
 	pb "github.com/icco/etu-backend/proto"
+	"github.com/icco/gutil/logging"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -139,9 +140,11 @@ func (s *ApiKeysService) VerifyApiKey(ctx context.Context, req *pb.VerifyApiKeyR
 	// Check each potential match
 	for _, k := range keys {
 		if err := bcrypt.CompareHashAndPassword([]byte(k.KeyHash), []byte(req.RawKey)); err == nil {
-			// Update last used timestamp asynchronously
+			// Detach from request ctx but preserve the logger so the async
+			// audit write stays correlated.
+			bgCtx := logging.NewContext(context.Background(), logging.FromContext(ctx))
 			go func(keyID string) {
-				_ = s.db.UpdateApiKeyLastUsed(context.Background(), keyID)
+				_ = s.db.UpdateApiKeyLastUsed(bgCtx, keyID)
 			}(k.ID)
 
 			return &pb.VerifyApiKeyResponse{

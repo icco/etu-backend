@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -93,8 +94,7 @@ func (c *Client) DeleteImage(ctx context.Context, objectName string) error {
 	defer cancel()
 
 	if err := obj.Delete(ctx); err != nil {
-		if err == storage.ErrObjectNotExist {
-			// Object doesn't exist, nothing to delete
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			return nil
 		}
 		return fmt.Errorf("failed to delete image: %w", err)

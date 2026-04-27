@@ -2,6 +2,7 @@ package syncdb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -104,7 +105,7 @@ func (db *DB) AutoMigrate() error {
 func (db *DB) GetNoteByNotionPageID(userID, pageID string) (*Note, error) {
 	var note Note
 	result := db.conn.Where(`"userId" = ? AND "externalId" = ?`, userID, pageID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -117,7 +118,7 @@ func (db *DB) GetNoteByNotionPageID(userID, pageID string) (*Note, error) {
 func (db *DB) GetNoteByNotionUUID(userID, notionUUID string) (*Note, error) {
 	var note Note
 	result := db.conn.Where(`"userId" = ? AND "notionUuid" = ?`, userID, notionUUID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -134,12 +135,12 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 	err := db.conn.Transaction(func(tx *gorm.DB) error {
 		// Try to find existing note by Notion UUID first, then by page ID
 		result := tx.Where(`"userId" = ? AND "notionUuid" = ?`, userID, notionUUID).First(&note)
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			// Try by page ID (for backwards compatibility)
 			result = tx.Where(`"userId" = ? AND "externalId" = ?`, userID, pageID).First(&note)
 		}
 
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			// Create new note
 			isNew = true
 			note = Note{
@@ -182,7 +183,7 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 
 			var tag Tag
 			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				// Create new tag
 				tag = Tag{
 					ID:        models.GenerateCUID(),
@@ -221,7 +222,7 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 func (db *DB) GetLastSyncTime(userID string) (*time.Time, error) {
 	var state SyncState
 	result := db.conn.Where(`"userId" = ?`, userID).First(&state)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -339,7 +340,7 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {

@@ -42,7 +42,7 @@ func (s *TagsService) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*p
 		pbTags[i] = &pb.Tag{
 			Id:        t.ID,
 			Name:      t.Name,
-			Count:     int32(t.Count),
+			Count:     clampInt32(t.Count),
 			CreatedAt: timestamppb.New(t.CreatedAt),
 		}
 	}

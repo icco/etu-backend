@@ -9,6 +9,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// Shared sqlmock test fixtures. Extracted to satisfy goconst across the many
+// table-driven cases below.
+const (
+	testUserID  = "user-1"
+	testNoteID  = "note-1"
+	testImageID = "img-1"
+)
+
 func TestNewFromConn(t *testing.T) {
 	sqlDB, _, err := sqlmock.New()
 	if err != nil {
@@ -166,8 +174,8 @@ func TestDeleteNote_SQL(t *testing.T) {
 		t.Fatalf("NewFromConn: %v", err)
 	}
 
-	userID := "user-1"
-	noteID := "note-1"
+	userID := testUserID
+	noteID := testNoteID
 
 	// GORM may run in a transaction; postgres driver can trigger Begin.
 	// DELETE FROM "Note" WHERE id = $1 AND "userId" = $2
@@ -205,12 +213,12 @@ func TestDeleteNote_NotFound(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`DELETE FROM "Note"`).
-		WithArgs("note-missing", "user-1").
+		WithArgs("note-missing", testUserID).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
 	ctx := context.Background()
-	deleted, err := db.DeleteNote(ctx, "user-1", "note-missing")
+	deleted, err := db.DeleteNote(ctx, testUserID, "note-missing")
 	if err != nil {
 		t.Fatalf("DeleteNote: %v", err)
 	}
@@ -345,7 +353,7 @@ func TestListNotes_SQL(t *testing.T) {
 	}
 
 	userID := "user-list"
-	noteID := "note-1"
+	noteID := testNoteID
 	now := time.Now().UTC()
 
 	// 1) Count: SELECT count(*) FROM "Note" WHERE "userId" = $1
@@ -467,12 +475,12 @@ func TestUpdateNote_NotFound(t *testing.T) {
 	content := "updated"
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
-		WithArgs("note-missing", "user-1", 1).
+		WithArgs("note-missing", testUserID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId", "externalId", "notionUuid", "lastSyncedToNotion"}))
 	mock.ExpectCommit()
 
 	ctx := context.Background()
-	note, err := db.UpdateNote(ctx, "user-1", "note-missing", &content, nil, false)
+	note, err := db.UpdateNote(ctx, testUserID, "note-missing", &content, nil, false)
 	if err != nil {
 		t.Fatalf("UpdateNote: %v", err)
 	}
@@ -499,7 +507,7 @@ func TestAddImageToNote_SQL(t *testing.T) {
 
 	noteID := "note-img"
 	img := &NoteImage{
-		ID:            "img-1",
+		ID:            testImageID,
 		URL:           "https://example.com/img.png",
 		GCSObjectName: "bucket/img.png",
 		MimeType:      "image/png",
@@ -534,7 +542,7 @@ func TestRemoveImageFromNote_SQL(t *testing.T) {
 		t.Fatalf("NewFromConn: %v", err)
 	}
 
-	userID, noteID, imageID := "user-1", "note-1", "img-1"
+	userID, noteID, imageID := testUserID, testNoteID, testImageID
 	gcsName := "bucket/obj.png"
 	now := time.Now().UTC()
 
@@ -579,11 +587,11 @@ func TestRemoveImageFromNote_NoteNotFound(t *testing.T) {
 	}
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
-		WithArgs("note-missing", "user-1", 1).
+		WithArgs("note-missing", testUserID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId"}))
 
 	ctx := context.Background()
-	_, err = db.RemoveImageFromNote(ctx, "user-1", "note-missing", "img-1")
+	_, err = db.RemoveImageFromNote(ctx, testUserID, "note-missing", testImageID)
 	if err == nil || err.Error() != "note not found" {
 		t.Errorf("RemoveImageFromNote: want 'note not found' error, got %v", err)
 	}
@@ -611,14 +619,14 @@ func TestGetNoteImages_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(noteID).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt"}).
-			AddRow("img-1", noteID, "https://a", "gcs/a", "", "image/png", now))
+			AddRow(testImageID, noteID, "https://a", "gcs/a", "", "image/png", now))
 
 	ctx := context.Background()
 	images, err := db.GetNoteImages(ctx, noteID)
 	if err != nil {
 		t.Fatalf("GetNoteImages: %v", err)
 	}
-	if len(images) != 1 || images[0].ID != "img-1" {
+	if len(images) != 1 || images[0].ID != testImageID {
 		t.Errorf("GetNoteImages: got %+v", images)
 	}
 
@@ -710,7 +718,7 @@ func TestRemoveAudioFromNote_SQL(t *testing.T) {
 		t.Fatalf("NewFromConn: %v", err)
 	}
 
-	userID, noteID, audioID := "user-1", "note-1", "aud-1"
+	userID, noteID, audioID := testUserID, testNoteID, "aud-1"
 	gcsName := "bucket/audio.mp3"
 	now := time.Now().UTC()
 
@@ -755,11 +763,11 @@ func TestRemoveAudioFromNote_NoteNotFound(t *testing.T) {
 	}
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
-		WithArgs("note-missing", "user-1", 1).
+		WithArgs("note-missing", testUserID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId"}))
 
 	ctx := context.Background()
-	_, err = db.RemoveAudioFromNote(ctx, "user-1", "note-missing", "aud-1")
+	_, err = db.RemoveAudioFromNote(ctx, testUserID, "note-missing", "aud-1")
 	if err == nil || err.Error() != "note not found" {
 		t.Errorf("RemoveAudioFromNote: want 'note not found' error, got %v", err)
 	}
@@ -1008,12 +1016,12 @@ func TestDeleteApiKey_SQL(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`DELETE FROM "ApiKey"`).
-		WithArgs("key-1", "user-1").
+		WithArgs("key-1", testUserID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	ctx := context.Background()
-	deleted, err := db.DeleteApiKey(ctx, "user-1", "key-1")
+	deleted, err := db.DeleteApiKey(ctx, testUserID, "key-1")
 	if err != nil {
 		t.Fatalf("DeleteApiKey: %v", err)
 	}
@@ -1042,7 +1050,7 @@ func TestGetApiKeysByPrefix_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "ApiKey"`).
 		WithArgs("prefix_abc").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "keyPrefix", "keyHash", "userId", "createdAt", "lastUsed"}).
-			AddRow("key-1", "k", "prefix_abc", "hash", "user-1", now, nil))
+			AddRow("key-1", "k", "prefix_abc", "hash", testUserID, now, nil))
 
 	ctx := context.Background()
 	keys, err := db.GetApiKeysByPrefix(ctx, "prefix_abc")
@@ -1100,7 +1108,7 @@ func TestGetNotesWithFewTags_SQL(t *testing.T) {
 	}
 
 	userID := "user-few"
-	noteID := "note-1"
+	noteID := testNoteID
 	now := time.Now().UTC()
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
@@ -1137,7 +1145,7 @@ func TestAddTagsToNote_SQL(t *testing.T) {
 		t.Fatalf("NewFromConn: %v", err)
 	}
 
-	userID, noteID := "user-1", "note-1"
+	userID, noteID := testUserID, testNoteID
 	now := time.Now().UTC()
 
 	// Transaction: BEGIN, SELECT note, SELECT tag (not found), INSERT tag, SELECT NoteTag (not found), INSERT NoteTag, COMMIT
@@ -1329,7 +1337,7 @@ func TestGetRandomNotes_SQL(t *testing.T) {
 	}
 
 	userID := "user-rand"
-	noteID := "note-1"
+	noteID := testNoteID
 	now := time.Now().UTC()
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
@@ -1413,7 +1421,7 @@ func TestGetImagesWithoutExtractedText(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt",
 		}).AddRow(
-			"img-1", "note-1", "https://example.com/img1.jpg", "images/img1.jpg", "", "image/jpeg", now,
+			testImageID, testNoteID, "https://example.com/img1.jpg", "images/img1.jpg", "", "image/jpeg", now,
 		).AddRow(
 			"img-2", "note-2", "https://example.com/img2.png", "images/img2.png", "", "image/png", now,
 		))
@@ -1426,7 +1434,7 @@ func TestGetImagesWithoutExtractedText(t *testing.T) {
 	if len(images) != 2 {
 		t.Errorf("GetImagesWithoutExtractedText: got %d images, want 2", len(images))
 	}
-	if images[0].ID != "img-1" || images[1].ID != "img-2" {
+	if images[0].ID != testImageID || images[1].ID != "img-2" {
 		t.Errorf("GetImagesWithoutExtractedText: unexpected image IDs")
 	}
 
@@ -1514,7 +1522,7 @@ func TestGetAudiosWithoutTranscription(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id", "noteId", "url", "gcsObjectName", "transcribedText", "mimeType", "createdAt",
 		}).AddRow(
-			"audio-1", "note-1", "https://example.com/audio1.mp3", "audio/audio1.mp3", "", "audio/mpeg", now,
+			"audio-1", testNoteID, "https://example.com/audio1.mp3", "audio/audio1.mp3", "", "audio/mpeg", now,
 		).AddRow(
 			"audio-2", "note-2", "https://example.com/audio2.wav", "audio/audio2.wav", "", "audio/wav", now,
 		))

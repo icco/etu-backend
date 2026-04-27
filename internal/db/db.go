@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -288,7 +289,7 @@ func (db *DB) getImagesForNotes(ctx context.Context, noteIDs []string) (map[stri
 func (db *DB) GetNote(ctx context.Context, userID, noteID string) (*Note, error) {
 	var note Note
 	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -337,7 +338,7 @@ func (db *DB) CreateNote(ctx context.Context, userID, content string, tagNames [
 
 			var tag models.Tag
 			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				tag = models.Tag{
 					ID:        models.GenerateCUID(),
 					Name:      tagName,
@@ -388,7 +389,7 @@ func (db *DB) UpdateNote(ctx context.Context, userID, noteID string, content *st
 	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verify ownership and get current note
 		result := tx.Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil
 		}
 		if result.Error != nil {
@@ -421,7 +422,7 @@ func (db *DB) UpdateNote(ctx context.Context, userID, noteID string, content *st
 
 				var tag models.Tag
 				result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-				if result.Error == gorm.ErrRecordNotFound {
+				if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 					tag = models.Tag{
 						ID:        models.GenerateCUID(),
 						Name:      tagName,
@@ -495,7 +496,7 @@ func (db *DB) RemoveImageFromNote(ctx context.Context, userID, noteID, imageID s
 	// First verify the note belongs to the user
 	var note Note
 	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", fmt.Errorf("note not found")
 	}
 	if result.Error != nil {
@@ -505,7 +506,7 @@ func (db *DB) RemoveImageFromNote(ctx context.Context, userID, noteID, imageID s
 	// Get the image to return the GCS object name
 	var image NoteImage
 	result = db.conn.WithContext(ctx).Where(`id = ? AND "noteId" = ?`, imageID, noteID).First(&image)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", nil // Image doesn't exist, nothing to delete
 	}
 	if result.Error != nil {
@@ -552,7 +553,7 @@ func (db *DB) RemoveAudioFromNote(ctx context.Context, userID, noteID, audioID s
 	// First verify the note belongs to the user
 	var note Note
 	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", fmt.Errorf("note not found")
 	}
 	if result.Error != nil {
@@ -562,7 +563,7 @@ func (db *DB) RemoveAudioFromNote(ctx context.Context, userID, noteID, audioID s
 	// Get the audio to return the GCS object name
 	var audio NoteAudio
 	result = db.conn.WithContext(ctx).Where(`id = ? AND "noteId" = ?`, audioID, noteID).First(&audio)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", nil // Audio doesn't exist, nothing to delete
 	}
 	if result.Error != nil {
@@ -669,7 +670,7 @@ func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where("email = ?", email).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -689,7 +690,7 @@ func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 func (db *DB) GetUser(ctx context.Context, userID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where("id = ?", userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -709,7 +710,7 @@ func (db *DB) GetUser(ctx context.Context, userID string) (*User, error) {
 func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"stripeCustomerId" = ?`, stripeCustomerID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -752,7 +753,7 @@ func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionSt
 func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Select("disabled, \"failedLoginAttempts\"").Where("id = ?", userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return false, fmt.Errorf("user not found")
 	}
 	if result.Error != nil {
@@ -938,7 +939,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 		// Verify note ownership
 		var note Note
 		result := tx.Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("note not found")
 		}
 		if result.Error != nil {
@@ -958,7 +959,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 			// Find or create the tag
 			var tag models.Tag
 			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				tag = models.Tag{
 					ID:        models.GenerateCUID(),
 					Name:      tagName,
@@ -975,7 +976,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 			// Check if the tag is already linked to the note
 			var noteTag models.NoteTag
 			result = tx.Where(`"noteId" = ? AND "tagId" = ?`, noteID, tag.ID).First(&noteTag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				// Link note to tag if not already linked
 				noteTag = models.NoteTag{NoteID: noteID, TagID: tag.ID}
 				if err := tx.Create(&noteTag).Error; err != nil {
@@ -1002,7 +1003,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -1025,7 +1026,7 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
 
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("user not found")
 	} else if result.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", result.Error)

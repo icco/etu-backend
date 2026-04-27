@@ -118,7 +118,7 @@ func (s *mockNotesService) ListNotes(ctx context.Context, req *pb.ListNotesReque
 
 	return &pb.ListNotesResponse{
 		Notes:  notes,
-		Total:  int32(len(notes)),
+		Total:  clampInt32(len(notes)),
 		Limit:  DefaultNotesLimit,
 		Offset: 0,
 	}, nil

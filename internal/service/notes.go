@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/icco/etu-backend/internal/ai"
 	"github.com/icco/etu-backend/internal/db"
@@ -79,10 +80,23 @@ func (s *NotesService) ListNotes(ctx context.Context, req *pb.ListNotesRequest) 
 
 	return &pb.ListNotesResponse{
 		Notes:  pbNotes,
-		Total:  int32(total),
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		Total:  clampInt32(total),
+		Limit:  clampInt32(limit),
+		Offset: clampInt32(offset),
 	}, nil
+}
+
+// clampInt32 returns n as int32, clamped to the int32 range. Callers use this
+// to convert non-negative counts (note totals, pagination, tag usage) returned
+// from the DB into proto int32 fields without tripping gosec G115.
+func clampInt32(n int) int32 {
+	if n < 0 {
+		return 0
+	}
+	if n > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(n)
 }
 
 // CreateNote creates a new note
