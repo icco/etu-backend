@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	log := logger.New()
+	log := logger.New("etu-backend-sync")
 	rootCtx := logging.NewContext(context.Background(), log)
 
 	fullSync := flag.Bool("full", false, "Perform a full sync instead of incremental")

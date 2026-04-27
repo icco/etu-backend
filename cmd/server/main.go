@@ -38,7 +38,7 @@ var (
 )
 
 func main() {
-	log := logger.New()
+	log := logger.New("etu-backend-server")
 
 	// rootCtx carries the application logger so any code path that derives a
 	// context (HTTP handlers, gRPC interceptors, background goroutines) can
