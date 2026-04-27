@@ -23,6 +23,10 @@ RUN task build
 # Final image
 FROM debian:bookworm-slim
 
+LABEL org.opencontainers.image.source=https://github.com/icco/etu-backend
+LABEL org.opencontainers.image.description="ghcr.io/icco/etu-backend container image"
+LABEL org.opencontainers.image.licenses=CC-BY-NC-4.0
+
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user.
