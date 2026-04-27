@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	log := logger.New()
+	log := logger.New("etu-backend-taggen")
 
 	// rootCtx carries the application logger so descendant contexts
 	// (signal-cancellable, per-task) can retrieve it via logging.FromContext.
