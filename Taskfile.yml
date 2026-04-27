@@ -1,39 +1,32 @@
-version: '3'
-
+version: "3"
 vars:
   GIT_COMMIT:
     sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
-
 tasks:
   default:
     desc: Show available tasks
     cmds:
       - task --list
-
   proto:
     desc: Generate protobuf files (Go)
     cmds:
       - protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/etu.proto
-
   proto-ts:
     desc: Generate protobuf files (TypeScript)
     dir: packages/etu-proto
     cmds:
       - npm install
       - npm run build
-
   build:
     desc: Build all binaries
     cmds:
       - go build -ldflags "-X main.CommitSHA={{.GIT_COMMIT}}" -o bin/server ./cmd/server
       - go build -ldflags "-X main.CommitSHA={{.GIT_COMMIT}}" -o bin/sync ./cmd/sync
       - go build -ldflags "-X main.CommitSHA={{.GIT_COMMIT}}" -o bin/taggen ./cmd/taggen
-
   run:
     desc: Run the server
     cmds:
       - go run ./cmd/server
-
   sync:
     desc: Run sync job (requires USER_ID env var, optionally FULL_SYNC=true and INTERVAL=1h)
     cmds:
@@ -46,7 +39,6 @@ tasks:
           ARGS="$ARGS -interval=${INTERVAL}"
         fi
         go run ./cmd/sync $ARGS
-
   taggen:
     desc: Run tag generation job (requires USER_ID and GEMINI_API_KEY env vars, optionally DRY_RUN=true and INTERVAL=1h)
     cmds:
@@ -59,35 +51,29 @@ tasks:
           ARGS="$ARGS -interval=${INTERVAL}"
         fi
         go run ./cmd/taggen $ARGS
-
   test:
     desc: Run tests
     cmds:
       - go test -v -cover ./...
-
   test-race:
     desc: Run tests with race detection
     cmds:
       - go test -v -race ./...
-
   clean:
     desc: Clean build artifacts
     cmds:
       - rm -rf bin/
-
   deps:
     desc: Install dependencies
     cmds:
       - go mod download
       - go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
       - go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
   lint:
     desc: Run linters
     cmds:
       - go vet ./...
       - staticcheck ./...
-
   update:
     desc: Update dependencies
     cmds:

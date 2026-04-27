@@ -21,6 +21,10 @@ var userColumns = []string{
 	"disabled", "disabledReason", "failedLoginAttempts", "lastFailedLogin",
 }
 
+// testProfileImageGCSObject is a fixture GCS object name reused across the
+// profile-image fixtures below.
+const testProfileImageGCSObject = "profiles/user1/avatar"
+
 // helper to create a sqlmock-backed UserSettingsService.
 func newTestUserSettingsService(t *testing.T, imgixDomain string) (*UserSettingsService, sqlmock.Sqlmock, func()) {
 	t.Helper()
@@ -98,7 +102,7 @@ func TestGetUserSettings_RefreshSignedURL_ImgixDomain(t *testing.T) {
 
 	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
 	now := time.Now()
-	gcsObj := "profiles/user1/avatar"
+	gcsObj := testProfileImageGCSObject
 
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs("user1", 1).
@@ -132,7 +136,7 @@ func TestGetUserSettings_RefreshSignedURL_NoImgixNoStorage(t *testing.T) {
 
 	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
 	now := time.Now()
-	gcsObj := "profiles/user1/avatar"
+	gcsObj := testProfileImageGCSObject
 	oldImage := "https://old-signed-url.example"
 
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
@@ -317,7 +321,7 @@ func TestUpdateUserSettings_ClearProfileImage(t *testing.T) {
 	clearFlag := true
 
 	// Step 1: SELECT existing user (has a profile image)
-	gcsObj := "profiles/user1/avatar"
+	gcsObj := testProfileImageGCSObject
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs("user1", 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
@@ -399,7 +403,7 @@ func TestRefreshProfileImageURL_WithImgixDomain(t *testing.T) {
 	svc, _, cleanup := newTestUserSettingsService(t, "my-cdn.imgix.net")
 	defer cleanup()
 
-	gcsObj := "profiles/user1/avatar"
+	gcsObj := testProfileImageGCSObject
 	user := &db.User{
 		ID:                    "user1",
 		Image:                 strPtr("https://old.example/img.png"),
@@ -419,7 +423,7 @@ func TestRefreshProfileImageURL_NoImgixNoStorage(t *testing.T) {
 	svc, _, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	gcsObj := "profiles/user1/avatar"
+	gcsObj := testProfileImageGCSObject
 	oldImg := "https://old-signed.example/img.png"
 	user := &db.User{
 		ID:                    "user1",

@@ -3,23 +3,24 @@ package service
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/models"
 	"github.com/icco/etu-backend/internal/storage"
 	pb "github.com/icco/etu-backend/proto"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// UserSettingsService implements the UserSettings gRPC service
+// UserSettingsService implements the UserSettings gRPC service.
+// Loggers are sourced from per-call ctx via gutil/logging.
 type UserSettingsService struct {
 	pb.UnimplementedUserSettingsServiceServer
 	db          *db.DB
 	storage     *storage.Client
 	imgixDomain string
-	log         *slog.Logger
 }
 
 // NewUserSettingsService creates a new UserSettingsService
@@ -28,7 +29,6 @@ func NewUserSettingsService(database *db.DB, storageClient *storage.Client, imgi
 		db:          database,
 		storage:     storageClient,
 		imgixDomain: imgixDomain,
-		log:         slog.Default().With("service", "user_settings"),
 	}
 }
 
@@ -125,7 +125,10 @@ func (s *UserSettingsService) refreshProfileImageURL(ctx context.Context, user *
 	if s.storage != nil {
 		url, err := s.storage.GetSignedURL(ctx, *user.ProfileImageGCSObject)
 		if err != nil {
-			s.log.Warn("failed to refresh profile image signed URL", "error", err)
+			logging.FromContext(ctx).Warnw("failed to refresh profile image signed URL",
+				"service", "user_settings",
+				zap.Error(err),
+			)
 			return
 		}
 		user.Image = &url

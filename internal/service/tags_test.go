@@ -46,7 +46,7 @@ func (s *mockTagsService) ListTags(ctx context.Context, req *pb.ListTagsRequest)
 			tags = append(tags, &pb.Tag{
 				Id:        t.ID,
 				Name:      t.Name,
-				Count:     int32(t.Count),
+				Count:     clampInt32(t.Count),
 				CreatedAt: timestamppb.New(t.CreatedAt),
 			})
 		}

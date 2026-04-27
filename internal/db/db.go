@@ -3,26 +3,27 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/icco/etu-backend/internal/crypto"
-	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/models"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// DB wraps the GORM database connection
+// DB wraps the GORM database connection.
+// Loggers are sourced from per-call ctx via gutil/logging.
 type DB struct {
 	conn *gorm.DB
-	log  *slog.Logger
 }
 
 // Re-export models for backwards compatibility
@@ -35,15 +36,14 @@ type NoteAudio = models.NoteAudio
 
 // encryptNotionKey encrypts a Notion API key if encryption is available.
 // If ENCRYPTION_KEY is not set, it logs a warning and returns the plaintext.
-func (db *DB) encryptNotionKey(key string) string {
+func (db *DB) encryptNotionKey(ctx context.Context, key string) string {
 	if key == "" {
 		return ""
 	}
 
 	encrypted, err := crypto.Encrypt(key)
 	if err != nil {
-		// If encryption fails (e.g., ENCRYPTION_KEY not set), log warning and return plaintext
-		db.log.Warn("failed to encrypt Notion key, storing in plaintext", "error", err)
+		logging.FromContext(ctx).Warnw("failed to encrypt Notion key, storing in plaintext", zap.Error(err))
 		return key
 	}
 
@@ -52,15 +52,14 @@ func (db *DB) encryptNotionKey(key string) string {
 
 // decryptNotionKey decrypts a Notion API key if it's encrypted.
 // If ENCRYPTION_KEY is not set or decryption fails, it assumes the key is plaintext.
-func (db *DB) decryptNotionKey(encrypted string) string {
+func (db *DB) decryptNotionKey(ctx context.Context, encrypted string) string {
 	if encrypted == "" {
 		return ""
 	}
 
 	decrypted, err := crypto.Decrypt(encrypted)
 	if err != nil {
-		// If decryption fails, assume it's plaintext (backwards compatibility)
-		db.log.Warn("failed to decrypt Notion key, assuming plaintext", "error", err)
+		logging.FromContext(ctx).Warnw("failed to decrypt Notion key, assuming plaintext", zap.Error(err))
 		return encrypted
 	}
 
@@ -93,7 +92,6 @@ func New() (*DB, error) {
 
 	return &DB{
 		conn: conn,
-		log:  logger.New(),
 	}, nil
 }
 
@@ -108,7 +106,6 @@ func NewFromConn(sqlDB *sql.DB) (*DB, error) {
 	}
 	return &DB{
 		conn: conn,
-		log:  logger.New(),
 	}, nil
 }
 
@@ -292,7 +289,7 @@ func (db *DB) getImagesForNotes(ctx context.Context, noteIDs []string) (map[stri
 func (db *DB) GetNote(ctx context.Context, userID, noteID string) (*Note, error) {
 	var note Note
 	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -341,7 +338,7 @@ func (db *DB) CreateNote(ctx context.Context, userID, content string, tagNames [
 
 			var tag models.Tag
 			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				tag = models.Tag{
 					ID:        models.GenerateCUID(),
 					Name:      tagName,
@@ -392,7 +389,7 @@ func (db *DB) UpdateNote(ctx context.Context, userID, noteID string, content *st
 	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Verify ownership and get current note
 		result := tx.Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil
 		}
 		if result.Error != nil {
@@ -425,7 +422,7 @@ func (db *DB) UpdateNote(ctx context.Context, userID, noteID string, content *st
 
 				var tag models.Tag
 				result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-				if result.Error == gorm.ErrRecordNotFound {
+				if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 					tag = models.Tag{
 						ID:        models.GenerateCUID(),
 						Name:      tagName,
@@ -499,7 +496,7 @@ func (db *DB) RemoveImageFromNote(ctx context.Context, userID, noteID, imageID s
 	// First verify the note belongs to the user
 	var note Note
 	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", fmt.Errorf("note not found")
 	}
 	if result.Error != nil {
@@ -509,7 +506,7 @@ func (db *DB) RemoveImageFromNote(ctx context.Context, userID, noteID, imageID s
 	// Get the image to return the GCS object name
 	var image NoteImage
 	result = db.conn.WithContext(ctx).Where(`id = ? AND "noteId" = ?`, imageID, noteID).First(&image)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", nil // Image doesn't exist, nothing to delete
 	}
 	if result.Error != nil {
@@ -556,7 +553,7 @@ func (db *DB) RemoveAudioFromNote(ctx context.Context, userID, noteID, audioID s
 	// First verify the note belongs to the user
 	var note Note
 	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", fmt.Errorf("note not found")
 	}
 	if result.Error != nil {
@@ -566,7 +563,7 @@ func (db *DB) RemoveAudioFromNote(ctx context.Context, userID, noteID, audioID s
 	// Get the audio to return the GCS object name
 	var audio NoteAudio
 	result = db.conn.WithContext(ctx).Where(`id = ? AND "noteId" = ?`, audioID, noteID).First(&audio)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return "", nil // Audio doesn't exist, nothing to delete
 	}
 	if result.Error != nil {
@@ -673,7 +670,7 @@ func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where("email = ?", email).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -682,7 +679,7 @@ func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 
 	// Decrypt Notion key if present
 	if user.NotionKey != nil && *user.NotionKey != "" {
-		decrypted := db.decryptNotionKey(*user.NotionKey)
+		decrypted := db.decryptNotionKey(ctx, *user.NotionKey)
 		user.NotionKey = &decrypted
 	}
 
@@ -693,7 +690,7 @@ func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 func (db *DB) GetUser(ctx context.Context, userID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where("id = ?", userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -702,7 +699,7 @@ func (db *DB) GetUser(ctx context.Context, userID string) (*User, error) {
 
 	// Decrypt Notion key if present
 	if user.NotionKey != nil && *user.NotionKey != "" {
-		decrypted := db.decryptNotionKey(*user.NotionKey)
+		decrypted := db.decryptNotionKey(ctx, *user.NotionKey)
 		user.NotionKey = &decrypted
 	}
 
@@ -713,7 +710,7 @@ func (db *DB) GetUser(ctx context.Context, userID string) (*User, error) {
 func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"stripeCustomerId" = ?`, stripeCustomerID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -722,7 +719,7 @@ func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID st
 
 	// Decrypt Notion key if present
 	if user.NotionKey != nil && *user.NotionKey != "" {
-		decrypted := db.decryptNotionKey(*user.NotionKey)
+		decrypted := db.decryptNotionKey(ctx, *user.NotionKey)
 		user.NotionKey = &decrypted
 	}
 
@@ -756,7 +753,7 @@ func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionSt
 func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Select("disabled, \"failedLoginAttempts\"").Where("id = ?", userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return false, fmt.Errorf("user not found")
 	}
 	if result.Error != nil {
@@ -942,7 +939,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 		// Verify note ownership
 		var note Note
 		result := tx.Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("note not found")
 		}
 		if result.Error != nil {
@@ -962,7 +959,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 			// Find or create the tag
 			var tag models.Tag
 			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				tag = models.Tag{
 					ID:        models.GenerateCUID(),
 					Name:      tagName,
@@ -979,7 +976,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 			// Check if the tag is already linked to the note
 			var noteTag models.NoteTag
 			result = tx.Where(`"noteId" = ? AND "tagId" = ?`, noteID, tag.ID).First(&noteTag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				// Link note to tag if not already linked
 				noteTag = models.NoteTag{NoteID: noteID, TagID: tag.ID}
 				if err := tx.Create(&noteTag).Error; err != nil {
@@ -1006,7 +1003,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -1015,7 +1012,7 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 
 	// Decrypt Notion key if present
 	if user.NotionKey != nil && *user.NotionKey != "" {
-		decrypted := db.decryptNotionKey(*user.NotionKey)
+		decrypted := db.decryptNotionKey(ctx, *user.NotionKey)
 		user.NotionKey = &decrypted
 	}
 
@@ -1029,7 +1026,7 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
 
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("user not found")
 	} else if result.Error != nil {
 		return nil, fmt.Errorf("failed to get user: %w", result.Error)
@@ -1041,7 +1038,7 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	}
 	if notionKey != nil {
 		// Encrypt the Notion key before storing
-		encrypted := db.encryptNotionKey(*notionKey)
+		encrypted := db.encryptNotionKey(ctx, *notionKey)
 		updates["notionKey"] = encrypted
 	}
 	if name != nil {
@@ -1075,7 +1072,7 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 
 	// Decrypt Notion key if present for return
 	if user.NotionKey != nil && *user.NotionKey != "" {
-		decrypted := db.decryptNotionKey(*user.NotionKey)
+		decrypted := db.decryptNotionKey(ctx, *user.NotionKey)
 		user.NotionKey = &decrypted
 	}
 
@@ -1095,7 +1092,7 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 	// Decrypt Notion keys for all users
 	for i := range users {
 		if users[i].NotionKey != nil && *users[i].NotionKey != "" {
-			decrypted := db.decryptNotionKey(*users[i].NotionKey)
+			decrypted := db.decryptNotionKey(ctx, *users[i].NotionKey)
 			users[i].NotionKey = &decrypted
 		}
 	}

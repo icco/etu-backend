@@ -1,7 +1,8 @@
 # etu-backend
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/icco/etu-backend.svg)](https://pkg.go.dev/github.com/icco/etu-backend)
-[![CI](https://github.com/icco/etu-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/icco/etu-backend/actions/workflows/ci.yml)
+[![Test Go](https://github.com/icco/etu-backend/actions/workflows/test.yml/badge.svg)](https://github.com/icco/etu-backend/actions/workflows/test.yml)
+[![golangci-lint](https://github.com/icco/etu-backend/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/icco/etu-backend/actions/workflows/golangci-lint.yml)
 
 A gRPC-based notes and tags management API written in Go. This service provides a backend for managing user notes with tagging functionality and API key-based authentication.
 
@@ -22,11 +23,11 @@ A gRPC-based notes and tags management API written in Go. This service provides 
   - OCR text extraction from images
   - Audio transcription
 
-**Tech Stack:** Go 1.25, gRPC, Protocol Buffers, PostgreSQL, Docker
+**Tech Stack:** Go 1.26, gRPC, Protocol Buffers, PostgreSQL, Docker
 
 ## Quick Start
 
-**Prerequisites:** Go 1.25+, PostgreSQL, [Task](https://taskfile.dev/) (optional)
+**Prerequisites:** Go 1.26+, PostgreSQL, [Task](https://taskfile.dev/) (optional)
 
 **Environment Variables:**
 - `DATABASE_URL` - PostgreSQL connection string (required)

@@ -2,24 +2,25 @@ package syncdb
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/icco/etu-backend/internal/crypto"
-	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/models"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// DB wraps the GORM database connection
+// DB wraps the GORM database connection.
+// Loggers are sourced from per-call ctx via gutil/logging.
 type DB struct {
 	conn *gorm.DB
-	log  *slog.Logger
 }
 
 // Re-export models for backwards compatibility
@@ -31,15 +32,14 @@ type SyncState = models.SyncState
 
 // decryptNotionKey decrypts a Notion API key if it's encrypted.
 // If ENCRYPTION_KEY is not set or decryption fails, it assumes the key is plaintext.
-func (db *DB) decryptNotionKey(encrypted string) string {
+func (db *DB) decryptNotionKey(ctx context.Context, encrypted string) string {
 	if encrypted == "" {
 		return ""
 	}
 
 	decrypted, err := crypto.Decrypt(encrypted)
 	if err != nil {
-		// If decryption fails, assume it's plaintext (backwards compatibility)
-		db.log.Warn("failed to decrypt Notion key, assuming plaintext", "error", err)
+		logging.FromContext(ctx).Warnw("failed to decrypt Notion key, assuming plaintext", zap.Error(err))
 		return encrypted
 	}
 
@@ -72,7 +72,6 @@ func New() (*DB, error) {
 
 	return &DB{
 		conn: conn,
-		log:  logger.New(),
 	}, nil
 }
 
@@ -106,7 +105,7 @@ func (db *DB) AutoMigrate() error {
 func (db *DB) GetNoteByNotionPageID(userID, pageID string) (*Note, error) {
 	var note Note
 	result := db.conn.Where(`"userId" = ? AND "externalId" = ?`, userID, pageID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -119,7 +118,7 @@ func (db *DB) GetNoteByNotionPageID(userID, pageID string) (*Note, error) {
 func (db *DB) GetNoteByNotionUUID(userID, notionUUID string) (*Note, error) {
 	var note Note
 	result := db.conn.Where(`"userId" = ? AND "notionUuid" = ?`, userID, notionUUID).First(&note)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -136,12 +135,12 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 	err := db.conn.Transaction(func(tx *gorm.DB) error {
 		// Try to find existing note by Notion UUID first, then by page ID
 		result := tx.Where(`"userId" = ? AND "notionUuid" = ?`, userID, notionUUID).First(&note)
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			// Try by page ID (for backwards compatibility)
 			result = tx.Where(`"userId" = ? AND "externalId" = ?`, userID, pageID).First(&note)
 		}
 
-		if result.Error == gorm.ErrRecordNotFound {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			// Create new note
 			isNew = true
 			note = Note{
@@ -184,7 +183,7 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 
 			var tag Tag
 			result := tx.Where(`"userId" = ? AND LOWER(name) = ?`, userID, tagName).First(&tag)
-			if result.Error == gorm.ErrRecordNotFound {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				// Create new tag
 				tag = Tag{
 					ID:        models.GenerateCUID(),
@@ -223,7 +222,7 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 func (db *DB) GetLastSyncTime(userID string) (*time.Time, error) {
 	var state SyncState
 	result := db.conn.Where(`"userId" = ?`, userID).First(&state)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
@@ -327,10 +326,9 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 		return nil, err
 	}
 
-	// Decrypt Notion keys for all users
 	for i := range users {
 		if users[i].NotionKey != nil && *users[i].NotionKey != "" {
-			decrypted := db.decryptNotionKey(*users[i].NotionKey)
+			decrypted := db.decryptNotionKey(ctx, *users[i].NotionKey)
 			users[i].NotionKey = &decrypted
 		}
 	}
@@ -342,16 +340,15 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error) {
 	var user User
 	result := db.conn.WithContext(ctx).Where(`"id" = ?`, userID).First(&user)
-	if result.Error == gorm.ErrRecordNotFound {
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	// Decrypt Notion key if present
 	if user.NotionKey != nil && *user.NotionKey != "" {
-		decrypted := db.decryptNotionKey(*user.NotionKey)
+		decrypted := db.decryptNotionKey(ctx, *user.NotionKey)
 		user.NotionKey = &decrypted
 	}
 
