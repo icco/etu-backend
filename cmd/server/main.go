@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -19,6 +20,11 @@ import (
 	"github.com/icco/etu-backend/internal/storage"
 	pb "github.com/icco/etu-backend/proto"
 	"github.com/icco/gutil/logging"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
+	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -50,6 +56,25 @@ func main() {
 	}
 
 	log.Infow("starting etu-backend server", "commit", CommitSHA, "grpc_port", grpcPort, "http_port", httpPort)
+
+	// OpenTelemetry meter provider exporting to Prometheus. Only HTTP is
+	// instrumented today; the /metrics endpoint is mounted on the health
+	// HTTP server below.
+	registry := prometheus.NewRegistry()
+	exporter, err := otelprom.New(otelprom.WithRegisterer(registry))
+	if err != nil {
+		log.Errorw("failed to init prometheus exporter", zap.Error(err))
+		os.Exit(1)
+	}
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
+	otel.SetMeterProvider(mp)
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := mp.Shutdown(shutdownCtx); err != nil {
+			log.Warnw("meter provider shutdown", zap.Error(err))
+		}
+	}()
 
 	database, err := db.New()
 	if err != nil {
@@ -153,7 +178,7 @@ func main() {
 	// ReadTimeout begins only after the first body byte arrives.
 	httpServer := &http.Server{
 		Addr:              ":" + httpPort,
-		Handler:           newHealthHandler(log),
+		Handler:           newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{})),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       5 * time.Second,
 		WriteTimeout:      5 * time.Second,
@@ -161,7 +186,7 @@ func main() {
 
 	go func() {
 		log.Infow("HTTP health server listening", "port", httpPort)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Errorw("HTTP server error", zap.Error(err))
 			os.Exit(1)
 		}
@@ -192,9 +217,13 @@ func main() {
 	log.Infow("servers stopped gracefully")
 }
 
-// newHealthHandler creates an HTTP handler for health check endpoints
-func newHealthHandler(log *zap.SugaredLogger) http.Handler {
+// newHealthHandler creates an HTTP handler for health check and metrics
+// endpoints. metrics is the Prometheus exposition handler for the OTel
+// meter provider configured in main.
+func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler {
 	mux := http.NewServeMux()
+
+	mux.Handle("/metrics", metrics)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
