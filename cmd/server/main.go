@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -19,6 +18,8 @@ import (
 	"github.com/icco/etu-backend/internal/service"
 	"github.com/icco/etu-backend/internal/storage"
 	pb "github.com/icco/etu-backend/proto"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -33,6 +34,11 @@ var (
 func main() {
 	log := logger.New()
 
+	// rootCtx carries the application logger so any code path that derives a
+	// context (HTTP handlers, gRPC interceptors, background goroutines) can
+	// retrieve a logger via logging.FromContext.
+	rootCtx := logging.NewContext(context.Background(), log)
+
 	grpcPort := os.Getenv("GRPC_PORT")
 	if grpcPort == "" {
 		grpcPort = "50051"
@@ -43,91 +49,81 @@ func main() {
 		httpPort = "8080"
 	}
 
-	log.Info("starting etu-backend server", "commit", CommitSHA, "grpc_port", grpcPort, "http_port", httpPort)
+	log.Infow("starting etu-backend server", "commit", CommitSHA, "grpc_port", grpcPort, "http_port", httpPort)
 
-	// Initialize database
 	database, err := db.New()
 	if err != nil {
-		log.Error("failed to connect to database", "error", err)
+		log.Errorw("failed to connect to database", zap.Error(err))
 		os.Exit(1)
 	}
 	defer func() {
 		if err := database.Close(); err != nil {
-			log.Error("error closing database", "error", err)
+			log.Errorw("error closing database", zap.Error(err))
 		}
 	}()
 
-	// Run database migrations
 	if err := database.AutoMigrate(); err != nil {
-		log.Error("failed to run database migrations", "error", err)
+		log.Errorw("failed to run database migrations", zap.Error(err))
 		os.Exit(1)
 	}
-	log.Info("database initialized and migrations completed")
+	log.Infow("database initialized and migrations completed")
 
-	// Initialize authenticator
 	authenticator, err := auth.New()
 	if err != nil {
-		log.Error("failed to initialize authenticator", "error", err)
+		log.Errorw("failed to initialize authenticator", zap.Error(err))
 		os.Exit(1)
 	}
 	defer func() {
 		if err := authenticator.Close(); err != nil {
-			log.Error("error closing authenticator", "error", err)
+			log.Errorw("error closing authenticator", zap.Error(err))
 		}
 	}()
-	log.Info("authenticator initialized")
+	log.Infow("authenticator initialized")
 
-	// Initialize GCS storage client (optional - image uploads won't work without it)
 	var storageClient *storage.Client
 	gcsBucket := os.Getenv("GCS_BUCKET")
 	if gcsBucket != "" {
-		ctx := context.Background()
-		storageClient, err = storage.New(ctx, gcsBucket)
+		storageClient, err = storage.New(rootCtx, gcsBucket)
 		if err != nil {
-			log.Warn("failed to initialize GCS storage client, image uploads will be disabled", "error", err, "bucket", gcsBucket)
+			log.Warnw("failed to initialize GCS storage client, image uploads will be disabled", zap.Error(err), "bucket", gcsBucket)
 		} else {
 			defer func() {
 				if err := storageClient.Close(); err != nil {
-					log.Error("error closing storage client", "error", err)
+					log.Errorw("error closing storage client", zap.Error(err))
 				}
 			}()
-			log.Info("GCS storage initialized", "bucket", gcsBucket)
+			log.Infow("GCS storage initialized", "bucket", gcsBucket)
 		}
 	} else {
-		log.Info("GCS storage not configured, image uploads will be disabled")
+		log.Infow("GCS storage not configured, image uploads will be disabled")
 	}
 
-	// Get Gemini project for AI operations via Vertex AI (optional)
 	var aiClient *ai.Client
 	geminiProject := os.Getenv("GEMINI_PROJECT")
 	if geminiProject != "" {
 		aiClient, err = ai.NewClient(geminiProject, os.Getenv("GEMINI_LOCATION"))
 		if err != nil {
-			log.Warn("failed to initialize AI client", "error", err)
+			log.Warnw("failed to initialize AI client", zap.Error(err))
 		} else {
-			log.Info("AI client initialized (OCR, transcription enabled)")
+			log.Infow("AI client initialized (OCR, transcription enabled)")
 		}
 	} else {
-		log.Info("AI client not configured (OCR, transcription disabled)")
+		log.Infow("AI client not configured (OCR, transcription disabled)")
 	}
 
-	// Get imgix domain for image URLs (optional)
 	imgixDomain := os.Getenv("IMGIX_DOMAIN")
 
-	log.Info("optional features configured",
+	log.Infow("optional features configured",
 		"ai_enabled", aiClient != nil,
 		"imgix_enabled", imgixDomain != "",
 		"imgix_domain", imgixDomain)
 
-	// Initialize M2M authentication configuration
-	m2mConfig := auth.NewM2MConfig(log)
+	m2mConfig := auth.NewM2MConfig(rootCtx)
 
-	// Create gRPC server with authentication interceptor
 	server := grpc.NewServer(
 		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
 	)
 
-	// Register services
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
 	tagsService := service.NewTagsService(database)
 	authService := service.NewAuthService(database)
@@ -142,13 +138,11 @@ func main() {
 	pb.RegisterUserSettingsServiceServer(server, userSettingsService)
 	pb.RegisterStatsServiceServer(server, statsService)
 
-	// Enable reflection for development/debugging
 	reflection.Register(server)
 
-	// Start gRPC listener
 	grpcListener, err := net.Listen("tcp", ":"+grpcPort)
 	if err != nil {
-		log.Error("failed to listen on gRPC port", "port", grpcPort, "error", err)
+		log.Errorw("failed to listen on gRPC port", "port", grpcPort, zap.Error(err))
 		os.Exit(1)
 	}
 
@@ -165,49 +159,43 @@ func main() {
 		WriteTimeout:      5 * time.Second,
 	}
 
-	// Start HTTP server in goroutine
 	go func() {
-		log.Info("HTTP health server listening", "port", httpPort)
+		log.Infow("HTTP health server listening", "port", httpPort)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Error("HTTP server error", "error", err)
+			log.Errorw("HTTP server error", zap.Error(err))
 			os.Exit(1)
 		}
 	}()
 
-	// Start gRPC server in goroutine
 	go func() {
-		log.Info("gRPC server listening", "port", grpcPort)
+		log.Infow("gRPC server listening", "port", grpcPort)
 		if err := server.Serve(grpcListener); err != nil {
-			log.Error("gRPC server error", "error", err)
+			log.Errorw("gRPC server error", zap.Error(err))
 			os.Exit(1)
 		}
 	}()
 
-	// Handle graceful shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigCh
 
-	log.Info("shutting down servers", "signal", sig.String())
+	log.Infow("shutting down servers", "signal", sig.String())
 
-	// Shutdown HTTP server with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(rootCtx, 5*time.Second)
 	defer cancel()
-	if err := httpServer.Shutdown(ctx); err != nil {
-		log.Error("HTTP server shutdown error", "error", err)
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Errorw("HTTP server shutdown error", zap.Error(err))
 	}
 
-	// Gracefully stop gRPC server
 	server.GracefulStop()
 
-	log.Info("servers stopped gracefully")
+	log.Infow("servers stopped gracefully")
 }
 
 // newHealthHandler creates an HTTP handler for health check endpoints
-func newHealthHandler(log *slog.Logger) http.Handler {
+func newHealthHandler(log *zap.SugaredLogger) http.Handler {
 	mux := http.NewServeMux()
 
-	// Root health check
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
@@ -219,11 +207,10 @@ func newHealthHandler(log *slog.Logger) http.Handler {
 			"status": "ok",
 			"commit": CommitSHA,
 		}); err != nil {
-			log.Error("error encoding health response", "error", err)
+			log.Errorw("error encoding health response", zap.Error(err))
 		}
 	})
 
-	// Explicit health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -231,36 +218,35 @@ func newHealthHandler(log *slog.Logger) http.Handler {
 			"status": "ok",
 			"commit": CommitSHA,
 		}); err != nil {
-			log.Error("error encoding health response", "error", err)
+			log.Errorw("error encoding health response", zap.Error(err))
 		}
 	})
 
-	// Block all crawlers
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		if _, err := fmt.Fprint(w, "User-agent: *\nDisallow: /\n"); err != nil {
-			log.Error("error writing robots", "error", err)
+			log.Errorw("error writing robots", zap.Error(err))
 		}
 	})
 
-	// Readiness check (could add DB checks here if needed)
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{
 			"status": "ready",
 		}); err != nil {
-			log.Error("error encoding ready response", "error", err)
+			log.Errorw("error encoding ready response", zap.Error(err))
 		}
 	})
 
 	return mux
 }
 
-// authInterceptor creates a gRPC interceptor that validates API keys and M2M tokens
-func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfig, log *slog.Logger) grpc.UnaryServerInterceptor {
-	// Methods that don't require authentication
+// authInterceptor creates a gRPC interceptor that validates API keys and M2M tokens.
+// It also injects the application logger into the request context so downstream
+// handlers can call logging.FromContext(ctx) and emit correlated logs.
+func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfig, log *zap.SugaredLogger) grpc.UnaryServerInterceptor {
 	publicMethods := map[string]bool{
 		"/etu.AuthService/Register":        true,
 		"/etu.AuthService/Authenticate":    true,
@@ -268,19 +254,20 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 	}
 
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		// Skip auth for public methods
+		// Always seed the per-request logger so downstream code can use logging.FromContext.
+		ctx = logging.NewContext(ctx, log)
+		l := logging.FromContext(ctx).With("method", info.FullMethod)
+
 		if publicMethods[info.FullMethod] {
-			log.Info("public request", "method", info.FullMethod)
+			l.Infow("public request")
 			return handler(ctx, req)
 		}
 
-		// Extract metadata from context
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "missing metadata")
 		}
 
-		// Get authorization header
 		authHeaders := md.Get("authorization")
 		if len(authHeaders) == 0 {
 			return nil, status.Error(codes.Unauthenticated, "missing authorization header")
@@ -288,28 +275,23 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 
 		token := authHeaders[0]
 
-		// Check for M2M token (server-to-server auth)
 		if m2mConfig.IsEnabled() {
 			if valid, tokenIndex := m2mConfig.ValidateToken(token); valid {
-				// M2M authentication successful - no user context
 				ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
-				m2mConfig.LogAuthentication(info.FullMethod, tokenIndex)
+				m2mConfig.LogAuthentication(ctx, info.FullMethod, tokenIndex)
 				return handler(ctx, req)
 			}
 		}
 
-		// Fall back to API key verification
 		userID, err := authenticator.VerifyAPIKey(ctx, token)
 		if err != nil {
-			log.Warn("authentication failed", "method", info.FullMethod, "error", err.Error())
+			l.Warnw("authentication failed", zap.Error(err))
 			return nil, status.Errorf(codes.Unauthenticated, "invalid API key: %v", err)
 		}
 
-		// Add user ID to context for use by handlers
 		ctx = auth.SetAuthContext(ctx, userID, "apikey")
 
-		// Log the authenticated request
-		log.Info("authenticated request", "method", info.FullMethod, "user_id", userID, "auth_type", "apikey")
+		l.Infow("authenticated request", "user_id", userID, "auth_type", "apikey")
 
 		return handler(ctx, req)
 	}

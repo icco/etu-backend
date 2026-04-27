@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/icco/etu-backend/internal/ai"
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/models"
 	"github.com/icco/etu-backend/internal/storage"
 	pb "github.com/icco/etu-backend/proto"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,14 +23,14 @@ const (
 	MaxAudioSize      = 25 * 1024 * 1024 // 25MB max audio size
 )
 
-// NotesService implements the NotesService gRPC service
+// NotesService implements the NotesService gRPC service.
+// Loggers are sourced from per-call ctx via gutil/logging.
 type NotesService struct {
 	pb.UnimplementedNotesServiceServer
 	db          *db.DB
 	storage     *storage.Client
 	aiClient    *ai.Client
 	imgixDomain string
-	log         *slog.Logger
 }
 
 // NewNotesService creates a new NotesService
@@ -39,7 +40,6 @@ func NewNotesService(database *db.DB, storageClient *storage.Client, aiClient *a
 		storage:     storageClient,
 		aiClient:    aiClient,
 		imgixDomain: imgixDomain,
-		log:         slog.Default(),
 	}
 }
 
@@ -107,23 +107,21 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		return nil, status.Errorf(codes.Internal, "failed to create note: %v", err)
 	}
 
-	// Process images if any
+	l := logging.FromContext(ctx)
+
 	if len(req.Images) > 0 && s.storage != nil {
 		for i, img := range req.Images {
-			// Upload image to GCS
 			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
 			if err != nil {
-				s.log.Error("failed to process image", "note_id", note.ID, "image_index", i, "error", err)
-				continue // Continue with other images even if one fails
+				l.Errorw("failed to process image", "note_id", note.ID, "image_index", i, zap.Error(err))
+				continue
 			}
 
-			// Add image to database
 			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
-				s.log.Error("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, "error", err)
-				// Try to clean up the uploaded image
+				l.Errorw("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, zap.Error(err))
 				if s.storage != nil {
 					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
-						s.log.Error("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, "error", deleteErr)
+						l.Errorw("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, zap.Error(deleteErr))
 					}
 				}
 				continue
@@ -133,23 +131,19 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		}
 	}
 
-	// Process audio files if any
 	if len(req.Audios) > 0 && s.storage != nil {
 		for i, aud := range req.Audios {
-			// Upload audio to GCS
 			noteAudio, err := s.processAndUploadAudio(ctx, note.ID, aud.Data, aud.MimeType)
 			if err != nil {
-				s.log.Error("failed to process audio", "note_id", note.ID, "audio_index", i, "error", err)
-				continue // Continue with other audios even if one fails
+				l.Errorw("failed to process audio", "note_id", note.ID, "audio_index", i, zap.Error(err))
+				continue
 			}
 
-			// Add audio to database
 			if err := s.db.AddAudioToNote(ctx, note.ID, noteAudio); err != nil {
-				s.log.Error("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, "error", err)
-				// Try to clean up the uploaded audio
+				l.Errorw("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, zap.Error(err))
 				if s.storage != nil {
 					if deleteErr := s.storage.DeleteImage(ctx, noteAudio.GCSObjectName); deleteErr != nil {
-						s.log.Error("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, "error", deleteErr)
+						l.Errorw("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, zap.Error(deleteErr))
 					}
 				}
 				continue
@@ -312,20 +306,21 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		return nil, status.Error(codes.NotFound, "note not found")
 	}
 
-	// Add new images if any
+	l := logging.FromContext(ctx)
+
 	if len(req.AddImages) > 0 && s.storage != nil {
 		for i, img := range req.AddImages {
 			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
 			if err != nil {
-				s.log.Error("failed to process image", "note_id", note.ID, "image_index", i, "error", err)
+				l.Errorw("failed to process image", "note_id", note.ID, "image_index", i, zap.Error(err))
 				continue
 			}
 
 			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
-				s.log.Error("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, "error", err)
+				l.Errorw("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, zap.Error(err))
 				if s.storage != nil {
 					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
-						s.log.Error("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, "error", deleteErr)
+						l.Errorw("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, zap.Error(deleteErr))
 					}
 				}
 				continue
@@ -333,20 +328,19 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		}
 	}
 
-	// Add new audio files if any
 	if len(req.AddAudios) > 0 && s.storage != nil {
 		for i, aud := range req.AddAudios {
 			noteAudio, err := s.processAndUploadAudio(ctx, note.ID, aud.Data, aud.MimeType)
 			if err != nil {
-				s.log.Error("failed to process audio", "note_id", note.ID, "audio_index", i, "error", err)
+				l.Errorw("failed to process audio", "note_id", note.ID, "audio_index", i, zap.Error(err))
 				continue
 			}
 
 			if err := s.db.AddAudioToNote(ctx, note.ID, noteAudio); err != nil {
-				s.log.Error("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, "error", err)
+				l.Errorw("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, zap.Error(err))
 				if s.storage != nil {
 					if deleteErr := s.storage.DeleteImage(ctx, noteAudio.GCSObjectName); deleteErr != nil {
-						s.log.Error("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, "error", deleteErr)
+						l.Errorw("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, zap.Error(deleteErr))
 					}
 				}
 				continue
@@ -379,16 +373,16 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 		return nil, err
 	}
 
-	// Get images before deleting the note so we can clean them up from GCS
+	l := logging.FromContext(ctx)
+
 	images, err := s.db.GetImagesByNoteID(ctx, req.Id)
 	if err != nil {
-		s.log.Warn("failed to get images for note before deletion", "note_id", req.Id, "error", err)
+		l.Warnw("failed to get images for note before deletion", "note_id", req.Id, zap.Error(err))
 	}
 
-	// Get audio files before deleting the note so we can clean them up from GCS
 	audios, err := s.db.GetAudiosByNoteID(ctx, req.Id)
 	if err != nil {
-		s.log.Warn("failed to get audios for note before deletion", "note_id", req.Id, "error", err)
+		l.Warnw("failed to get audios for note before deletion", "note_id", req.Id, zap.Error(err))
 	}
 
 	deleted, err := s.db.DeleteNote(ctx, req.UserId, req.Id)
@@ -396,20 +390,18 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 		return nil, status.Errorf(codes.Internal, "failed to delete note: %v", err)
 	}
 
-	// Clean up images from GCS if the note was deleted
 	if deleted && s.storage != nil {
 		for _, img := range images {
 			if err := s.storage.DeleteImage(ctx, img.GCSObjectName); err != nil {
-				s.log.Error("failed to delete image from GCS", "object_name", img.GCSObjectName, "error", err)
+				l.Errorw("failed to delete image from GCS", "object_name", img.GCSObjectName, zap.Error(err))
 			}
 		}
 	}
 
-	// Clean up audio files from GCS if the note was deleted
 	if deleted && s.storage != nil {
 		for _, aud := range audios {
 			if err := s.storage.DeleteImage(ctx, aud.GCSObjectName); err != nil {
-				s.log.Error("failed to delete audio from GCS", "object_name", aud.GCSObjectName, "error", err)
+				l.Errorw("failed to delete audio from GCS", "object_name", aud.GCSObjectName, zap.Error(err))
 			}
 		}
 	}

@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/icco/gutil/logging"
 	_ "github.com/lib/pq"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -54,10 +55,10 @@ func SetAuthContext(ctx context.Context, userID, authType string) context.Contex
 	return ctx
 }
 
-// Authenticator handles API key authentication
+// Authenticator handles API key authentication.
+// Loggers are sourced from per-call ctx via gutil/logging.
 type Authenticator struct {
-	db  *sql.DB
-	log *slog.Logger
+	db *sql.DB
 }
 
 // New creates a new Authenticator
@@ -77,8 +78,7 @@ func New() (*Authenticator, error) {
 	}
 
 	return &Authenticator{
-		db:  conn,
-		log: slog.Default(),
+		db: conn,
 	}, nil
 }
 
@@ -107,23 +107,21 @@ func (a *Authenticator) VerifyAPIKey(ctx context.Context, apiKey string) (string
 	if err != nil {
 		return "", fmt.Errorf("failed to query API keys: %w", err)
 	}
+	l := logging.FromContext(ctx)
 	defer func() {
 		if err := rows.Close(); err != nil {
-			a.log.Error("error closing rows", "error", err)
+			l.Errorw("error closing rows", zap.Error(err))
 		}
 	}()
 
-	// Check each potential match
 	for rows.Next() {
 		var id, keyHash, userID string
 		if err := rows.Scan(&id, &keyHash, &userID); err != nil {
 			return "", fmt.Errorf("failed to scan API key: %w", err)
 		}
 
-		// Compare the full key against the hash
 		if err := bcrypt.CompareHashAndPassword([]byte(keyHash), []byte(apiKey)); err == nil {
-			// Update last used timestamp
-			go a.updateLastUsed(id)
+			go a.updateLastUsed(logging.NewContext(context.Background(), l), id)
 			return userID, nil
 		}
 	}
@@ -135,12 +133,13 @@ func (a *Authenticator) VerifyAPIKey(ctx context.Context, apiKey string) (string
 	return "", fmt.Errorf("invalid API key")
 }
 
-// updateLastUsed updates the lastUsed timestamp for an API key
-func (a *Authenticator) updateLastUsed(keyID string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// updateLastUsed updates the lastUsed timestamp for an API key.
+// The provided ctx should already contain a logger via gutil/logging.NewContext.
+func (a *Authenticator) updateLastUsed(ctx context.Context, keyID string) {
+	bg, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, _ = a.db.ExecContext(ctx, `
+	_, _ = a.db.ExecContext(bg, `
 		UPDATE "ApiKey" SET "lastUsed" = $1 WHERE id = $2
 	`, time.Now(), keyID)
 }

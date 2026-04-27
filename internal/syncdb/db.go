@@ -3,23 +3,23 @@ package syncdb
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/icco/etu-backend/internal/crypto"
-	"github.com/icco/etu-backend/internal/logger"
 	"github.com/icco/etu-backend/internal/models"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// DB wraps the GORM database connection
+// DB wraps the GORM database connection.
+// Loggers are sourced from per-call ctx via gutil/logging.
 type DB struct {
 	conn *gorm.DB
-	log  *slog.Logger
 }
 
 // Re-export models for backwards compatibility
@@ -31,15 +31,14 @@ type SyncState = models.SyncState
 
 // decryptNotionKey decrypts a Notion API key if it's encrypted.
 // If ENCRYPTION_KEY is not set or decryption fails, it assumes the key is plaintext.
-func (db *DB) decryptNotionKey(encrypted string) string {
+func (db *DB) decryptNotionKey(ctx context.Context, encrypted string) string {
 	if encrypted == "" {
 		return ""
 	}
 
 	decrypted, err := crypto.Decrypt(encrypted)
 	if err != nil {
-		// If decryption fails, assume it's plaintext (backwards compatibility)
-		db.log.Warn("failed to decrypt Notion key, assuming plaintext", "error", err)
+		logging.FromContext(ctx).Warnw("failed to decrypt Notion key, assuming plaintext", zap.Error(err))
 		return encrypted
 	}
 
@@ -72,7 +71,6 @@ func New() (*DB, error) {
 
 	return &DB{
 		conn: conn,
-		log:  logger.New(),
 	}, nil
 }
 
@@ -327,10 +325,9 @@ func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 		return nil, err
 	}
 
-	// Decrypt Notion keys for all users
 	for i := range users {
 		if users[i].NotionKey != nil && *users[i].NotionKey != "" {
-			decrypted := db.decryptNotionKey(*users[i].NotionKey)
+			decrypted := db.decryptNotionKey(ctx, *users[i].NotionKey)
 			users[i].NotionKey = &decrypted
 		}
 	}
@@ -349,9 +346,8 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 		return nil, result.Error
 	}
 
-	// Decrypt Notion key if present
 	if user.NotionKey != nil && *user.NotionKey != "" {
-		decrypted := db.decryptNotionKey(*user.NotionKey)
+		decrypted := db.decryptNotionKey(ctx, *user.NotionKey)
 		user.NotionKey = &decrypted
 	}
 
