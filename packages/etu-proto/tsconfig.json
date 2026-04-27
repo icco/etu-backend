@@ -13,6 +13,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["gen/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "gen/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
