@@ -37,6 +37,8 @@ var (
 	CommitSHA = "unknown"
 )
 
+const statusKey = "status"
+
 func main() {
 	log := logger.New("etu-backend-server")
 
@@ -233,7 +235,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{
-			"status": "ok",
+			statusKey: "ok",
 			"commit": CommitSHA,
 		}); err != nil {
 			log.Errorw("error encoding health response", zap.Error(err))
@@ -244,7 +246,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{
-			"status": "ok",
+			statusKey: "ok",
 			"commit": CommitSHA,
 		}); err != nil {
 			log.Errorw("error encoding health response", zap.Error(err))
@@ -263,7 +265,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{
-			"status": "ready",
+			statusKey: "ready",
 		}); err != nil {
 			log.Errorw("error encoding ready response", zap.Error(err))
 		}

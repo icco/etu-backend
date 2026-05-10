@@ -16,6 +16,12 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	dirFromNotion    = "from-notion"
+	dirToNotion      = "to-notion"
+	dirBidirectional = "bidirectional"
+)
+
 func main() {
 	log := logger.New("etu-backend-sync")
 	rootCtx := logging.NewContext(context.Background(), log)
@@ -26,12 +32,12 @@ func main() {
 	flag.Parse()
 
 	validDirections := map[string]bool{
-		"from-notion":   true,
-		"to-notion":     true,
-		"bidirectional": true,
+		dirFromNotion:    true,
+		dirToNotion:      true,
+		dirBidirectional: true,
 	}
 	if !validDirections[*direction] {
-		log.Errorw("invalid direction value", "direction", *direction, "valid_options", []string{"from-notion", "to-notion", "bidirectional"})
+		log.Errorw("invalid direction value", "direction", *direction, "valid_options", []string{dirFromNotion, dirToNotion, dirBidirectional})
 		os.Exit(1)
 	}
 
@@ -155,16 +161,16 @@ func performSyncWithResult(ctx context.Context, syncer *sync.Syncer, userID stri
 	l := logging.FromContext(ctx).With("user_id", userID)
 
 	switch syncMode {
-	case "to-notion":
+	case dirToNotion:
 		result, err := syncer.SyncUserToNotion(ctx, userID)
 		if err != nil {
 			l.Errorw("sync to Notion failed",
-				"direction", "to-notion",
+				"direction", dirToNotion,
 				zap.Error(err))
 			return false
 		}
 		l.Infow("sync to Notion completed",
-			"direction", "to-notion",
+			"direction", dirToNotion,
 			"duration", result.Duration.String(),
 			"created", result.Created,
 			"updated", result.Updated,
@@ -172,16 +178,16 @@ func performSyncWithResult(ctx context.Context, syncer *sync.Syncer, userID stri
 			"errors", result.Errors)
 		return result.Errors == 0
 
-	case "bidirectional":
+	case dirBidirectional:
 		fromResult, toResult, err := syncer.SyncUserBidirectional(ctx, userID, fullSync)
 		if err != nil {
 			l.Errorw("bidirectional sync failed",
-				"direction", "bidirectional",
+				"direction", dirBidirectional,
 				zap.Error(err))
 			return false
 		}
 		l.Infow("bidirectional sync completed",
-			"direction", "bidirectional",
+			"direction", dirBidirectional,
 			"from_notion_duration", fromResult.Duration.String(),
 			"from_notion_created", fromResult.Created,
 			"from_notion_updated", fromResult.Updated,

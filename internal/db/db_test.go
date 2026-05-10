@@ -15,13 +15,13 @@ func TestParseTagSearch(t *testing.T) {
 		{
 			name:          "single tag",
 			search:        "tag:work",
-			wantTags:      []string{"work"},
+			wantTags:      []string{tagWork},
 			wantRemaining: "",
 		},
 		{
 			name:          "multiple tags",
 			search:        "tag:work tag:urgent",
-			wantTags:      []string{"work", "urgent"},
+			wantTags:      []string{tagWork, "urgent"},
 			wantRemaining: "",
 		},
 		{
@@ -57,7 +57,7 @@ func TestParseTagSearch(t *testing.T) {
 		{
 			name:          "invalid tag format ignored",
 			search:        "tag:Work tag:valid",
-			wantTags:      []string{"valid"},
+			wantTags:      []string{tagValid},
 			wantRemaining: "tag:Work",
 		},
 		{
@@ -156,12 +156,12 @@ func TestNormalizeTagNames(t *testing.T) {
 		{
 			name: "lowercases and trims values",
 			in:   []string{" Work ", "PERSONAL"},
-			want: []string{"work", "personal"},
+			want: []string{tagWork, "personal"},
 		},
 		{
 			name: "drops empty tags after normalization",
-			in:   []string{"", "   ", "\n", "valid"},
-			want: []string{"valid"},
+			in:   []string{"", "   ", "\n", tagValid},
+			want: []string{tagValid},
 		},
 		{
 			name: "returns nil for empty input",

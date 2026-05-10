@@ -62,8 +62,8 @@ func TestListTags(t *testing.T) {
 	ctx := context.Background()
 
 	// Add some tags
-	svc.addTag("user-123", "work", 5)
-	svc.addTag("user-123", "personal", 3)
+	svc.addTag(testUserID1, "work", 5)
+	svc.addTag(testUserID1, "personal", 3)
 	svc.addTag("user-456", "other", 1)
 
 	tests := []struct {
@@ -75,13 +75,13 @@ func TestListTags(t *testing.T) {
 		{
 			name: "valid list",
 			req: &pb.ListTagsRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			wantErr:   codes.OK,
 			wantCount: 2,
 		},
 		{
-			name:    "missing user_id",
+			name:    caseMissingUserID,
 			req:     &pb.ListTagsRequest{},
 			wantErr: codes.InvalidArgument,
 		},

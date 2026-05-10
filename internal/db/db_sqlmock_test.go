@@ -52,8 +52,8 @@ func TestGetUser_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(userID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "email", "name", "image", "passwordHash", "subscriptionStatus",
-			"subscriptionEnd", "createdAt", "stripeCustomerId", "notionKey", "updatedAt",
+			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
 			userID, "test@example.com", nil, nil, "hash", "free",
 			nil, now, nil, nil, now,
@@ -96,8 +96,8 @@ func TestGetUser_NotFound(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs("nonexistent", 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "email", "name", "image", "passwordHash", "subscriptionStatus",
-			"subscriptionEnd", "createdAt", "stripeCustomerId", "notionKey", "updatedAt",
+			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}))
 
 	ctx := context.Background()
@@ -134,8 +134,8 @@ func TestGetUserByEmail_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(email, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "email", "name", "image", "passwordHash", "subscriptionStatus",
-			"subscriptionEnd", "createdAt", "stripeCustomerId", "notionKey", "updatedAt",
+			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
 			userID, email, nil, nil, "hash", "free",
 			nil, now, nil, nil, now,
@@ -178,7 +178,7 @@ func TestDeleteNote_SQL(t *testing.T) {
 	noteID := testNoteID
 
 	// GORM may run in a transaction; postgres driver can trigger Begin.
-	// DELETE FROM "Note" WHERE id = $1 AND "userId" = $2
+	// DELETE FROM "Note" WHERE id = $1 AND colUserID = $2
 	mock.ExpectBegin()
 	mock.ExpectExec(`DELETE FROM "Note"`).
 		WithArgs(noteID, userID).
@@ -246,12 +246,12 @@ func TestListTags_SQL(t *testing.T) {
 	userID := "user-tags"
 	now := time.Now().UTC()
 
-	// ListTags: SELECT "Tag".*, COUNT("NoteTag"."noteId") ... LEFT JOIN "NoteTag" ... WHERE "Tag"."userId" = $1 GROUP BY "Tag".id ORDER BY "Tag".name
+	// ListTags: SELECT "Tag".*, COUNT("NoteTag".colNoteID) ... LEFT JOIN "NoteTag" ... WHERE "Tag".colUserID = $1 GROUP BY "Tag".id ORDER BY "Tag".name
 	mock.ExpectQuery(`SELECT (.+) FROM "Tag"`).
 		WithArgs(userID).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "name", "createdAt", "userId", "count",
-		}).AddRow("tag-1", "work", now, userID, 3).AddRow("tag-2", "personal", now, userID, 1))
+			"id", colName, colCreatedAt, colUserID, colCount,
+		}).AddRow("tag-1", tagWork, now, userID, 3).AddRow("tag-2", "personal", now, userID, 1))
 
 	ctx := context.Background()
 	tags, err := db.ListTags(ctx, userID)
@@ -261,7 +261,7 @@ func TestListTags_SQL(t *testing.T) {
 	if len(tags) != 2 {
 		t.Fatalf("ListTags: got %d tags, want 2", len(tags))
 	}
-	if tags[0].Name != "work" {
+	if tags[0].Name != tagWork {
 		t.Errorf("tags[0].Name = %q, want work", tags[0].Name)
 	}
 	if tags[0].Count != 3 {
@@ -295,25 +295,25 @@ func TestGetNote_SQL(t *testing.T) {
 	noteID := "note-abc"
 	now := time.Now().UTC()
 
-	// 1) GetNote: SELECT * FROM "Note" WHERE id = $1 AND "userId" = $2 ORDER BY ... LIMIT $3
+	// 1) GetNote: SELECT * FROM "Note" WHERE id = $1 AND colUserID = $2 ORDER BY ... LIMIT $3
 	mock.ExpectQuery(`SELECT (.+) FROM "Note" (.+)`).
 		WithArgs(noteID, userID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "content", "createdAt", "updatedAt", "userId",
-			"externalId", "notionUuid", "lastSyncedToNotion",
+			"id", colContent, colCreatedAt, colUpdatedAt, colUserID,
+			colExternalID, colNotionUUID, colLastSyncedToNotion,
 		}).AddRow(noteID, "hello world", now, now, userID, nil, nil, nil))
 
 	// 2) getNoteTags: JOIN Tag with NoteTag WHERE noteId = $1
 	mock.ExpectQuery(`SELECT (.+) FROM "Tag"`).
 		WithArgs(noteID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "createdAt", "userId"}).
-			AddRow("tag-1", "work", now, userID))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colName, colCreatedAt, colUserID}).
+			AddRow("tag-1", tagWork, now, userID))
 
-	// 3) getNoteImages: SELECT * FROM "NoteImage" WHERE "noteId" = $1
+	// 3) getNoteImages: SELECT * FROM "NoteImage" WHERE colNoteID = $1
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(noteID).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt",
+			"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt,
 		}))
 
 	ctx := context.Background()
@@ -328,7 +328,7 @@ func TestGetNote_SQL(t *testing.T) {
 	if note.ID != noteID || note.Content != "hello world" {
 		t.Errorf("note = %+v", note)
 	}
-	if len(note.Tags) != 1 || note.Tags[0].Name != "work" {
+	if len(note.Tags) != 1 || note.Tags[0].Name != tagWork {
 		t.Errorf("note.Tags = %+v", note.Tags)
 	}
 	if len(note.Images) != 0 {
@@ -356,30 +356,30 @@ func TestListNotes_SQL(t *testing.T) {
 	noteID := testNoteID
 	now := time.Now().UTC()
 
-	// 1) Count: SELECT count(*) FROM "Note" WHERE "userId" = $1
+	// 1) Count: SELECT count(*) FROM "Note" WHERE colUserID = $1
 	mock.ExpectQuery(`SELECT count\(.+\) FROM "Note"`).
 		WithArgs(userID).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+		WillReturnRows(sqlmock.NewRows([]string{colCount}).AddRow(1))
 
-	// 2) Find: SELECT * FROM "Note" WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT $2 (offset 0 may be in SQL)
+	// 2) Find: SELECT * FROM "Note" WHERE colUserID = $1 ORDER BY colCreatedAt DESC LIMIT $2 (offset 0 may be in SQL)
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(userID, 10).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "content", "createdAt", "updatedAt", "userId",
-			"externalId", "notionUuid", "lastSyncedToNotion",
-		}).AddRow(noteID, "content", now, now, userID, nil, nil, nil))
+			"id", colContent, colCreatedAt, colUpdatedAt, colUserID,
+			colExternalID, colNotionUUID, colLastSyncedToNotion,
+		}).AddRow(noteID, colContent, now, now, userID, nil, nil, nil))
 
 	// 3) getTagsForNotes: batch fetch tags for note IDs
 	mock.ExpectQuery(`SELECT (.+) FROM "Tag"`).
 		WithArgs(sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"note_id", "id", "name", "createdAt", "userId"}).
-			AddRow(noteID, "tag-1", "work", now, userID))
+		WillReturnRows(sqlmock.NewRows([]string{"note_id", "id", colName, colCreatedAt, colUserID}).
+			AddRow(noteID, "tag-1", tagWork, now, userID))
 
 	// 4) getImagesForNotes: batch fetch images
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt",
+			"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt,
 		}))
 
 	ctx := context.Background()
@@ -396,7 +396,7 @@ func TestListNotes_SQL(t *testing.T) {
 	if notes[0].ID != noteID {
 		t.Errorf("notes[0].ID = %q, want %q", notes[0].ID, noteID)
 	}
-	if diff := cmp.Diff(notes[0].Tags, []Tag{{ID: "tag-1", Name: "work", CreatedAt: now, UserID: userID}}); diff != "" {
+	if diff := cmp.Diff(notes[0].Tags, []Tag{{ID: "tag-1", Name: tagWork, CreatedAt: now, UserID: userID}}); diff != "" {
 		t.Errorf("notes[0].Tags mismatch (-got +want):\n%s", diff)
 	}
 
@@ -431,11 +431,11 @@ func TestCreateNote_SQL(t *testing.T) {
 	// getNoteTags
 	mock.ExpectQuery(`SELECT (.+) FROM "Tag"`).
 		WithArgs(sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "createdAt", "userId"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colName, colCreatedAt, colUserID}))
 	// getNoteImages
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt}))
 
 	ctx := context.Background()
 	note, err := db.CreateNote(ctx, userID, "hello", nil)
@@ -476,7 +476,7 @@ func TestUpdateNote_NotFound(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs("note-missing", testUserID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId", "externalId", "notionUuid", "lastSyncedToNotion"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}))
 	mock.ExpectCommit()
 
 	ctx := context.Background()
@@ -548,11 +548,11 @@ func TestRemoveImageFromNote_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(noteID, userID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId", "externalId", "notionUuid", "lastSyncedToNotion"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}).
 			AddRow(noteID, "c", now, now, userID, nil, nil, nil))
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(imageID, noteID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt}).
 			AddRow(imageID, noteID, "https://u", gcsName, "", "image/png", now))
 	mock.ExpectBegin()
 	mock.ExpectExec(`DELETE FROM "NoteImage"`).
@@ -588,7 +588,7 @@ func TestRemoveImageFromNote_NoteNotFound(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs("note-missing", testUserID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID}))
 
 	ctx := context.Background()
 	_, err = db.RemoveImageFromNote(ctx, testUserID, "note-missing", testImageID)
@@ -618,7 +618,7 @@ func TestGetNoteImages_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(noteID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt}).
 			AddRow(testImageID, noteID, "https://a", "gcs/a", "", "image/png", now))
 
 	ctx := context.Background()
@@ -652,7 +652,7 @@ func TestGetImagesByNoteID_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(noteID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt}).
 			AddRow("i1", noteID, "u", "g", "", "", now))
 
 	ctx := context.Background()
@@ -724,11 +724,11 @@ func TestRemoveAudioFromNote_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(noteID, userID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId", "externalId", "notionUuid", "lastSyncedToNotion"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}).
 			AddRow(noteID, "c", now, now, userID, nil, nil, nil))
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteAudio"`).
 		WithArgs(audioID, noteID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "transcribedText", "mimeType", "createdAt"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, colURL, colGCSObjectName, colTranscribedText, colMimeType, colCreatedAt}).
 			AddRow(audioID, noteID, "https://u", gcsName, "", "audio/mpeg", now))
 	mock.ExpectBegin()
 	mock.ExpectExec(`DELETE FROM "NoteAudio"`).
@@ -764,7 +764,7 @@ func TestRemoveAudioFromNote_NoteNotFound(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs("note-missing", testUserID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID}))
 
 	ctx := context.Background()
 	_, err = db.RemoveAudioFromNote(ctx, testUserID, "note-missing", "aud-1")
@@ -794,7 +794,7 @@ func TestGetAudiosByNoteID_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteAudio"`).
 		WithArgs(noteID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "transcribedText", "mimeType", "createdAt"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, colURL, colGCSObjectName, colTranscribedText, colMimeType, colCreatedAt}).
 			AddRow("a1", noteID, "u", "g", "", "", now))
 
 	ctx := context.Background()
@@ -813,8 +813,8 @@ func TestGetAudiosByNoteID_SQL(t *testing.T) {
 
 // userRowColumns is the column set for scanning User in tests.
 var userRowColumns = []string{
-	"id", "email", "name", "image", "passwordHash", "subscriptionStatus",
-	"subscriptionEnd", "createdAt", "stripeCustomerId", "notionKey", "notionDatabaseName", "updatedAt",
+	"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+	colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, "notionDatabaseName", colUpdatedAt,
 }
 
 func TestCreateUser_SQL(t *testing.T) {
@@ -985,7 +985,7 @@ func TestListApiKeys_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "ApiKey"`).
 		WithArgs(userID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "keyPrefix", "createdAt", "lastUsed", "userId"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colName, "keyPrefix", colCreatedAt, "lastUsed", colUserID}).
 			AddRow("key-1", "k1", "pre", now, nil, userID))
 
 	ctx := context.Background()
@@ -1049,7 +1049,7 @@ func TestGetApiKeysByPrefix_SQL(t *testing.T) {
 	now := time.Now().UTC()
 	mock.ExpectQuery(`SELECT (.+) FROM "ApiKey"`).
 		WithArgs("prefix_abc").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "keyPrefix", "keyHash", "userId", "createdAt", "lastUsed"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colName, "keyPrefix", "keyHash", colUserID, colCreatedAt, "lastUsed"}).
 			AddRow("key-1", "k", "prefix_abc", "hash", testUserID, now, nil))
 
 	ctx := context.Background()
@@ -1113,11 +1113,11 @@ func TestGetNotesWithFewTags_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(userID, 2).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId", "externalId", "notionUuid", "lastSyncedToNotion"}).
-			AddRow(noteID, "content", now, now, userID, nil, nil, nil))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}).
+			AddRow(noteID, colContent, now, now, userID, nil, nil, nil))
 	mock.ExpectQuery(`SELECT (.+) FROM "Tag"`).
 		WithArgs(noteID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "createdAt", "userId"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colName, colCreatedAt, colUserID}))
 
 	ctx := context.Background()
 	notes, err := db.GetNotesWithFewTags(ctx, userID, 2)
@@ -1152,17 +1152,17 @@ func TestAddTagsToNote_SQL(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(noteID, userID, 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId", "externalId", "notionUuid", "lastSyncedToNotion"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}).
 			AddRow(noteID, "c", now, now, userID, nil, nil, nil))
 	mock.ExpectQuery(`SELECT (.+) FROM "Tag"`).
-		WithArgs(userID, "work", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "createdAt", "userId"}))
+		WithArgs(userID, tagWork, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colName, colCreatedAt, colUserID}))
 	mock.ExpectExec(`INSERT INTO "Tag"`).
-		WithArgs(sqlmock.AnyArg(), "work", sqlmock.AnyArg(), userID).
+		WithArgs(sqlmock.AnyArg(), tagWork, sqlmock.AnyArg(), userID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteTag"`).
 		WithArgs(noteID, sqlmock.AnyArg(), 1).
-		WillReturnRows(sqlmock.NewRows([]string{"noteId", "tagId"}))
+		WillReturnRows(sqlmock.NewRows([]string{colNoteID, "tagId"}))
 	mock.ExpectExec(`INSERT INTO "NoteTag"`).
 		WithArgs(noteID, sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -1172,7 +1172,7 @@ func TestAddTagsToNote_SQL(t *testing.T) {
 	mock.ExpectCommit()
 
 	ctx := context.Background()
-	err = db.AddTagsToNote(ctx, userID, noteID, []string{"work"})
+	err = db.AddTagsToNote(ctx, userID, noteID, []string{tagWork})
 	if err != nil {
 		t.Fatalf("AddTagsToNote: %v", err)
 	}
@@ -1342,14 +1342,14 @@ func TestGetRandomNotes_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(userID, 5).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "content", "createdAt", "updatedAt", "userId", "externalId", "notionUuid", "lastSyncedToNotion"}).
+		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}).
 			AddRow(noteID, "c", now, now, userID, nil, nil, nil))
 	mock.ExpectQuery(`SELECT (.+) FROM "Tag"`).
 		WithArgs(sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"note_id", "id", "name", "createdAt", "userId"}))
+		WillReturnRows(sqlmock.NewRows([]string{"note_id", "id", colName, colCreatedAt, colUserID}))
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage"`).
 		WithArgs(sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt}))
 
 	ctx := context.Background()
 	notes, err := db.GetRandomNotes(ctx, userID, 5)
@@ -1381,13 +1381,13 @@ func TestGetStats_SQL(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT count\(.+\) FROM "Note"`).
 		WithArgs(userID).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(42))
+		WillReturnRows(sqlmock.NewRows([]string{colCount}).AddRow(42))
 	mock.ExpectQuery(`SELECT count\(.+\) FROM "Tag"`).
 		WithArgs(userID).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(10))
+		WillReturnRows(sqlmock.NewRows([]string{colCount}).AddRow(10))
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(userID, 1000).
-		WillReturnRows(sqlmock.NewRows([]string{"content"}).AddRow("one two three"))
+		WillReturnRows(sqlmock.NewRows([]string{colContent}).AddRow("one two three"))
 
 	ctx := context.Background()
 	blips, tags, words, err := db.GetStats(ctx, userID)
@@ -1419,7 +1419,7 @@ func TestGetImagesWithoutExtractedText(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteImage" WHERE "extractedText" = (.+)`).
 		WithArgs("").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "noteId", "url", "gcsObjectName", "extractedText", "mimeType", "createdAt",
+			"id", colNoteID, colURL, colGCSObjectName, colExtractedText, colMimeType, colCreatedAt,
 		}).AddRow(
 			testImageID, testNoteID, "https://example.com/img1.jpg", "images/img1.jpg", "", "image/jpeg", now,
 		).AddRow(
@@ -1520,7 +1520,7 @@ func TestGetAudiosWithoutTranscription(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "NoteAudio" WHERE "transcribedText" = (.+)`).
 		WithArgs("").
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "noteId", "url", "gcsObjectName", "transcribedText", "mimeType", "createdAt",
+			"id", colNoteID, colURL, colGCSObjectName, colTranscribedText, colMimeType, colCreatedAt,
 		}).AddRow(
 			"audio-1", testNoteID, "https://example.com/audio1.mp3", "audio/audio1.mp3", "", "audio/mpeg", now,
 		).AddRow(

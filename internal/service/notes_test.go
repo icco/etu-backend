@@ -190,14 +190,14 @@ func TestCreateNote(t *testing.T) {
 		{
 			name: "valid note",
 			req: &pb.CreateNoteRequest{
-				UserId:  "user-123",
+				UserId:  testUserID1,
 				Content: "Test note content",
 				Tags:    []string{"tag1", "tag2"},
 			},
 			wantErr: codes.OK,
 		},
 		{
-			name: "missing user_id",
+			name: caseMissingUserID,
 			req: &pb.CreateNoteRequest{
 				Content: "Test note content",
 			},
@@ -206,14 +206,14 @@ func TestCreateNote(t *testing.T) {
 		{
 			name: "missing content and images",
 			req: &pb.CreateNoteRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			wantErr: codes.InvalidArgument,
 		},
 		{
 			name: "image only without storage configured",
 			req: &pb.CreateNoteRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 				Images: []*pb.ImageUpload{{Data: []byte("test"), MimeType: "image/png"}},
 			},
 			wantErr: codes.FailedPrecondition,
@@ -256,7 +256,7 @@ func TestGetNote(t *testing.T) {
 
 	// Create a note first
 	createResp, _ := svc.CreateNote(ctx, &pb.CreateNoteRequest{
-		UserId:  "user-123",
+		UserId:  testUserID1,
 		Content: "Test content",
 	})
 
@@ -268,13 +268,13 @@ func TestGetNote(t *testing.T) {
 		{
 			name: "valid get",
 			req: &pb.GetNoteRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 				Id:     createResp.Note.Id,
 			},
 			wantErr: codes.OK,
 		},
 		{
-			name: "missing user_id",
+			name: caseMissingUserID,
 			req: &pb.GetNoteRequest{
 				Id: createResp.Note.Id,
 			},
@@ -283,14 +283,14 @@ func TestGetNote(t *testing.T) {
 		{
 			name: "missing id",
 			req: &pb.GetNoteRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			wantErr: codes.InvalidArgument,
 		},
 		{
 			name: "wrong user",
 			req: &pb.GetNoteRequest{
-				UserId: "user-456",
+				UserId: testUserID2,
 				Id:     createResp.Note.Id,
 			},
 			wantErr: codes.NotFound,
@@ -298,7 +298,7 @@ func TestGetNote(t *testing.T) {
 		{
 			name: "non-existent note",
 			req: &pb.GetNoteRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 				Id:     "non-existent",
 			},
 			wantErr: codes.NotFound,
@@ -338,11 +338,11 @@ func TestListNotes(t *testing.T) {
 
 	// Create some notes
 	_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
-		UserId:  "user-123",
+		UserId:  testUserID1,
 		Content: "Note 1",
 	})
 	_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
-		UserId:  "user-123",
+		UserId:  testUserID1,
 		Content: "Note 2",
 	})
 
@@ -354,12 +354,12 @@ func TestListNotes(t *testing.T) {
 		{
 			name: "valid list",
 			req: &pb.ListNotesRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			wantErr: codes.OK,
 		},
 		{
-			name: "missing user_id",
+			name: caseMissingUserID,
 			req: &pb.ListNotesRequest{
 				Limit: 10,
 			},
@@ -400,7 +400,7 @@ func TestDeleteNote(t *testing.T) {
 
 	// Create a note first
 	createResp, _ := svc.CreateNote(ctx, &pb.CreateNoteRequest{
-		UserId:  "user-123",
+		UserId:  testUserID1,
 		Content: "Test content",
 	})
 
@@ -413,14 +413,14 @@ func TestDeleteNote(t *testing.T) {
 		{
 			name: "valid delete",
 			req: &pb.DeleteNoteRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 				Id:     createResp.Note.Id,
 			},
 			wantErr:     codes.OK,
 			wantSuccess: true,
 		},
 		{
-			name: "missing user_id",
+			name: caseMissingUserID,
 			req: &pb.DeleteNoteRequest{
 				Id: createResp.Note.Id,
 			},
@@ -429,7 +429,7 @@ func TestDeleteNote(t *testing.T) {
 		{
 			name: "missing id",
 			req: &pb.DeleteNoteRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			wantErr: codes.InvalidArgument,
 		},
@@ -469,7 +469,7 @@ func TestGetRandomNotes(t *testing.T) {
 	// Create several notes for testing
 	for i := 1; i <= 10; i++ {
 		_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
-			UserId:  "user-123",
+			UserId:  testUserID1,
 			Content: fmt.Sprintf("Test note %d", i),
 		})
 	}
@@ -477,7 +477,7 @@ func TestGetRandomNotes(t *testing.T) {
 	// Create a smaller set of notes for another user
 	for i := 1; i <= 2; i++ {
 		_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
-			UserId:  "user-456",
+			UserId:  testUserID2,
 			Content: fmt.Sprintf("Test note for user-456: %d", i),
 		})
 	}
@@ -492,7 +492,7 @@ func TestGetRandomNotes(t *testing.T) {
 		{
 			name: "valid get random notes with default count",
 			req: &pb.GetRandomNotesRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			wantErr:      codes.OK,
 			wantNotesMin: 5,
@@ -501,7 +501,7 @@ func TestGetRandomNotes(t *testing.T) {
 		{
 			name: "valid get random notes with custom count",
 			req: &pb.GetRandomNotesRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 				Count:  3,
 			},
 			wantErr:      codes.OK,
@@ -511,7 +511,7 @@ func TestGetRandomNotes(t *testing.T) {
 		{
 			name: "valid get random notes with count larger than available",
 			req: &pb.GetRandomNotesRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 				Count:  20,
 			},
 			wantErr:      codes.OK,
@@ -521,7 +521,7 @@ func TestGetRandomNotes(t *testing.T) {
 		{
 			name: "request more notes than available (small dataset)",
 			req: &pb.GetRandomNotesRequest{
-				UserId: "user-456",
+				UserId: testUserID2,
 				Count:  5,
 			},
 			wantErr:      codes.OK,
@@ -529,7 +529,7 @@ func TestGetRandomNotes(t *testing.T) {
 			wantNotesMax: 2,
 		},
 		{
-			name: "missing user_id",
+			name: caseMissingUserID,
 			req: &pb.GetRandomNotesRequest{
 				Count: 5,
 			},
@@ -583,7 +583,7 @@ func TestGetRandomNotes(t *testing.T) {
 		svc := newMockNotesService()
 		for i := 1; i <= 10; i++ {
 			_, _ = svc.CreateNote(ctx, &pb.CreateNoteRequest{
-				UserId:  "user-123",
+				UserId:  testUserID1,
 				Content: fmt.Sprintf("Note %d", i),
 			})
 		}
@@ -592,7 +592,7 @@ func TestGetRandomNotes(t *testing.T) {
 		orderings := make([][]string, 0, 20)
 		for i := 0; i < 20; i++ {
 			resp, err := svc.GetRandomNotes(ctx, &pb.GetRandomNotesRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 				Count:  5,
 			})
 			if err != nil {
