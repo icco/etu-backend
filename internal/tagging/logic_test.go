@@ -14,12 +14,12 @@ func TestExtractHashtags(t *testing.T) {
 		{
 			name:    "extracts hashtags from content",
 			content: "Write #Work notes and #planning docs",
-			want:    []string{"work", "planning"},
+			want:    []string{tagWork, "planning"},
 		},
 		{
 			name:    "deduplicates hashtags case insensitively",
 			content: "#Work #work #WORK",
-			want:    []string{"work"},
+			want:    []string{tagWork},
 		},
 		{
 			name:    "supports alphanumeric hashtag body",
@@ -59,11 +59,11 @@ func TestSelectGeneratedTags(t *testing.T) {
 		"already": true,
 	}
 	existingTagNames := map[string]bool{
-		"work": true,
+		tagWork: true,
 	}
 
 	got := SelectGeneratedTags(generated, existingNoteTags, existingTagNames, 3)
-	want := []string{"work", "newtag", "misc"}
+	want := []string{tagWork, "newtag", "misc"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("SelectGeneratedTags() = %v, want %v", got, want)
 	}
@@ -71,7 +71,7 @@ func TestSelectGeneratedTags(t *testing.T) {
 
 func TestSelectHashtagsToAdd(t *testing.T) {
 	existingNoteTags := map[string]bool{
-		"work": true,
+		tagWork: true,
 	}
 
 	got := SelectHashtagsToAdd("#Work #new #other", existingNoteTags, 1)

@@ -28,20 +28,20 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 
 	service := NewAuthService(database)
 
-	// Create a password hash for "testpass"
-	passwordHash, _ := bcrypt.GenerateFromPassword([]byte("testpass"), bcrypt.DefaultCost)
+	// Create a password hash for testPassword
+	passwordHash, _ := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
 
 	t.Run("successful authentication clears failed attempts", func(t *testing.T) {
 		ctx := context.Background()
 
 		// Expect GetUserByEmail
 		mock.ExpectQuery(`SELECT \* FROM "User"`).
-			WithArgs("test@example.com", 1).
+			WithArgs(testEmail, 1).
 			WillReturnRows(sqlmock.NewRows([]string{
-				"id", "email", "passwordHash", "subscriptionStatus", "createdAt", "updatedAt",
-				"disabled", "failedLoginAttempts",
+				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
+				colDisabled, colFailedLoginAttempts,
 			}).AddRow(
-				"user123", "test@example.com", string(passwordHash), "free", time.Now(), time.Now(),
+				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
 				false, 3,
 			))
 
@@ -53,8 +53,8 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 		mock.ExpectCommit()
 
 		resp, err := service.Authenticate(ctx, &pb.AuthenticateRequest{
-			Email:    "test@example.com",
-			Password: "testpass",
+			Email:    testEmail,
+			Password: testPassword,
 		})
 
 		if err != nil {
@@ -73,12 +73,12 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 
 		// Expect GetUserByEmail
 		mock.ExpectQuery(`SELECT \* FROM "User"`).
-			WithArgs("test@example.com", 1).
+			WithArgs(testEmail, 1).
 			WillReturnRows(sqlmock.NewRows([]string{
-				"id", "email", "passwordHash", "subscriptionStatus", "createdAt", "updatedAt",
-				"disabled", "failedLoginAttempts",
+				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
+				colDisabled, colFailedLoginAttempts,
 			}).AddRow(
-				"user123", "test@example.com", string(passwordHash), "free", time.Now(), time.Now(),
+				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
 				false, 2,
 			))
 
@@ -87,10 +87,10 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 		mock.ExpectQuery(`SELECT \* FROM "User"`).
 			WithArgs("user123", 1).
 			WillReturnRows(sqlmock.NewRows([]string{
-				"id", "email", "passwordHash", "subscriptionStatus", "createdAt", "updatedAt",
-				"disabled", "failedLoginAttempts",
+				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
+				colDisabled, colFailedLoginAttempts,
 			}).AddRow(
-				"user123", "test@example.com", string(passwordHash), "free", time.Now(), time.Now(),
+				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
 				false, 2,
 			))
 		mock.ExpectExec(`UPDATE "User"`).
@@ -102,7 +102,7 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 		mock.ExpectCommit()
 
 		resp, err := service.Authenticate(ctx, &pb.AuthenticateRequest{
-			Email:    "test@example.com",
+			Email:    testEmail,
 			Password: "wrongpass",
 		})
 
@@ -119,18 +119,18 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 
 		// Expect GetUserByEmail
 		mock.ExpectQuery(`SELECT \* FROM "User"`).
-			WithArgs("test@example.com", 1).
+			WithArgs(testEmail, 1).
 			WillReturnRows(sqlmock.NewRows([]string{
-				"id", "email", "passwordHash", "subscriptionStatus", "createdAt", "updatedAt",
-				"disabled", "disabledReason", "failedLoginAttempts",
+				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
+				colDisabled, "disabledReason", colFailedLoginAttempts,
 			}).AddRow(
-				"user123", "test@example.com", string(passwordHash), "free", time.Now(), time.Now(),
+				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
 				true, "Terms violation", 0,
 			))
 
 		_, err := service.Authenticate(ctx, &pb.AuthenticateRequest{
-			Email:    "test@example.com",
-			Password: "testpass",
+			Email:    testEmail,
+			Password: testPassword,
 		})
 
 		if err == nil {
@@ -151,18 +151,18 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 
 		// Expect GetUserByEmail
 		mock.ExpectQuery(`SELECT \* FROM "User"`).
-			WithArgs("test@example.com", 1).
+			WithArgs(testEmail, 1).
 			WillReturnRows(sqlmock.NewRows([]string{
-				"id", "email", "passwordHash", "subscriptionStatus", "createdAt", "updatedAt",
-				"disabled", "failedLoginAttempts",
+				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
+				colDisabled, colFailedLoginAttempts,
 			}).AddRow(
-				"user123", "test@example.com", string(passwordHash), "free", time.Now(), time.Now(),
+				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
 				false, 10,
 			))
 
 		_, err := service.Authenticate(ctx, &pb.AuthenticateRequest{
-			Email:    "test@example.com",
-			Password: "testpass",
+			Email:    testEmail,
+			Password: testPassword,
 		})
 
 		if err == nil {

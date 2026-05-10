@@ -15,10 +15,10 @@ import (
 
 // userColumns lists all columns of the User table in the order GORM scans them.
 var userColumns = []string{
-	"id", "email", "name", "image", "passwordHash", "subscriptionStatus",
-	"subscriptionEnd", "createdAt", "stripeCustomerId", "notionKey",
-	"notionDatabaseName", "profileImageGCSObject", "updatedAt",
-	"disabled", "disabledReason", "failedLoginAttempts", "lastFailedLogin",
+	"id", colEmail, "name", "image", colPasswordHash, colSubscriptionStatus,
+	"subscriptionEnd", colCreatedAt, "stripeCustomerId", "notionKey",
+	"notionDatabaseName", "profileImageGCSObject", colUpdatedAt,
+	colDisabled, "disabledReason", colFailedLoginAttempts, "lastFailedLogin",
 }
 
 // testProfileImageGCSObject is a fixture GCS object name reused across the
@@ -50,18 +50,18 @@ func TestGetUserSettings_Basic(t *testing.T) {
 	svc, mock, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 	now := time.Now()
 
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", 1).
+		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", "https://img.example/old.png", "hash",
+			testUserNameRow, "a@b.com", "Alice", "https://img.example/old.png", "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
 
-	resp, err := svc.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: "user1"})
+	resp, err := svc.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: testUserNameRow})
 	if err != nil {
 		t.Fatalf("GetUserSettings: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestGetUserSettings_MissingUserID(t *testing.T) {
 	svc, _, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 
 	_, err := svc.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: ""})
 	if err == nil {
@@ -100,19 +100,19 @@ func TestGetUserSettings_RefreshSignedURL_ImgixDomain(t *testing.T) {
 	svc, mock, cleanup := newTestUserSettingsService(t, "my-imgix.imgix.net")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 	now := time.Now()
 	gcsObj := testProfileImageGCSObject
 
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", 1).
+		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", "https://old-signed-url.example", "hash",
+			testUserNameRow, "a@b.com", "Alice", "https://old-signed-url.example", "hash",
 			"active", nil, now, nil, nil, nil, &gcsObj, now,
 			false, nil, 0, nil,
 		))
 
-	resp, err := svc.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: "user1"})
+	resp, err := svc.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: testUserNameRow})
 	if err != nil {
 		t.Fatalf("GetUserSettings: %v", err)
 	}
@@ -134,20 +134,20 @@ func TestGetUserSettings_RefreshSignedURL_NoImgixNoStorage(t *testing.T) {
 	svc, mock, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 	now := time.Now()
 	gcsObj := testProfileImageGCSObject
 	oldImage := "https://old-signed-url.example"
 
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", 1).
+		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", &oldImage, "hash",
+			testUserNameRow, "a@b.com", "Alice", &oldImage, "hash",
 			"active", nil, now, nil, nil, nil, &gcsObj, now,
 			false, nil, 0, nil,
 		))
 
-	resp, err := svc.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: "user1"})
+	resp, err := svc.GetUserSettings(ctx, &pb.GetUserSettingsRequest{UserId: testUserNameRow})
 	if err != nil {
 		t.Fatalf("GetUserSettings: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestUpdateUserSettings_MissingUserID(t *testing.T) {
 	svc, _, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 
 	_, err := svc.UpdateUserSettings(ctx, &pb.UpdateUserSettingsRequest{UserId: ""})
 	if err == nil {
@@ -187,10 +187,10 @@ func TestUpdateUserSettings_ProfileImageUpload_NilStorage(t *testing.T) {
 	svc, _, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 
 	_, err := svc.UpdateUserSettings(ctx, &pb.UpdateUserSettingsRequest{
-		UserId: "user1",
+		UserId: testUserNameRow,
 		ProfileImageUpload: &pb.ImageUpload{
 			Data:     []byte{0x89, 0x50, 0x4E, 0x47}, // PNG magic bytes (partial)
 			MimeType: "image/png",
@@ -215,28 +215,28 @@ func TestUpdateUserSettings_NoImageFieldInProto(t *testing.T) {
 	svc, mock, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 	now := time.Now()
 
 	// Step 1: SELECT to find the existing user
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", 1).
+		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", "https://old.example/img.png", "hash",
+			testUserNameRow, "a@b.com", "Alice", "https://old.example/img.png", "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
 	// Step 2: UPDATE — only updatedAt changes
 	mock.ExpectBegin()
 	mock.ExpectExec(`UPDATE "User"`).
-		WithArgs(sqlmock.AnyArg(), "user1").
+		WithArgs(sqlmock.AnyArg(), testUserNameRow).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	// Step 3: SELECT to reload user
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", "user1", 1).
+		WithArgs(testUserNameRow, testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", "https://old.example/img.png", "hash",
+			testUserNameRow, "a@b.com", "Alice", "https://old.example/img.png", "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
@@ -244,7 +244,7 @@ func TestUpdateUserSettings_NoImageFieldInProto(t *testing.T) {
 	// Send a request with no image-related fields — only name is absent too,
 	// so the DB update should only set updatedAt.
 	resp, err := svc.UpdateUserSettings(ctx, &pb.UpdateUserSettingsRequest{
-		UserId: "user1",
+		UserId: testUserNameRow,
 	})
 	if err != nil {
 		t.Fatalf("UpdateUserSettings: %v", err)
@@ -266,15 +266,15 @@ func TestUpdateUserSettings_NameOnly(t *testing.T) {
 	svc, mock, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 	now := time.Now()
 	newName := "Bob"
 
 	// Step 1: SELECT to find the existing user
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", 1).
+		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", nil, "hash",
+			testUserNameRow, "a@b.com", "Alice", nil, "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
@@ -283,21 +283,21 @@ func TestUpdateUserSettings_NameOnly(t *testing.T) {
 	mock.ExpectExec(`UPDATE "User"`).
 		WithArgs(
 			sqlmock.AnyArg(), sqlmock.AnyArg(),
-			"user1",
+			testUserNameRow,
 		).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	// Step 3: SELECT to reload user (GORM adds "User"."id" = $2 from the model)
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", "user1", 1).
+		WithArgs(testUserNameRow, testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", &newName, nil, "hash",
+			testUserNameRow, "a@b.com", &newName, nil, "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
 
 	resp, err := svc.UpdateUserSettings(ctx, &pb.UpdateUserSettingsRequest{
-		UserId: "user1",
+		UserId: testUserNameRow,
 		Name:   &newName,
 	})
 	if err != nil {
@@ -316,36 +316,36 @@ func TestUpdateUserSettings_ClearProfileImage(t *testing.T) {
 	svc, mock, cleanup := newTestUserSettingsService(t, "")
 	defer cleanup()
 
-	ctx := auth.SetAuthContext(context.Background(), "user1", "m2m")
+	ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
 	now := time.Now()
 	clearFlag := true
 
 	// Step 1: SELECT existing user (has a profile image)
 	gcsObj := testProfileImageGCSObject
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", 1).
+		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", "https://signed.example/img", "hash",
+			testUserNameRow, "a@b.com", "Alice", "https://signed.example/img", "hash",
 			"active", nil, now, nil, nil, nil, &gcsObj, now,
 			false, nil, 0, nil,
 		))
 	// Step 2: UPDATE — clears image and profileImageGCSObject
 	mock.ExpectBegin()
 	mock.ExpectExec(`UPDATE "User"`).
-		WithArgs("", "", sqlmock.AnyArg(), "user1").
+		WithArgs("", "", sqlmock.AnyArg(), testUserNameRow).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	// Step 3: SELECT to reload user
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user1", "user1", 1).
+		WithArgs(testUserNameRow, testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			"user1", "a@b.com", "Alice", "", "hash",
+			testUserNameRow, "a@b.com", "Alice", "", "hash",
 			"active", nil, now, nil, nil, nil, "", now,
 			false, nil, 0, nil,
 		))
 
 	resp, err := svc.UpdateUserSettings(ctx, &pb.UpdateUserSettingsRequest{
-		UserId:            "user1",
+		UserId:            testUserNameRow,
 		ClearProfileImage: &clearFlag,
 	})
 	if err != nil {
@@ -367,7 +367,7 @@ func TestRefreshProfileImageURL_NilObject(t *testing.T) {
 	defer cleanup()
 
 	user := &db.User{
-		ID:                    "user1",
+		ID:                    testUserNameRow,
 		Image:                 strPtr("https://original.example/img.png"),
 		ProfileImageGCSObject: nil,
 	}
@@ -386,7 +386,7 @@ func TestRefreshProfileImageURL_EmptyObject(t *testing.T) {
 
 	empty := ""
 	user := &db.User{
-		ID:                    "user1",
+		ID:                    testUserNameRow,
 		Image:                 strPtr("https://original.example/img.png"),
 		ProfileImageGCSObject: &empty,
 	}
@@ -405,7 +405,7 @@ func TestRefreshProfileImageURL_WithImgixDomain(t *testing.T) {
 
 	gcsObj := testProfileImageGCSObject
 	user := &db.User{
-		ID:                    "user1",
+		ID:                    testUserNameRow,
 		Image:                 strPtr("https://old.example/img.png"),
 		ProfileImageGCSObject: &gcsObj,
 	}
@@ -426,7 +426,7 @@ func TestRefreshProfileImageURL_NoImgixNoStorage(t *testing.T) {
 	gcsObj := testProfileImageGCSObject
 	oldImg := "https://old-signed.example/img.png"
 	user := &db.User{
-		ID:                    "user1",
+		ID:                    testUserNameRow,
 		Image:                 &oldImg,
 		ProfileImageGCSObject: &gcsObj,
 	}

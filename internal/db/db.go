@@ -729,10 +729,10 @@ func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID st
 // UpdateUserSubscription updates a user's subscription information
 func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionStatus string, stripeCustomerID *string, subscriptionEnd *time.Time) (*User, error) {
 	updates := map[string]interface{}{
-		"subscriptionStatus": subscriptionStatus,
+		colSubscriptionStatus: subscriptionStatus,
 	}
 	if stripeCustomerID != nil {
-		updates["stripeCustomerId"] = *stripeCustomerID
+		updates[colStripeCustomerID] = *stripeCustomerID
 	}
 	if subscriptionEnd != nil {
 		updates["subscriptionEnd"] = *subscriptionEnd
@@ -798,8 +798,8 @@ func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 // RecordSuccessfulLogin clears failed login attempts
 func (db *DB) RecordSuccessfulLogin(ctx context.Context, userID string) error {
 	updates := map[string]interface{}{
-		"failedLoginAttempts": 0,
-		"lastFailedLogin":     nil,
+		colFailedLoginAttempts: 0,
+		colLastFailedLogin:     nil,
 	}
 
 	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
@@ -990,7 +990,7 @@ func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames
 
 		// Update the note's updatedAt timestamp if tags were added
 		if tagsAdded {
-			if err := tx.Model(&note).Update("updatedAt", now).Error; err != nil {
+			if err := tx.Model(&note).Update(colUpdatedAt, now).Error; err != nil {
 				return fmt.Errorf("failed to update note timestamp: %w", err)
 			}
 		}
@@ -1034,18 +1034,18 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 
 	// Update user fields
 	updates := map[string]interface{}{
-		"updatedAt": now,
+		colUpdatedAt: now,
 	}
 	if notionKey != nil {
 		// Encrypt the Notion key before storing
 		encrypted := db.encryptNotionKey(ctx, *notionKey)
-		updates["notionKey"] = encrypted
+		updates[colNotionKey] = encrypted
 	}
 	if name != nil {
-		updates["name"] = *name
+		updates[colName] = *name
 	}
 	if image != nil {
-		updates["image"] = *image
+		updates[colImage] = *image
 	}
 	if password != nil && *password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*password), bcrypt.DefaultCost)

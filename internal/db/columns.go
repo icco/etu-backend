@@ -1,0 +1,32 @@
+package db
+
+const (
+	colCreatedAt           = "createdAt"
+	colUpdatedAt           = "updatedAt"
+	colDisabled            = "disabled"
+	colEmail               = "email"
+	colImage               = "image"
+	colCount               = "count"
+	colContent             = "content"
+	colExternalID          = "externalId"
+	colExtractedText       = "extractedText"
+	colTranscribedText     = "transcribedText"
+	colPasswordHash        = "passwordHash"
+	colFailedLoginAttempts = "failedLoginAttempts"
+	colLastFailedLogin     = "lastFailedLogin"
+	colSubscriptionStatus  = "subscriptionStatus"
+	colNotionKey           = "notionKey"
+	colLastSyncedToNotion  = "lastSyncedToNotion"
+	colGCSObjectName       = "gcsObjectName"
+	colUserID              = "userId"
+	colName                = "name"
+	colStripeCustomerID    = "stripeCustomerId"
+	colNotionUUID          = "notionUuid"
+	colMimeType            = "mimeType"
+	colSubscriptionEnd     = "subscriptionEnd"
+	colNoteID              = "noteId"
+	colURL                 = "url"
+
+	tagWork  = "work"
+	tagValid = "valid"
+)

@@ -62,7 +62,7 @@ func TestGetStats(t *testing.T) {
 		{
 			name: "get stats for specific user",
 			req: &pb.GetStatsRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			mockDB: &mockStatsDB{
 				totalBlips:   10,
@@ -107,7 +107,7 @@ func TestGetStats(t *testing.T) {
 		{
 			name: "database error",
 			req: &pb.GetStatsRequest{
-				UserId: "user-123",
+				UserId: testUserID1,
 			},
 			mockDB: &mockStatsDB{
 				shouldError: true,

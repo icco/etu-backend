@@ -5,6 +5,12 @@ import (
 	"testing"
 )
 
+const (
+	testToken1 = "token1"
+	testToken2 = "token2"
+	testToken3 = "token3"
+)
+
 func TestNewM2MConfig_MultiToken(t *testing.T) {
 	t.Setenv("GRPC_API_KEYS", "token1,token2,token3")
 
@@ -18,7 +24,7 @@ func TestNewM2MConfig_MultiToken(t *testing.T) {
 		t.Errorf("Expected 3 tokens, got %d", len(config.tokens))
 	}
 
-	expectedTokens := []string{"token1", "token2", "token3"}
+	expectedTokens := []string{testToken1, testToken2, testToken3}
 	for i, expected := range expectedTokens {
 		if config.tokens[i] != expected {
 			t.Errorf("Expected token[%d] to be %s, got %s", i, expected, config.tokens[i])
@@ -35,7 +41,7 @@ func TestNewM2MConfig_MultiTokenWithWhitespace(t *testing.T) {
 		t.Errorf("Expected 3 tokens, got %d", len(config.tokens))
 	}
 
-	expectedTokens := []string{"token1", "token2", "token3"}
+	expectedTokens := []string{testToken1, testToken2, testToken3}
 	for i, expected := range expectedTokens {
 		if config.tokens[i] != expected {
 			t.Errorf("Expected token[%d] to be %s, got %s", i, expected, config.tokens[i])
@@ -65,9 +71,9 @@ func TestValidateToken_ValidToken(t *testing.T) {
 		expectedValid bool
 		expectedIndex int
 	}{
-		{"token1", true, 0},
-		{"token2", true, 1},
-		{"token3", true, 2},
+		{testToken1, true, 0},
+		{testToken2, true, 1},
+		{testToken3, true, 2},
 		{"invalid", false, -1},
 		{"", false, -1},
 	}
@@ -122,7 +128,7 @@ func TestNewM2MConfig_EmptyTokensIgnored(t *testing.T) {
 		t.Errorf("Expected 3 tokens (empty ones ignored), got %d", len(config.tokens))
 	}
 
-	expectedTokens := []string{"token1", "token2", "token3"}
+	expectedTokens := []string{testToken1, testToken2, testToken3}
 	for i, expected := range expectedTokens {
 		if config.tokens[i] != expected {
 			t.Errorf("Expected token[%d] to be %s, got %s", i, expected, config.tokens[i])
