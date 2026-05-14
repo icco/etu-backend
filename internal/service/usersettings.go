@@ -7,6 +7,8 @@ import (
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/storage"
 	pb "github.com/icco/etu-backend/proto"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -62,22 +64,43 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		return nil, err
 	}
 
+	l := logging.FromContext(ctx)
+	l.Infow("UpdateUserSettings received",
+		"user_id", req.UserId,
+		"has_profile_image_upload", req.ProfileImageUpload != nil,
+		"clear_profile_image", req.ClearProfileImage != nil && *req.ClearProfileImage,
+		"has_name", req.Name != nil,
+		"has_notion_key", req.NotionKey != nil,
+		"has_password", req.Password != nil,
+		"has_notion_db", req.NotionDatabaseName != nil,
+	)
+
 	var profileImageGCSObject *string
 
 	if req.ProfileImageUpload != nil {
+		l.Infow("ProfileImageUpload present",
+			"user_id", req.UserId,
+			"data_len", len(req.ProfileImageUpload.Data),
+			"mime_type", req.ProfileImageUpload.MimeType,
+		)
+
 		if s.storage == nil {
 			return nil, status.Error(codes.FailedPrecondition, "storage client not configured")
 		}
 
 		if err := validateImage(req.ProfileImageUpload.Data, req.ProfileImageUpload.MimeType); err != nil {
+			l.Errorw("profile image validation failed", "user_id", req.UserId, zap.Error(err))
 			return nil, status.Errorf(codes.InvalidArgument, "invalid profile image: %v", err)
 		}
 
 		// Fixed path overwrites any existing avatar for this user.
 		objectName := fmt.Sprintf("profiles/%s/avatar", req.UserId)
 		if _, err := s.storage.UploadImage(ctx, objectName, req.ProfileImageUpload.Data, req.ProfileImageUpload.MimeType); err != nil {
+			l.Errorw("GCS upload failed", "user_id", req.UserId, "object_name", objectName, zap.Error(err))
 			return nil, status.Errorf(codes.Internal, "failed to upload profile image: %v", err)
 		}
+
+		l.Infow("GCS upload succeeded", "user_id", req.UserId, "object_name", objectName, "bytes", len(req.ProfileImageUpload.Data))
 
 		profileImageGCSObject = &objectName
 	} else if req.ClearProfileImage != nil && *req.ClearProfileImage {
