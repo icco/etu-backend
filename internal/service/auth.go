@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"time"
 
 	"github.com/icco/etu-backend/internal/db"
 	pb "github.com/icco/etu-backend/proto"
@@ -160,18 +159,23 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 		return nil, status.Error(codes.InvalidArgument, "subscription_status is required")
 	}
 
-	var stripeCustomerID *string
-	if req.StripeCustomerId != nil {
-		stripeCustomerID = req.StripeCustomerId
+	update := db.SubscriptionUpdate{
+		SubscriptionStatus:   req.SubscriptionStatus,
+		StripeCustomerID:     req.StripeCustomerId,
+		StripeSubscriptionID: req.StripeSubscriptionId,
+		StripePriceID:        req.StripePriceId,
+		CancelAtPeriodEnd:    req.CancelAtPeriodEnd,
 	}
-
-	var subscriptionEnd *time.Time
 	if req.SubscriptionEnd != nil {
-		t := time.Unix(req.SubscriptionEnd.Seconds, int64(req.SubscriptionEnd.Nanos))
-		subscriptionEnd = &t
+		t := req.SubscriptionEnd.AsTime()
+		update.SubscriptionEnd = &t
+	}
+	if req.CurrentPeriodStart != nil {
+		t := req.CurrentPeriodStart.AsTime()
+		update.CurrentPeriodStart = &t
 	}
 
-	user, err := s.db.UpdateUserSubscription(ctx, req.UserId, req.SubscriptionStatus, stripeCustomerID, subscriptionEnd)
+	user, err := s.db.UpdateUserSubscription(ctx, req.UserId, update)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user subscription: %v", err)
 	}
@@ -180,6 +184,34 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	}
 
 	return &pb.UpdateUserSubscriptionResponse{
+		User: userToProto(user),
+	}, nil
+}
+
+// UpdateUserStripeCustomer syncs Stripe customer profile fields
+// (name, billing address) from webhook events to the user record.
+func (s *AuthService) UpdateUserStripeCustomer(ctx context.Context, req *pb.UpdateUserStripeCustomerRequest) (*pb.UpdateUserStripeCustomerResponse, error) {
+	if req.UserId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+
+	user, err := s.db.UpdateUserStripeCustomer(ctx, req.UserId, db.StripeCustomerUpdate{
+		Name:              req.Name,
+		BillingLine1:      req.BillingLine1,
+		BillingLine2:      req.BillingLine2,
+		BillingCity:       req.BillingCity,
+		BillingState:      req.BillingState,
+		BillingPostalCode: req.BillingPostalCode,
+		BillingCountry:    req.BillingCountry,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update stripe customer: %v", err)
+	}
+	if user == nil {
+		return nil, status.Error(codes.NotFound, "user not found")
+	}
+
+	return &pb.UpdateUserStripeCustomerResponse{
 		User: userToProto(user),
 	}, nil
 }
@@ -193,6 +225,7 @@ func userToProto(u *db.User) *pb.User {
 		CreatedAt:          timestamppb.New(u.CreatedAt),
 		UpdatedAt:          timestamppb.New(u.UpdatedAt),
 		Disabled:           u.Disabled,
+		CancelAtPeriodEnd:  u.CancelAtPeriodEnd,
 	}
 
 	if u.Name != nil {
@@ -208,6 +241,33 @@ func userToProto(u *db.User) *pb.User {
 	}
 	if u.StripeCustomerID != nil {
 		pbUser.StripeCustomerId = u.StripeCustomerID
+	}
+	if u.StripeSubscriptionID != nil {
+		pbUser.StripeSubscriptionId = u.StripeSubscriptionID
+	}
+	if u.StripePriceID != nil {
+		pbUser.StripePriceId = u.StripePriceID
+	}
+	if u.CurrentPeriodStart != nil {
+		pbUser.CurrentPeriodStart = timestamppb.New(*u.CurrentPeriodStart)
+	}
+	if u.BillingLine1 != nil {
+		pbUser.BillingLine1 = u.BillingLine1
+	}
+	if u.BillingLine2 != nil {
+		pbUser.BillingLine2 = u.BillingLine2
+	}
+	if u.BillingCity != nil {
+		pbUser.BillingCity = u.BillingCity
+	}
+	if u.BillingState != nil {
+		pbUser.BillingState = u.BillingState
+	}
+	if u.BillingPostalCode != nil {
+		pbUser.BillingPostalCode = u.BillingPostalCode
+	}
+	if u.BillingCountry != nil {
+		pbUser.BillingCountry = u.BillingCountry
 	}
 	if u.NotionKey != nil {
 		pbUser.NotionKey = u.NotionKey

@@ -132,6 +132,28 @@ message User {
   optional DisabledReason disabled_reason = 13;
   // notion_database_name is the Notion database used for sync.
   optional string notion_database_name = 14;
+  // stripe_subscription_id is the Stripe subscription resource id.
+  optional string stripe_subscription_id = 15;
+  // stripe_price_id is the Stripe price the user is currently subscribed to.
+  optional string stripe_price_id = 16;
+  // cancel_at_period_end reports whether the subscription will cancel at
+  // the end of the current billing period.
+  bool cancel_at_period_end = 17;
+  // current_period_start is the start of the current billing period.
+  optional google.protobuf.Timestamp current_period_start = 18;
+  // billing_line1 is the first line of the user's billing address.
+  optional string billing_line1 = 19;
+  // billing_line2 is the second line of the user's billing address.
+  optional string billing_line2 = 20;
+  // billing_city is the city of the user's billing address.
+  optional string billing_city = 21;
+  // billing_state is the state or region of the user's billing address.
+  optional string billing_state = 22;
+  // billing_postal_code is the postal code of the user's billing address.
+  optional string billing_postal_code = 23;
+  // billing_country is the ISO-3166-1 alpha-2 country code of the
+  // user's billing address.
+  optional string billing_country = 24;
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -323,15 +345,56 @@ message GetUserByStripeCustomerIdResponse {
 }
 
 // UpdateUserSubscriptionRequest updates subscription billing fields.
+//
+// Optional fields are only persisted when set; pass an empty/null value to
+// leave the existing column unchanged. cancel_at_period_end is always written.
 message UpdateUserSubscriptionRequest {
   string user_id = 1;
   string subscription_status = 2;
   optional string stripe_customer_id = 3;
   optional google.protobuf.Timestamp subscription_end = 4;
+  // stripe_subscription_id sets the Stripe subscription resource id.
+  optional string stripe_subscription_id = 5;
+  // stripe_price_id sets the Stripe price id the user is subscribed to.
+  optional string stripe_price_id = 6;
+  // cancel_at_period_end sets whether the subscription will cancel at the
+  // end of the current billing period.
+  bool cancel_at_period_end = 7;
+  // current_period_start sets the start of the current billing period.
+  optional google.protobuf.Timestamp current_period_start = 8;
 }
 
 // UpdateUserSubscriptionResponse returns the updated user record.
 message UpdateUserSubscriptionResponse {
+  User user = 1;
+}
+
+// UpdateUserStripeCustomerRequest updates customer-level Stripe profile
+// fields (name, billing address) synced from Stripe webhook events.
+//
+// All optional fields are only persisted when set; pass an empty/null value
+// to leave the existing column unchanged. Empty strings explicitly clear
+// the field.
+message UpdateUserStripeCustomerRequest {
+  string user_id = 1;
+  // name is the customer's display name on the Stripe customer record.
+  optional string name = 2;
+  // billing_line1 is the first line of the billing address.
+  optional string billing_line1 = 3;
+  // billing_line2 is the second line of the billing address.
+  optional string billing_line2 = 4;
+  // billing_city is the city of the billing address.
+  optional string billing_city = 5;
+  // billing_state is the state or region of the billing address.
+  optional string billing_state = 6;
+  // billing_postal_code is the postal code of the billing address.
+  optional string billing_postal_code = 7;
+  // billing_country is the ISO-3166-1 alpha-2 country code.
+  optional string billing_country = 8;
+}
+
+// UpdateUserStripeCustomerResponse returns the updated user record.
+message UpdateUserStripeCustomerResponse {
   User user = 1;
 }
 
@@ -460,6 +523,9 @@ service AuthService {
   rpc GetUserByStripeCustomerId(GetUserByStripeCustomerIdRequest) returns (GetUserByStripeCustomerIdResponse);
   // UpdateUserSubscription updates billing-related subscription state.
   rpc UpdateUserSubscription(UpdateUserSubscriptionRequest) returns (UpdateUserSubscriptionResponse);
+  // UpdateUserStripeCustomer syncs Stripe customer profile fields
+  // (name, billing address) from Stripe webhook events.
+  rpc UpdateUserStripeCustomer(UpdateUserStripeCustomerRequest) returns (UpdateUserStripeCustomerResponse);
 }
 
 // ApiKeysService manages API key lifecycle and verification.

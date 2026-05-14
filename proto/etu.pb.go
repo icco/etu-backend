@@ -565,8 +565,30 @@ type User struct {
 	DisabledReason *DisabledReason `protobuf:"varint,13,opt,name=disabled_reason,json=disabledReason,proto3,enum=etu.DisabledReason,oneof" json:"disabled_reason,omitempty"`
 	// notion_database_name is the Notion database used for sync.
 	NotionDatabaseName *string `protobuf:"bytes,14,opt,name=notion_database_name,json=notionDatabaseName,proto3,oneof" json:"notion_database_name,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// stripe_subscription_id is the Stripe subscription resource id.
+	StripeSubscriptionId *string `protobuf:"bytes,15,opt,name=stripe_subscription_id,json=stripeSubscriptionId,proto3,oneof" json:"stripe_subscription_id,omitempty"`
+	// stripe_price_id is the Stripe price the user is currently subscribed to.
+	StripePriceId *string `protobuf:"bytes,16,opt,name=stripe_price_id,json=stripePriceId,proto3,oneof" json:"stripe_price_id,omitempty"`
+	// cancel_at_period_end reports whether the subscription will cancel at
+	// the end of the current billing period.
+	CancelAtPeriodEnd bool `protobuf:"varint,17,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd,proto3" json:"cancel_at_period_end,omitempty"`
+	// current_period_start is the start of the current billing period.
+	CurrentPeriodStart *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=current_period_start,json=currentPeriodStart,proto3,oneof" json:"current_period_start,omitempty"`
+	// billing_line1 is the first line of the user's billing address.
+	BillingLine1 *string `protobuf:"bytes,19,opt,name=billing_line1,json=billingLine1,proto3,oneof" json:"billing_line1,omitempty"`
+	// billing_line2 is the second line of the user's billing address.
+	BillingLine2 *string `protobuf:"bytes,20,opt,name=billing_line2,json=billingLine2,proto3,oneof" json:"billing_line2,omitempty"`
+	// billing_city is the city of the user's billing address.
+	BillingCity *string `protobuf:"bytes,21,opt,name=billing_city,json=billingCity,proto3,oneof" json:"billing_city,omitempty"`
+	// billing_state is the state or region of the user's billing address.
+	BillingState *string `protobuf:"bytes,22,opt,name=billing_state,json=billingState,proto3,oneof" json:"billing_state,omitempty"`
+	// billing_postal_code is the postal code of the user's billing address.
+	BillingPostalCode *string `protobuf:"bytes,23,opt,name=billing_postal_code,json=billingPostalCode,proto3,oneof" json:"billing_postal_code,omitempty"`
+	// billing_country is the ISO-3166-1 alpha-2 country code of the
+	// user's billing address.
+	BillingCountry *string `protobuf:"bytes,24,opt,name=billing_country,json=billingCountry,proto3,oneof" json:"billing_country,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -686,6 +708,76 @@ func (x *User) GetDisabledReason() DisabledReason {
 func (x *User) GetNotionDatabaseName() string {
 	if x != nil && x.NotionDatabaseName != nil {
 		return *x.NotionDatabaseName
+	}
+	return ""
+}
+
+func (x *User) GetStripeSubscriptionId() string {
+	if x != nil && x.StripeSubscriptionId != nil {
+		return *x.StripeSubscriptionId
+	}
+	return ""
+}
+
+func (x *User) GetStripePriceId() string {
+	if x != nil && x.StripePriceId != nil {
+		return *x.StripePriceId
+	}
+	return ""
+}
+
+func (x *User) GetCancelAtPeriodEnd() bool {
+	if x != nil {
+		return x.CancelAtPeriodEnd
+	}
+	return false
+}
+
+func (x *User) GetCurrentPeriodStart() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CurrentPeriodStart
+	}
+	return nil
+}
+
+func (x *User) GetBillingLine1() string {
+	if x != nil && x.BillingLine1 != nil {
+		return *x.BillingLine1
+	}
+	return ""
+}
+
+func (x *User) GetBillingLine2() string {
+	if x != nil && x.BillingLine2 != nil {
+		return *x.BillingLine2
+	}
+	return ""
+}
+
+func (x *User) GetBillingCity() string {
+	if x != nil && x.BillingCity != nil {
+		return *x.BillingCity
+	}
+	return ""
+}
+
+func (x *User) GetBillingState() string {
+	if x != nil && x.BillingState != nil {
+		return *x.BillingState
+	}
+	return ""
+}
+
+func (x *User) GetBillingPostalCode() string {
+	if x != nil && x.BillingPostalCode != nil {
+		return *x.BillingPostalCode
+	}
+	return ""
+}
+
+func (x *User) GetBillingCountry() string {
+	if x != nil && x.BillingCountry != nil {
+		return *x.BillingCountry
 	}
 	return ""
 }
@@ -2002,12 +2094,24 @@ func (x *GetUserByStripeCustomerIdResponse) GetUser() *User {
 }
 
 // UpdateUserSubscriptionRequest updates subscription billing fields.
+//
+// Optional fields are only persisted when set; pass an empty/null value to
+// leave the existing column unchanged. cancel_at_period_end is always written.
 type UpdateUserSubscriptionRequest struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	UserId             string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	SubscriptionStatus string                 `protobuf:"bytes,2,opt,name=subscription_status,json=subscriptionStatus,proto3" json:"subscription_status,omitempty"`
 	StripeCustomerId   *string                `protobuf:"bytes,3,opt,name=stripe_customer_id,json=stripeCustomerId,proto3,oneof" json:"stripe_customer_id,omitempty"`
 	SubscriptionEnd    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=subscription_end,json=subscriptionEnd,proto3,oneof" json:"subscription_end,omitempty"`
+	// stripe_subscription_id sets the Stripe subscription resource id.
+	StripeSubscriptionId *string `protobuf:"bytes,5,opt,name=stripe_subscription_id,json=stripeSubscriptionId,proto3,oneof" json:"stripe_subscription_id,omitempty"`
+	// stripe_price_id sets the Stripe price id the user is subscribed to.
+	StripePriceId *string `protobuf:"bytes,6,opt,name=stripe_price_id,json=stripePriceId,proto3,oneof" json:"stripe_price_id,omitempty"`
+	// cancel_at_period_end sets whether the subscription will cancel at the
+	// end of the current billing period.
+	CancelAtPeriodEnd bool `protobuf:"varint,7,opt,name=cancel_at_period_end,json=cancelAtPeriodEnd,proto3" json:"cancel_at_period_end,omitempty"`
+	// current_period_start sets the start of the current billing period.
+	CurrentPeriodStart *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=current_period_start,json=currentPeriodStart,proto3,oneof" json:"current_period_start,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -2070,6 +2174,34 @@ func (x *UpdateUserSubscriptionRequest) GetSubscriptionEnd() *timestamppb.Timest
 	return nil
 }
 
+func (x *UpdateUserSubscriptionRequest) GetStripeSubscriptionId() string {
+	if x != nil && x.StripeSubscriptionId != nil {
+		return *x.StripeSubscriptionId
+	}
+	return ""
+}
+
+func (x *UpdateUserSubscriptionRequest) GetStripePriceId() string {
+	if x != nil && x.StripePriceId != nil {
+		return *x.StripePriceId
+	}
+	return ""
+}
+
+func (x *UpdateUserSubscriptionRequest) GetCancelAtPeriodEnd() bool {
+	if x != nil {
+		return x.CancelAtPeriodEnd
+	}
+	return false
+}
+
+func (x *UpdateUserSubscriptionRequest) GetCurrentPeriodStart() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CurrentPeriodStart
+	}
+	return nil
+}
+
 // UpdateUserSubscriptionResponse returns the updated user record.
 type UpdateUserSubscriptionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2115,6 +2247,164 @@ func (x *UpdateUserSubscriptionResponse) GetUser() *User {
 	return nil
 }
 
+// UpdateUserStripeCustomerRequest updates customer-level Stripe profile
+// fields (name, billing address) synced from Stripe webhook events.
+//
+// All optional fields are only persisted when set; pass an empty/null value
+// to leave the existing column unchanged. Empty strings explicitly clear
+// the field.
+type UpdateUserStripeCustomerRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// name is the customer's display name on the Stripe customer record.
+	Name *string `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	// billing_line1 is the first line of the billing address.
+	BillingLine1 *string `protobuf:"bytes,3,opt,name=billing_line1,json=billingLine1,proto3,oneof" json:"billing_line1,omitempty"`
+	// billing_line2 is the second line of the billing address.
+	BillingLine2 *string `protobuf:"bytes,4,opt,name=billing_line2,json=billingLine2,proto3,oneof" json:"billing_line2,omitempty"`
+	// billing_city is the city of the billing address.
+	BillingCity *string `protobuf:"bytes,5,opt,name=billing_city,json=billingCity,proto3,oneof" json:"billing_city,omitempty"`
+	// billing_state is the state or region of the billing address.
+	BillingState *string `protobuf:"bytes,6,opt,name=billing_state,json=billingState,proto3,oneof" json:"billing_state,omitempty"`
+	// billing_postal_code is the postal code of the billing address.
+	BillingPostalCode *string `protobuf:"bytes,7,opt,name=billing_postal_code,json=billingPostalCode,proto3,oneof" json:"billing_postal_code,omitempty"`
+	// billing_country is the ISO-3166-1 alpha-2 country code.
+	BillingCountry *string `protobuf:"bytes,8,opt,name=billing_country,json=billingCountry,proto3,oneof" json:"billing_country,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *UpdateUserStripeCustomerRequest) Reset() {
+	*x = UpdateUserStripeCustomerRequest{}
+	mi := &file_proto_etu_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserStripeCustomerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserStripeCustomerRequest) ProtoMessage() {}
+
+func (x *UpdateUserStripeCustomerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserStripeCustomerRequest.ProtoReflect.Descriptor instead.
+func (*UpdateUserStripeCustomerRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetName() string {
+	if x != nil && x.Name != nil {
+		return *x.Name
+	}
+	return ""
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetBillingLine1() string {
+	if x != nil && x.BillingLine1 != nil {
+		return *x.BillingLine1
+	}
+	return ""
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetBillingLine2() string {
+	if x != nil && x.BillingLine2 != nil {
+		return *x.BillingLine2
+	}
+	return ""
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetBillingCity() string {
+	if x != nil && x.BillingCity != nil {
+		return *x.BillingCity
+	}
+	return ""
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetBillingState() string {
+	if x != nil && x.BillingState != nil {
+		return *x.BillingState
+	}
+	return ""
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetBillingPostalCode() string {
+	if x != nil && x.BillingPostalCode != nil {
+		return *x.BillingPostalCode
+	}
+	return ""
+}
+
+func (x *UpdateUserStripeCustomerRequest) GetBillingCountry() string {
+	if x != nil && x.BillingCountry != nil {
+		return *x.BillingCountry
+	}
+	return ""
+}
+
+// UpdateUserStripeCustomerResponse returns the updated user record.
+type UpdateUserStripeCustomerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateUserStripeCustomerResponse) Reset() {
+	*x = UpdateUserStripeCustomerResponse{}
+	mi := &file_proto_etu_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateUserStripeCustomerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateUserStripeCustomerResponse) ProtoMessage() {}
+
+func (x *UpdateUserStripeCustomerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateUserStripeCustomerResponse.ProtoReflect.Descriptor instead.
+func (*UpdateUserStripeCustomerResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *UpdateUserStripeCustomerResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
 // CreateApiKeyRequest creates a named API key for a user.
 type CreateApiKeyRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2126,7 +2416,7 @@ type CreateApiKeyRequest struct {
 
 func (x *CreateApiKeyRequest) Reset() {
 	*x = CreateApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[32]
+	mi := &file_proto_etu_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2138,7 +2428,7 @@ func (x *CreateApiKeyRequest) String() string {
 func (*CreateApiKeyRequest) ProtoMessage() {}
 
 func (x *CreateApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[32]
+	mi := &file_proto_etu_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2151,7 +2441,7 @@ func (x *CreateApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*CreateApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{32}
+	return file_proto_etu_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *CreateApiKeyRequest) GetUserId() string {
@@ -2180,7 +2470,7 @@ type CreateApiKeyResponse struct {
 
 func (x *CreateApiKeyResponse) Reset() {
 	*x = CreateApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[33]
+	mi := &file_proto_etu_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2192,7 +2482,7 @@ func (x *CreateApiKeyResponse) String() string {
 func (*CreateApiKeyResponse) ProtoMessage() {}
 
 func (x *CreateApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[33]
+	mi := &file_proto_etu_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2205,7 +2495,7 @@ func (x *CreateApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*CreateApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{33}
+	return file_proto_etu_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *CreateApiKeyResponse) GetApiKey() *ApiKey {
@@ -2232,7 +2522,7 @@ type ListApiKeysRequest struct {
 
 func (x *ListApiKeysRequest) Reset() {
 	*x = ListApiKeysRequest{}
-	mi := &file_proto_etu_proto_msgTypes[34]
+	mi := &file_proto_etu_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2244,7 +2534,7 @@ func (x *ListApiKeysRequest) String() string {
 func (*ListApiKeysRequest) ProtoMessage() {}
 
 func (x *ListApiKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[34]
+	mi := &file_proto_etu_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2257,7 +2547,7 @@ func (x *ListApiKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiKeysRequest.ProtoReflect.Descriptor instead.
 func (*ListApiKeysRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{34}
+	return file_proto_etu_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListApiKeysRequest) GetUserId() string {
@@ -2277,7 +2567,7 @@ type ListApiKeysResponse struct {
 
 func (x *ListApiKeysResponse) Reset() {
 	*x = ListApiKeysResponse{}
-	mi := &file_proto_etu_proto_msgTypes[35]
+	mi := &file_proto_etu_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2289,7 +2579,7 @@ func (x *ListApiKeysResponse) String() string {
 func (*ListApiKeysResponse) ProtoMessage() {}
 
 func (x *ListApiKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[35]
+	mi := &file_proto_etu_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2302,7 +2592,7 @@ func (x *ListApiKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListApiKeysResponse.ProtoReflect.Descriptor instead.
 func (*ListApiKeysResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{35}
+	return file_proto_etu_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListApiKeysResponse) GetApiKeys() []*ApiKey {
@@ -2323,7 +2613,7 @@ type DeleteApiKeyRequest struct {
 
 func (x *DeleteApiKeyRequest) Reset() {
 	*x = DeleteApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[36]
+	mi := &file_proto_etu_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2335,7 +2625,7 @@ func (x *DeleteApiKeyRequest) String() string {
 func (*DeleteApiKeyRequest) ProtoMessage() {}
 
 func (x *DeleteApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[36]
+	mi := &file_proto_etu_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2348,7 +2638,7 @@ func (x *DeleteApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{36}
+	return file_proto_etu_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *DeleteApiKeyRequest) GetUserId() string {
@@ -2375,7 +2665,7 @@ type DeleteApiKeyResponse struct {
 
 func (x *DeleteApiKeyResponse) Reset() {
 	*x = DeleteApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[37]
+	mi := &file_proto_etu_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2387,7 +2677,7 @@ func (x *DeleteApiKeyResponse) String() string {
 func (*DeleteApiKeyResponse) ProtoMessage() {}
 
 func (x *DeleteApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[37]
+	mi := &file_proto_etu_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2400,7 +2690,7 @@ func (x *DeleteApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*DeleteApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{37}
+	return file_proto_etu_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *DeleteApiKeyResponse) GetSuccess() bool {
@@ -2420,7 +2710,7 @@ type VerifyApiKeyRequest struct {
 
 func (x *VerifyApiKeyRequest) Reset() {
 	*x = VerifyApiKeyRequest{}
-	mi := &file_proto_etu_proto_msgTypes[38]
+	mi := &file_proto_etu_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2432,7 +2722,7 @@ func (x *VerifyApiKeyRequest) String() string {
 func (*VerifyApiKeyRequest) ProtoMessage() {}
 
 func (x *VerifyApiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[38]
+	mi := &file_proto_etu_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2445,7 +2735,7 @@ func (x *VerifyApiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyApiKeyRequest.ProtoReflect.Descriptor instead.
 func (*VerifyApiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{38}
+	return file_proto_etu_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *VerifyApiKeyRequest) GetRawKey() string {
@@ -2466,7 +2756,7 @@ type VerifyApiKeyResponse struct {
 
 func (x *VerifyApiKeyResponse) Reset() {
 	*x = VerifyApiKeyResponse{}
-	mi := &file_proto_etu_proto_msgTypes[39]
+	mi := &file_proto_etu_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2478,7 +2768,7 @@ func (x *VerifyApiKeyResponse) String() string {
 func (*VerifyApiKeyResponse) ProtoMessage() {}
 
 func (x *VerifyApiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[39]
+	mi := &file_proto_etu_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2491,7 +2781,7 @@ func (x *VerifyApiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyApiKeyResponse.ProtoReflect.Descriptor instead.
 func (*VerifyApiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{39}
+	return file_proto_etu_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *VerifyApiKeyResponse) GetValid() bool {
@@ -2518,7 +2808,7 @@ type GetUserSettingsRequest struct {
 
 func (x *GetUserSettingsRequest) Reset() {
 	*x = GetUserSettingsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[40]
+	mi := &file_proto_etu_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2530,7 +2820,7 @@ func (x *GetUserSettingsRequest) String() string {
 func (*GetUserSettingsRequest) ProtoMessage() {}
 
 func (x *GetUserSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[40]
+	mi := &file_proto_etu_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2543,7 +2833,7 @@ func (x *GetUserSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserSettingsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{40}
+	return file_proto_etu_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetUserSettingsRequest) GetUserId() string {
@@ -2563,7 +2853,7 @@ type GetUserSettingsResponse struct {
 
 func (x *GetUserSettingsResponse) Reset() {
 	*x = GetUserSettingsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[41]
+	mi := &file_proto_etu_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2575,7 +2865,7 @@ func (x *GetUserSettingsResponse) String() string {
 func (*GetUserSettingsResponse) ProtoMessage() {}
 
 func (x *GetUserSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[41]
+	mi := &file_proto_etu_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2588,7 +2878,7 @@ func (x *GetUserSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserSettingsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{41}
+	return file_proto_etu_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GetUserSettingsResponse) GetUser() *User {
@@ -2614,7 +2904,7 @@ type UpdateUserSettingsRequest struct {
 
 func (x *UpdateUserSettingsRequest) Reset() {
 	*x = UpdateUserSettingsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[42]
+	mi := &file_proto_etu_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2626,7 +2916,7 @@ func (x *UpdateUserSettingsRequest) String() string {
 func (*UpdateUserSettingsRequest) ProtoMessage() {}
 
 func (x *UpdateUserSettingsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[42]
+	mi := &file_proto_etu_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2639,7 +2929,7 @@ func (x *UpdateUserSettingsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSettingsRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserSettingsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{42}
+	return file_proto_etu_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *UpdateUserSettingsRequest) GetUserId() string {
@@ -2701,7 +2991,7 @@ type UpdateUserSettingsResponse struct {
 
 func (x *UpdateUserSettingsResponse) Reset() {
 	*x = UpdateUserSettingsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[43]
+	mi := &file_proto_etu_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2713,7 +3003,7 @@ func (x *UpdateUserSettingsResponse) String() string {
 func (*UpdateUserSettingsResponse) ProtoMessage() {}
 
 func (x *UpdateUserSettingsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[43]
+	mi := &file_proto_etu_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2726,7 +3016,7 @@ func (x *UpdateUserSettingsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserSettingsResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserSettingsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{43}
+	return file_proto_etu_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *UpdateUserSettingsResponse) GetUser() *User {
@@ -2747,7 +3037,7 @@ type GetStatsRequest struct {
 
 func (x *GetStatsRequest) Reset() {
 	*x = GetStatsRequest{}
-	mi := &file_proto_etu_proto_msgTypes[44]
+	mi := &file_proto_etu_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2759,7 +3049,7 @@ func (x *GetStatsRequest) String() string {
 func (*GetStatsRequest) ProtoMessage() {}
 
 func (x *GetStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[44]
+	mi := &file_proto_etu_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2772,7 +3062,7 @@ func (x *GetStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetStatsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{44}
+	return file_proto_etu_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *GetStatsRequest) GetUserId() string {
@@ -2797,7 +3087,7 @@ type GetStatsResponse struct {
 
 func (x *GetStatsResponse) Reset() {
 	*x = GetStatsResponse{}
-	mi := &file_proto_etu_proto_msgTypes[45]
+	mi := &file_proto_etu_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2809,7 +3099,7 @@ func (x *GetStatsResponse) String() string {
 func (*GetStatsResponse) ProtoMessage() {}
 
 func (x *GetStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[45]
+	mi := &file_proto_etu_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2822,7 +3112,7 @@ func (x *GetStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetStatsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{45}
+	return file_proto_etu_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *GetStatsResponse) GetTotalBlips() int64 {
@@ -2857,7 +3147,7 @@ type GetProfileImageURLRequest struct {
 
 func (x *GetProfileImageURLRequest) Reset() {
 	*x = GetProfileImageURLRequest{}
-	mi := &file_proto_etu_proto_msgTypes[46]
+	mi := &file_proto_etu_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2869,7 +3159,7 @@ func (x *GetProfileImageURLRequest) String() string {
 func (*GetProfileImageURLRequest) ProtoMessage() {}
 
 func (x *GetProfileImageURLRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[46]
+	mi := &file_proto_etu_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2882,7 +3172,7 @@ func (x *GetProfileImageURLRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProfileImageURLRequest.ProtoReflect.Descriptor instead.
 func (*GetProfileImageURLRequest) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{46}
+	return file_proto_etu_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GetProfileImageURLRequest) GetKey() string {
@@ -2902,7 +3192,7 @@ type GetProfileImageURLResponse struct {
 
 func (x *GetProfileImageURLResponse) Reset() {
 	*x = GetProfileImageURLResponse{}
-	mi := &file_proto_etu_proto_msgTypes[47]
+	mi := &file_proto_etu_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2914,7 +3204,7 @@ func (x *GetProfileImageURLResponse) String() string {
 func (*GetProfileImageURLResponse) ProtoMessage() {}
 
 func (x *GetProfileImageURLResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_etu_proto_msgTypes[47]
+	mi := &file_proto_etu_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2927,7 +3217,7 @@ func (x *GetProfileImageURLResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProfileImageURLResponse.ProtoReflect.Descriptor instead.
 func (*GetProfileImageURLResponse) Descriptor() ([]byte, []int) {
-	return file_proto_etu_proto_rawDescGZIP(), []int{47}
+	return file_proto_etu_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *GetProfileImageURLResponse) GetUrl() string {
@@ -2977,7 +3267,8 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xc1\x05\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xf1\n" +
+	"\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -2994,14 +3285,34 @@ const file_proto_etu_proto_rawDesc = "" +
 	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1a\n" +
 	"\bdisabled\x18\f \x01(\bR\bdisabled\x12A\n" +
 	"\x0fdisabled_reason\x18\r \x01(\x0e2\x13.etu.DisabledReasonH\x05R\x0edisabledReason\x88\x01\x01\x125\n" +
-	"\x14notion_database_name\x18\x0e \x01(\tH\x06R\x12notionDatabaseName\x88\x01\x01B\a\n" +
+	"\x14notion_database_name\x18\x0e \x01(\tH\x06R\x12notionDatabaseName\x88\x01\x01\x129\n" +
+	"\x16stripe_subscription_id\x18\x0f \x01(\tH\aR\x14stripeSubscriptionId\x88\x01\x01\x12+\n" +
+	"\x0fstripe_price_id\x18\x10 \x01(\tH\bR\rstripePriceId\x88\x01\x01\x12/\n" +
+	"\x14cancel_at_period_end\x18\x11 \x01(\bR\x11cancelAtPeriodEnd\x12Q\n" +
+	"\x14current_period_start\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampH\tR\x12currentPeriodStart\x88\x01\x01\x12(\n" +
+	"\rbilling_line1\x18\x13 \x01(\tH\n" +
+	"R\fbillingLine1\x88\x01\x01\x12(\n" +
+	"\rbilling_line2\x18\x14 \x01(\tH\vR\fbillingLine2\x88\x01\x01\x12&\n" +
+	"\fbilling_city\x18\x15 \x01(\tH\fR\vbillingCity\x88\x01\x01\x12(\n" +
+	"\rbilling_state\x18\x16 \x01(\tH\rR\fbillingState\x88\x01\x01\x123\n" +
+	"\x13billing_postal_code\x18\x17 \x01(\tH\x0eR\x11billingPostalCode\x88\x01\x01\x12,\n" +
+	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01B\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
 	"\x13_stripe_customer_idB\r\n" +
 	"\v_notion_keyB\x12\n" +
 	"\x10_disabled_reasonB\x17\n" +
-	"\x15_notion_database_nameJ\x04\b\n" +
+	"\x15_notion_database_nameB\x19\n" +
+	"\x17_stripe_subscription_idB\x12\n" +
+	"\x10_stripe_price_idB\x17\n" +
+	"\x15_current_period_startB\x10\n" +
+	"\x0e_billing_line1B\x10\n" +
+	"\x0e_billing_line2B\x0f\n" +
+	"\r_billing_cityB\x10\n" +
+	"\x0e_billing_stateB\x16\n" +
+	"\x14_billing_postal_codeB\x12\n" +
+	"\x10_billing_countryJ\x04\b\n" +
 	"\x10\v\"\xd2\x01\n" +
 	"\x06ApiKey\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -3089,15 +3400,40 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x12stripe_customer_id\x18\x01 \x01(\tR\x10stripeCustomerId\"P\n" +
 	"!GetUserByStripeCustomerIdResponse\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\t.etu.UserH\x00R\x04user\x88\x01\x01B\a\n" +
-	"\x05_user\"\x94\x02\n" +
+	"\x05_user\"\xc8\x04\n" +
 	"\x1dUpdateUserSubscriptionRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12/\n" +
 	"\x13subscription_status\x18\x02 \x01(\tR\x12subscriptionStatus\x121\n" +
 	"\x12stripe_customer_id\x18\x03 \x01(\tH\x00R\x10stripeCustomerId\x88\x01\x01\x12J\n" +
-	"\x10subscription_end\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampH\x01R\x0fsubscriptionEnd\x88\x01\x01B\x15\n" +
+	"\x10subscription_end\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampH\x01R\x0fsubscriptionEnd\x88\x01\x01\x129\n" +
+	"\x16stripe_subscription_id\x18\x05 \x01(\tH\x02R\x14stripeSubscriptionId\x88\x01\x01\x12+\n" +
+	"\x0fstripe_price_id\x18\x06 \x01(\tH\x03R\rstripePriceId\x88\x01\x01\x12/\n" +
+	"\x14cancel_at_period_end\x18\a \x01(\bR\x11cancelAtPeriodEnd\x12Q\n" +
+	"\x14current_period_start\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x04R\x12currentPeriodStart\x88\x01\x01B\x15\n" +
 	"\x13_stripe_customer_idB\x13\n" +
-	"\x11_subscription_end\"?\n" +
+	"\x11_subscription_endB\x19\n" +
+	"\x17_stripe_subscription_idB\x12\n" +
+	"\x10_stripe_price_idB\x17\n" +
+	"\x15_current_period_start\"?\n" +
 	"\x1eUpdateUserSubscriptionResponse\x12\x1d\n" +
+	"\x04user\x18\x01 \x01(\v2\t.etu.UserR\x04user\"\xd8\x03\n" +
+	"\x1fUpdateUserStripeCustomerRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
+	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12(\n" +
+	"\rbilling_line1\x18\x03 \x01(\tH\x01R\fbillingLine1\x88\x01\x01\x12(\n" +
+	"\rbilling_line2\x18\x04 \x01(\tH\x02R\fbillingLine2\x88\x01\x01\x12&\n" +
+	"\fbilling_city\x18\x05 \x01(\tH\x03R\vbillingCity\x88\x01\x01\x12(\n" +
+	"\rbilling_state\x18\x06 \x01(\tH\x04R\fbillingState\x88\x01\x01\x123\n" +
+	"\x13billing_postal_code\x18\a \x01(\tH\x05R\x11billingPostalCode\x88\x01\x01\x12,\n" +
+	"\x0fbilling_country\x18\b \x01(\tH\x06R\x0ebillingCountry\x88\x01\x01B\a\n" +
+	"\x05_nameB\x10\n" +
+	"\x0e_billing_line1B\x10\n" +
+	"\x0e_billing_line2B\x0f\n" +
+	"\r_billing_cityB\x10\n" +
+	"\x0e_billing_stateB\x16\n" +
+	"\x14_billing_postal_codeB\x12\n" +
+	"\x10_billing_country\"A\n" +
+	" UpdateUserStripeCustomerResponse\x12\x1d\n" +
 	"\x04user\x18\x01 \x01(\v2\t.etu.UserR\x04user\"B\n" +
 	"\x13CreateApiKeyRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
@@ -3172,13 +3508,14 @@ const file_proto_etu_proto_rawDesc = "" +
 	"DeleteNote\x12\x16.etu.DeleteNoteRequest\x1a\x17.etu.DeleteNoteResponse\x12I\n" +
 	"\x0eGetRandomNotes\x12\x1a.etu.GetRandomNotesRequest\x1a\x1b.etu.GetRandomNotesResponse2F\n" +
 	"\vTagsService\x127\n" +
-	"\bListTags\x12\x14.etu.ListTagsRequest\x1a\x15.etu.ListTagsResponse2\x90\x03\n" +
+	"\bListTags\x12\x14.etu.ListTagsRequest\x1a\x15.etu.ListTagsResponse2\xf9\x03\n" +
 	"\vAuthService\x127\n" +
 	"\bRegister\x12\x14.etu.RegisterRequest\x1a\x15.etu.RegisterResponse\x12C\n" +
 	"\fAuthenticate\x12\x18.etu.AuthenticateRequest\x1a\x19.etu.AuthenticateResponse\x124\n" +
 	"\aGetUser\x12\x13.etu.GetUserRequest\x1a\x14.etu.GetUserResponse\x12j\n" +
 	"\x19GetUserByStripeCustomerId\x12%.etu.GetUserByStripeCustomerIdRequest\x1a&.etu.GetUserByStripeCustomerIdResponse\x12a\n" +
-	"\x16UpdateUserSubscription\x12\".etu.UpdateUserSubscriptionRequest\x1a#.etu.UpdateUserSubscriptionResponse2\xa1\x02\n" +
+	"\x16UpdateUserSubscription\x12\".etu.UpdateUserSubscriptionRequest\x1a#.etu.UpdateUserSubscriptionResponse\x12g\n" +
+	"\x18UpdateUserStripeCustomer\x12$.etu.UpdateUserStripeCustomerRequest\x1a%.etu.UpdateUserStripeCustomerResponse2\xa1\x02\n" +
 	"\x0eApiKeysService\x12C\n" +
 	"\fCreateApiKey\x12\x18.etu.CreateApiKeyRequest\x1a\x19.etu.CreateApiKeyResponse\x12@\n" +
 	"\vListApiKeys\x12\x17.etu.ListApiKeysRequest\x1a\x18.etu.ListApiKeysResponse\x12C\n" +
@@ -3204,7 +3541,7 @@ func file_proto_etu_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_etu_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
+var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_proto_etu_proto_goTypes = []any{
 	(DisabledReason)(0),                       // 0: etu.DisabledReason
 	(*ImageUpload)(nil),                       // 1: etu.ImageUpload
@@ -3239,104 +3576,111 @@ var file_proto_etu_proto_goTypes = []any{
 	(*GetUserByStripeCustomerIdResponse)(nil), // 30: etu.GetUserByStripeCustomerIdResponse
 	(*UpdateUserSubscriptionRequest)(nil),     // 31: etu.UpdateUserSubscriptionRequest
 	(*UpdateUserSubscriptionResponse)(nil),    // 32: etu.UpdateUserSubscriptionResponse
-	(*CreateApiKeyRequest)(nil),               // 33: etu.CreateApiKeyRequest
-	(*CreateApiKeyResponse)(nil),              // 34: etu.CreateApiKeyResponse
-	(*ListApiKeysRequest)(nil),                // 35: etu.ListApiKeysRequest
-	(*ListApiKeysResponse)(nil),               // 36: etu.ListApiKeysResponse
-	(*DeleteApiKeyRequest)(nil),               // 37: etu.DeleteApiKeyRequest
-	(*DeleteApiKeyResponse)(nil),              // 38: etu.DeleteApiKeyResponse
-	(*VerifyApiKeyRequest)(nil),               // 39: etu.VerifyApiKeyRequest
-	(*VerifyApiKeyResponse)(nil),              // 40: etu.VerifyApiKeyResponse
-	(*GetUserSettingsRequest)(nil),            // 41: etu.GetUserSettingsRequest
-	(*GetUserSettingsResponse)(nil),           // 42: etu.GetUserSettingsResponse
-	(*UpdateUserSettingsRequest)(nil),         // 43: etu.UpdateUserSettingsRequest
-	(*UpdateUserSettingsResponse)(nil),        // 44: etu.UpdateUserSettingsResponse
-	(*GetStatsRequest)(nil),                   // 45: etu.GetStatsRequest
-	(*GetStatsResponse)(nil),                  // 46: etu.GetStatsResponse
-	(*GetProfileImageURLRequest)(nil),         // 47: etu.GetProfileImageURLRequest
-	(*GetProfileImageURLResponse)(nil),        // 48: etu.GetProfileImageURLResponse
-	(*timestamppb.Timestamp)(nil),             // 49: google.protobuf.Timestamp
+	(*UpdateUserStripeCustomerRequest)(nil),   // 33: etu.UpdateUserStripeCustomerRequest
+	(*UpdateUserStripeCustomerResponse)(nil),  // 34: etu.UpdateUserStripeCustomerResponse
+	(*CreateApiKeyRequest)(nil),               // 35: etu.CreateApiKeyRequest
+	(*CreateApiKeyResponse)(nil),              // 36: etu.CreateApiKeyResponse
+	(*ListApiKeysRequest)(nil),                // 37: etu.ListApiKeysRequest
+	(*ListApiKeysResponse)(nil),               // 38: etu.ListApiKeysResponse
+	(*DeleteApiKeyRequest)(nil),               // 39: etu.DeleteApiKeyRequest
+	(*DeleteApiKeyResponse)(nil),              // 40: etu.DeleteApiKeyResponse
+	(*VerifyApiKeyRequest)(nil),               // 41: etu.VerifyApiKeyRequest
+	(*VerifyApiKeyResponse)(nil),              // 42: etu.VerifyApiKeyResponse
+	(*GetUserSettingsRequest)(nil),            // 43: etu.GetUserSettingsRequest
+	(*GetUserSettingsResponse)(nil),           // 44: etu.GetUserSettingsResponse
+	(*UpdateUserSettingsRequest)(nil),         // 45: etu.UpdateUserSettingsRequest
+	(*UpdateUserSettingsResponse)(nil),        // 46: etu.UpdateUserSettingsResponse
+	(*GetStatsRequest)(nil),                   // 47: etu.GetStatsRequest
+	(*GetStatsResponse)(nil),                  // 48: etu.GetStatsResponse
+	(*GetProfileImageURLRequest)(nil),         // 49: etu.GetProfileImageURLRequest
+	(*GetProfileImageURLResponse)(nil),        // 50: etu.GetProfileImageURLResponse
+	(*timestamppb.Timestamp)(nil),             // 51: google.protobuf.Timestamp
 }
 var file_proto_etu_proto_depIdxs = []int32{
-	49, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
-	49, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
-	49, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
-	49, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
+	51, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
+	51, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
+	51, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
+	51, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
 	3,  // 4: etu.Note.images:type_name -> etu.NoteImage
 	4,  // 5: etu.Note.audios:type_name -> etu.NoteAudio
-	49, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
-	49, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
-	49, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
-	49, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
+	51, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
+	51, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
+	51, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
+	51, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 10: etu.User.disabled_reason:type_name -> etu.DisabledReason
-	49, // 11: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
-	49, // 12: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
-	5,  // 13: etu.ListNotesResponse.notes:type_name -> etu.Note
-	1,  // 14: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
-	2,  // 15: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
-	5,  // 16: etu.CreateNoteResponse.note:type_name -> etu.Note
-	5,  // 17: etu.GetNoteResponse.note:type_name -> etu.Note
-	1,  // 18: etu.UpdateNoteRequest.add_images:type_name -> etu.ImageUpload
-	2,  // 19: etu.UpdateNoteRequest.add_audios:type_name -> etu.AudioUpload
-	5,  // 20: etu.UpdateNoteResponse.note:type_name -> etu.Note
-	5,  // 21: etu.GetRandomNotesResponse.notes:type_name -> etu.Note
-	6,  // 22: etu.ListTagsResponse.tags:type_name -> etu.Tag
-	7,  // 23: etu.RegisterResponse.user:type_name -> etu.User
-	7,  // 24: etu.AuthenticateResponse.user:type_name -> etu.User
-	7,  // 25: etu.GetUserResponse.user:type_name -> etu.User
-	7,  // 26: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	49, // 27: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
-	7,  // 28: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
-	8,  // 29: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
-	8,  // 30: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
-	7,  // 31: etu.GetUserSettingsResponse.user:type_name -> etu.User
-	1,  // 32: etu.UpdateUserSettingsRequest.profile_image_upload:type_name -> etu.ImageUpload
-	7,  // 33: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
-	9,  // 34: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	11, // 35: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	13, // 36: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	15, // 37: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	17, // 38: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	19, // 39: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
-	21, // 40: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	23, // 41: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	25, // 42: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	27, // 43: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	29, // 44: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	31, // 45: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	33, // 46: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	35, // 47: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	37, // 48: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	39, // 49: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	41, // 50: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	43, // 51: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	47, // 52: etu.UserSettingsService.GetProfileImageURL:input_type -> etu.GetProfileImageURLRequest
-	45, // 53: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
-	10, // 54: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	12, // 55: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	14, // 56: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	16, // 57: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	18, // 58: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	20, // 59: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
-	22, // 60: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	24, // 61: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	26, // 62: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	28, // 63: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	30, // 64: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	32, // 65: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	34, // 66: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	36, // 67: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	38, // 68: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	40, // 69: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	42, // 70: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	44, // 71: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	48, // 72: etu.UserSettingsService.GetProfileImageURL:output_type -> etu.GetProfileImageURLResponse
-	46, // 73: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
-	54, // [54:74] is the sub-list for method output_type
-	34, // [34:54] is the sub-list for method input_type
-	34, // [34:34] is the sub-list for extension type_name
-	34, // [34:34] is the sub-list for extension extendee
-	0,  // [0:34] is the sub-list for field type_name
+	51, // 11: etu.User.current_period_start:type_name -> google.protobuf.Timestamp
+	51, // 12: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
+	51, // 13: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
+	5,  // 14: etu.ListNotesResponse.notes:type_name -> etu.Note
+	1,  // 15: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
+	2,  // 16: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
+	5,  // 17: etu.CreateNoteResponse.note:type_name -> etu.Note
+	5,  // 18: etu.GetNoteResponse.note:type_name -> etu.Note
+	1,  // 19: etu.UpdateNoteRequest.add_images:type_name -> etu.ImageUpload
+	2,  // 20: etu.UpdateNoteRequest.add_audios:type_name -> etu.AudioUpload
+	5,  // 21: etu.UpdateNoteResponse.note:type_name -> etu.Note
+	5,  // 22: etu.GetRandomNotesResponse.notes:type_name -> etu.Note
+	6,  // 23: etu.ListTagsResponse.tags:type_name -> etu.Tag
+	7,  // 24: etu.RegisterResponse.user:type_name -> etu.User
+	7,  // 25: etu.AuthenticateResponse.user:type_name -> etu.User
+	7,  // 26: etu.GetUserResponse.user:type_name -> etu.User
+	7,  // 27: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
+	51, // 28: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
+	51, // 29: etu.UpdateUserSubscriptionRequest.current_period_start:type_name -> google.protobuf.Timestamp
+	7,  // 30: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
+	7,  // 31: etu.UpdateUserStripeCustomerResponse.user:type_name -> etu.User
+	8,  // 32: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
+	8,  // 33: etu.ListApiKeysResponse.api_keys:type_name -> etu.ApiKey
+	7,  // 34: etu.GetUserSettingsResponse.user:type_name -> etu.User
+	1,  // 35: etu.UpdateUserSettingsRequest.profile_image_upload:type_name -> etu.ImageUpload
+	7,  // 36: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
+	9,  // 37: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	11, // 38: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	13, // 39: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	15, // 40: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	17, // 41: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	19, // 42: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
+	21, // 43: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	23, // 44: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	25, // 45: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	27, // 46: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	29, // 47: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	31, // 48: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	33, // 49: etu.AuthService.UpdateUserStripeCustomer:input_type -> etu.UpdateUserStripeCustomerRequest
+	35, // 50: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	37, // 51: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	39, // 52: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	41, // 53: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	43, // 54: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	45, // 55: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	49, // 56: etu.UserSettingsService.GetProfileImageURL:input_type -> etu.GetProfileImageURLRequest
+	47, // 57: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
+	10, // 58: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	12, // 59: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	14, // 60: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	16, // 61: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	18, // 62: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	20, // 63: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
+	22, // 64: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	24, // 65: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	26, // 66: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	28, // 67: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	30, // 68: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	32, // 69: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	34, // 70: etu.AuthService.UpdateUserStripeCustomer:output_type -> etu.UpdateUserStripeCustomerResponse
+	36, // 71: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	38, // 72: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	40, // 73: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	42, // 74: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	44, // 75: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	46, // 76: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	50, // 77: etu.UserSettingsService.GetProfileImageURL:output_type -> etu.GetProfileImageURLResponse
+	48, // 78: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
+	58, // [58:79] is the sub-list for method output_type
+	37, // [37:58] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }
@@ -3350,15 +3694,16 @@ func file_proto_etu_proto_init() {
 	file_proto_etu_proto_msgTypes[25].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[29].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[30].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[39].OneofWrappers = []any{}
-	file_proto_etu_proto_msgTypes[42].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[32].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[41].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[44].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_etu_proto_rawDesc), len(file_proto_etu_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   48,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   6,
 		},

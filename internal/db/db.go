@@ -736,21 +736,98 @@ func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID st
 	return &user, nil
 }
 
-// UpdateUserSubscription updates a user's subscription information
-func (db *DB) UpdateUserSubscription(ctx context.Context, userID, subscriptionStatus string, stripeCustomerID *string, subscriptionEnd *time.Time) (*User, error) {
+// SubscriptionUpdate carries optional Stripe subscription fields written by
+// UpdateUserSubscription. SubscriptionStatus is the only required field.
+// Pointer-typed fields are only persisted when non-nil; pass an empty string
+// pointer to explicitly clear the column. CancelAtPeriodEnd is always written.
+type SubscriptionUpdate struct {
+	SubscriptionStatus   string
+	StripeCustomerID     *string
+	SubscriptionEnd      *time.Time
+	StripeSubscriptionID *string
+	StripePriceID        *string
+	CancelAtPeriodEnd    bool
+	CurrentPeriodStart   *time.Time
+}
+
+// UpdateUserSubscription updates a user's subscription information.
+func (db *DB) UpdateUserSubscription(ctx context.Context, userID string, in SubscriptionUpdate) (*User, error) {
 	updates := map[string]interface{}{
-		colSubscriptionStatus: subscriptionStatus,
+		colSubscriptionStatus: in.SubscriptionStatus,
+		colCancelAtPeriodEnd:  in.CancelAtPeriodEnd,
 	}
-	if stripeCustomerID != nil {
-		updates[colStripeCustomerID] = *stripeCustomerID
+	if in.StripeCustomerID != nil {
+		updates[colStripeCustomerID] = *in.StripeCustomerID
 	}
-	if subscriptionEnd != nil {
-		updates["subscriptionEnd"] = *subscriptionEnd
+	if in.SubscriptionEnd != nil {
+		updates[colSubscriptionEnd] = *in.SubscriptionEnd
+	}
+	if in.StripeSubscriptionID != nil {
+		updates[colStripeSubscriptionID] = *in.StripeSubscriptionID
+	}
+	if in.StripePriceID != nil {
+		updates[colStripePriceID] = *in.StripePriceID
+	}
+	if in.CurrentPeriodStart != nil {
+		updates[colCurrentPeriodStart] = *in.CurrentPeriodStart
 	}
 
 	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to update user subscription: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return db.GetUser(ctx, userID)
+}
+
+// StripeCustomerUpdate carries optional Stripe customer-level profile fields
+// written by UpdateUserStripeCustomer. Each non-nil pointer is persisted;
+// an empty string pointer explicitly clears the column.
+type StripeCustomerUpdate struct {
+	Name              *string
+	BillingLine1      *string
+	BillingLine2      *string
+	BillingCity       *string
+	BillingState      *string
+	BillingPostalCode *string
+	BillingCountry    *string
+}
+
+// UpdateUserStripeCustomer updates Stripe customer profile fields synced from
+// Stripe webhook events. Returns nil, nil if the user does not exist.
+func (db *DB) UpdateUserStripeCustomer(ctx context.Context, userID string, in StripeCustomerUpdate) (*User, error) {
+	updates := map[string]interface{}{}
+	if in.Name != nil {
+		updates[colName] = *in.Name
+	}
+	if in.BillingLine1 != nil {
+		updates[colBillingLine1] = *in.BillingLine1
+	}
+	if in.BillingLine2 != nil {
+		updates[colBillingLine2] = *in.BillingLine2
+	}
+	if in.BillingCity != nil {
+		updates[colBillingCity] = *in.BillingCity
+	}
+	if in.BillingState != nil {
+		updates[colBillingState] = *in.BillingState
+	}
+	if in.BillingPostalCode != nil {
+		updates[colBillingPostalCode] = *in.BillingPostalCode
+	}
+	if in.BillingCountry != nil {
+		updates[colBillingCountry] = *in.BillingCountry
+	}
+	if len(updates) == 0 {
+		return db.GetUser(ctx, userID)
+	}
+
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to update stripe customer: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
 		return nil, nil
