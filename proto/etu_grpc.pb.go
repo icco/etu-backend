@@ -440,6 +440,7 @@ const (
 	AuthService_GetUser_FullMethodName                   = "/etu.AuthService/GetUser"
 	AuthService_GetUserByStripeCustomerId_FullMethodName = "/etu.AuthService/GetUserByStripeCustomerId"
 	AuthService_UpdateUserSubscription_FullMethodName    = "/etu.AuthService/UpdateUserSubscription"
+	AuthService_UpdateUserStripeCustomer_FullMethodName  = "/etu.AuthService/UpdateUserStripeCustomer"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -458,6 +459,9 @@ type AuthServiceClient interface {
 	GetUserByStripeCustomerId(ctx context.Context, in *GetUserByStripeCustomerIdRequest, opts ...grpc.CallOption) (*GetUserByStripeCustomerIdResponse, error)
 	// UpdateUserSubscription updates billing-related subscription state.
 	UpdateUserSubscription(ctx context.Context, in *UpdateUserSubscriptionRequest, opts ...grpc.CallOption) (*UpdateUserSubscriptionResponse, error)
+	// UpdateUserStripeCustomer syncs Stripe customer profile fields
+	// (name, billing address) from Stripe webhook events.
+	UpdateUserStripeCustomer(ctx context.Context, in *UpdateUserStripeCustomerRequest, opts ...grpc.CallOption) (*UpdateUserStripeCustomerResponse, error)
 }
 
 type authServiceClient struct {
@@ -518,6 +522,16 @@ func (c *authServiceClient) UpdateUserSubscription(ctx context.Context, in *Upda
 	return out, nil
 }
 
+func (c *authServiceClient) UpdateUserStripeCustomer(ctx context.Context, in *UpdateUserStripeCustomerRequest, opts ...grpc.CallOption) (*UpdateUserStripeCustomerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateUserStripeCustomerResponse)
+	err := c.cc.Invoke(ctx, AuthService_UpdateUserStripeCustomer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -534,6 +548,9 @@ type AuthServiceServer interface {
 	GetUserByStripeCustomerId(context.Context, *GetUserByStripeCustomerIdRequest) (*GetUserByStripeCustomerIdResponse, error)
 	// UpdateUserSubscription updates billing-related subscription state.
 	UpdateUserSubscription(context.Context, *UpdateUserSubscriptionRequest) (*UpdateUserSubscriptionResponse, error)
+	// UpdateUserStripeCustomer syncs Stripe customer profile fields
+	// (name, billing address) from Stripe webhook events.
+	UpdateUserStripeCustomer(context.Context, *UpdateUserStripeCustomerRequest) (*UpdateUserStripeCustomerResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -558,6 +575,9 @@ func (UnimplementedAuthServiceServer) GetUserByStripeCustomerId(context.Context,
 }
 func (UnimplementedAuthServiceServer) UpdateUserSubscription(context.Context, *UpdateUserSubscriptionRequest) (*UpdateUserSubscriptionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUserSubscription not implemented")
+}
+func (UnimplementedAuthServiceServer) UpdateUserStripeCustomer(context.Context, *UpdateUserStripeCustomerRequest) (*UpdateUserStripeCustomerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateUserStripeCustomer not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -670,6 +690,24 @@ func _AuthService_UpdateUserSubscription_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_UpdateUserStripeCustomer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserStripeCustomerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).UpdateUserStripeCustomer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_UpdateUserStripeCustomer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).UpdateUserStripeCustomer(ctx, req.(*UpdateUserStripeCustomerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -696,6 +734,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateUserSubscription",
 			Handler:    _AuthService_UpdateUserSubscription_Handler,
+		},
+		{
+			MethodName: "UpdateUserStripeCustomer",
+			Handler:    _AuthService_UpdateUserStripeCustomer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

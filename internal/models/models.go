@@ -94,6 +94,16 @@ type User struct {
 	SubscriptionEnd       *time.Time `gorm:"column:subscriptionEnd"`
 	CreatedAt             time.Time  `gorm:"column:createdAt"`
 	StripeCustomerID      *string    `gorm:"column:stripeCustomerId"`
+	StripeSubscriptionID  *string    `gorm:"column:stripeSubscriptionId"`
+	StripePriceID         *string    `gorm:"column:stripePriceId"`
+	CancelAtPeriodEnd     bool       `gorm:"column:cancelAtPeriodEnd;default:false"`
+	CurrentPeriodStart    *time.Time `gorm:"column:currentPeriodStart"`
+	BillingLine1          *string    `gorm:"column:billingLine1"`
+	BillingLine2          *string    `gorm:"column:billingLine2"`
+	BillingCity           *string    `gorm:"column:billingCity"`
+	BillingState          *string    `gorm:"column:billingState"`
+	BillingPostalCode     *string    `gorm:"column:billingPostalCode"`
+	BillingCountry        *string    `gorm:"column:billingCountry"`
 	NotionKey             *string    `gorm:"column:notionKey"`             // Notion API key for syncing (encrypted at rest using AES-256-GCM)
 	NotionDatabaseName    *string    `gorm:"column:notionDatabaseName"`    // Notion database name to sync (defaults to "Journal")
 	ProfileImageGCSObject *string    `gorm:"column:profileImageGCSObject"` // GCS object name for uploaded profile image

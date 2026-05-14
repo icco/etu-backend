@@ -835,6 +835,8 @@ func TestCreateUser_SQL(t *testing.T) {
 			sqlmock.AnyArg(), "new@example.com", sqlmock.AnyArg(), "hashed", "free",
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
+			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(),
 		).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -910,9 +912,9 @@ func TestUpdateUserSubscription_SQL(t *testing.T) {
 	now := time.Now().UTC()
 
 	mock.ExpectBegin()
-	// UPDATE "User" SET stripeCustomerId=$1, subscriptionStatus=$2, updatedAt=$3 WHERE id=$4
+	// UPDATE "User" SET cancelAtPeriodEnd=$1, stripeCustomerId=$2, subscriptionStatus=$3, updatedAt=$4 WHERE id=$5
 	mock.ExpectExec(`UPDATE "User"`).
-		WithArgs(stripeID, "premium", sqlmock.AnyArg(), userID).
+		WithArgs(false, stripeID, "premium", sqlmock.AnyArg(), userID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).
@@ -922,7 +924,10 @@ func TestUpdateUserSubscription_SQL(t *testing.T) {
 
 	ctx := context.Background()
 	stripeStr := stripeID
-	user, err := db.UpdateUserSubscription(ctx, userID, "premium", &stripeStr, nil)
+	user, err := db.UpdateUserSubscription(ctx, userID, SubscriptionUpdate{
+		SubscriptionStatus: "premium",
+		StripeCustomerID:   &stripeStr,
+	})
 	if err != nil {
 		t.Fatalf("UpdateUserSubscription: %v", err)
 	}
