@@ -184,7 +184,7 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	}, nil
 }
 
-// userToProto converts a db.User to a protobuf User
+// userToProto converts a db.User to a protobuf User.
 func userToProto(u *db.User) *pb.User {
 	pbUser := &pb.User{
 		Id:                 u.ID,
@@ -198,8 +198,10 @@ func userToProto(u *db.User) *pb.User {
 	if u.Name != nil {
 		pbUser.Name = u.Name
 	}
-	if u.Image != nil {
-		pbUser.Image = u.Image
+	// Image carries the GCS object key (not a URL) — clients resolve it
+	// through the image endpoint so signed URLs aren't persisted.
+	if u.ProfileImageGCSObject != nil && *u.ProfileImageGCSObject != "" {
+		pbUser.Image = u.ProfileImageGCSObject
 	}
 	if u.SubscriptionEnd != nil {
 		pbUser.SubscriptionEnd = timestamppb.New(*u.SubscriptionEnd)

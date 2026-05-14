@@ -120,7 +120,7 @@ func (db *DB) Close() error {
 
 // AutoMigrate runs auto migrations for all tables
 func (db *DB) AutoMigrate() error {
-	return db.conn.AutoMigrate(
+	if err := db.conn.AutoMigrate(
 		&models.User{},
 		&models.Note{},
 		&models.Tag{},
@@ -129,7 +129,17 @@ func (db *DB) AutoMigrate() error {
 		&models.SyncState{},
 		&models.NoteImage{},
 		&models.NoteAudio{},
-	)
+	); err != nil {
+		return err
+	}
+	// Avatar URLs are no longer stored — User.image was replaced by
+	// profileImageGCSObject and resolved on demand. Drop if still present.
+	if db.conn.Migrator().HasColumn(&models.User{}, "image") {
+		if err := db.conn.Migrator().DropColumn(&models.User{}, "image"); err != nil {
+			return fmt.Errorf("drop User.image: %w", err)
+		}
+	}
+	return nil
 }
 
 // ListNotes retrieves notes for a user with optional filtering
@@ -1020,7 +1030,7 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 }
 
 // UpdateUserSettings updates or creates user settings
-func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name, image, password, notionDatabaseName, profileImageGCSObject *string) (*User, error) {
+func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name, password, notionDatabaseName, profileImageGCSObject *string) (*User, error) {
 	now := time.Now()
 
 	var user User
@@ -1043,9 +1053,6 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	}
 	if name != nil {
 		updates[colName] = *name
-	}
-	if image != nil {
-		updates[colImage] = *image
 	}
 	if password != nil && *password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*password), bcrypt.DefaultCost)

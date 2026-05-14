@@ -52,10 +52,10 @@ func TestGetUser_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(userID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
-			userID, "test@example.com", nil, nil, "hash", "free",
+			userID, "test@example.com", nil, "hash", "free",
 			nil, now, nil, nil, now,
 		))
 
@@ -96,7 +96,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs("nonexistent", 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}))
 
@@ -134,10 +134,10 @@ func TestGetUserByEmail_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(email, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
-			userID, email, nil, nil, "hash", "free",
+			userID, email, nil, "hash", "free",
 			nil, now, nil, nil, now,
 		))
 
@@ -813,7 +813,7 @@ func TestGetAudiosByNoteID_SQL(t *testing.T) {
 
 // userRowColumns is the column set for scanning User in tests.
 var userRowColumns = []string{
-	"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+	"id", colEmail, colName, colPasswordHash, colSubscriptionStatus,
 	colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, "notionDatabaseName", colUpdatedAt,
 }
 
@@ -832,7 +832,7 @@ func TestCreateUser_SQL(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectExec(`INSERT INTO "User"`).
 		WithArgs(
-			sqlmock.AnyArg(), "new@example.com", sqlmock.AnyArg(), sqlmock.AnyArg(), "hashed", "free",
+			sqlmock.AnyArg(), "new@example.com", sqlmock.AnyArg(), "hashed", "free",
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(),
@@ -877,7 +877,7 @@ func TestGetUserByStripeCustomerID_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(stripeID, 1).
 		WillReturnRows(sqlmock.NewRows(userRowColumns).
-			AddRow(userID, "u@example.com", nil, nil, "hash", "premium", nil, now, stripeID, nil, nil, now))
+			AddRow(userID, "u@example.com", nil, "hash", "premium", nil, now, stripeID, nil, nil, now))
 
 	ctx := context.Background()
 	user, err := db.GetUserByStripeCustomerID(ctx, stripeID)
@@ -918,7 +918,7 @@ func TestUpdateUserSubscription_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).
 		WithArgs(userID, 1).
 		WillReturnRows(sqlmock.NewRows(userRowColumns).
-			AddRow(userID, "u@example.com", nil, nil, "hash", "premium", nil, now, stripeID, nil, nil, now))
+			AddRow(userID, "u@example.com", nil, "hash", "premium", nil, now, stripeID, nil, nil, now))
 
 	ctx := context.Background()
 	stripeStr := stripeID
@@ -1200,7 +1200,7 @@ func TestGetUserSettings_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).
 		WithArgs(userID, 1).
 		WillReturnRows(sqlmock.NewRows(userRowColumns).
-			AddRow(userID, "u@ex.com", nil, nil, "hash", "free", nil, now, nil, nil, nil, now))
+			AddRow(userID, "u@ex.com", nil, "hash", "free", nil, now, nil, nil, nil, now))
 
 	ctx := context.Background()
 	user, err := db.GetUserSettings(ctx, userID)
@@ -1235,7 +1235,7 @@ func TestUpdateUserSettings_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).
 		WithArgs(userID, 1).
 		WillReturnRows(sqlmock.NewRows(userRowColumns).
-			AddRow(userID, "u@ex.com", nil, nil, "hash", "free", nil, now, nil, nil, nil, now))
+			AddRow(userID, "u@ex.com", nil, "hash", "free", nil, now, nil, nil, nil, now))
 	mock.ExpectBegin()
 	mock.ExpectExec(`UPDATE "User"`).
 		WithArgs("New Name", sqlmock.AnyArg(), userID).
@@ -1245,10 +1245,10 @@ func TestUpdateUserSettings_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).
 		WithArgs(userID, userID, 1).
 		WillReturnRows(sqlmock.NewRows(userRowColumns).
-			AddRow(userID, "u@ex.com", &name, nil, "hash", "free", nil, now, nil, nil, nil, now))
+			AddRow(userID, "u@ex.com", &name, "hash", "free", nil, now, nil, nil, nil, now))
 
 	ctx := context.Background()
-	user, err := db.UpdateUserSettings(ctx, userID, nil, &name, nil, nil, nil, nil)
+	user, err := db.UpdateUserSettings(ctx, userID, nil, &name, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("UpdateUserSettings: %v", err)
 	}
@@ -1276,7 +1276,7 @@ func TestGetUsersWithNotionKeys_SQL(t *testing.T) {
 	now := time.Now().UTC()
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).
 		WillReturnRows(sqlmock.NewRows(userRowColumns).
-			AddRow("u1", "a@b.com", nil, nil, "h", "free", nil, now, nil, "notion-key", nil, now))
+			AddRow("u1", "a@b.com", nil, "h", "free", nil, now, nil, "notion-key", nil, now))
 
 	ctx := context.Background()
 	users, err := db.GetUsersWithNotionKeys(ctx)
@@ -1307,8 +1307,8 @@ func TestListAllUsers_SQL(t *testing.T) {
 	now := time.Now().UTC()
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).
 		WillReturnRows(sqlmock.NewRows(userRowColumns).
-			AddRow("u1", "a@b.com", nil, nil, "h", "free", nil, now, nil, nil, nil, now).
-			AddRow("u2", "b@b.com", nil, nil, "h", "free", nil, now, nil, nil, nil, now))
+			AddRow("u1", "a@b.com", nil, "h", "free", nil, now, nil, nil, nil, now).
+			AddRow("u2", "b@b.com", nil, "h", "free", nil, now, nil, nil, nil, now))
 
 	ctx := context.Background()
 	users, err := db.ListAllUsers(ctx)
