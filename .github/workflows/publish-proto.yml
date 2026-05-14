@@ -26,13 +26,33 @@ jobs:
       - name: Generate and build
         run: npm run build
       - name: Set version from date
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
-          YEAR=$(date +%Y)
-          MONTH=$(date +%m)
-          # Use time of day in HHMMSS format (000000-235959) as the patch version
-          COUNTER=$(date +%H%M%S)
-          VERSION="${YEAR}.${MONTH}.${COUNTER}"
-          npm version $VERSION --no-git-tag-version
+          set -euo pipefail
+          YEAR=$(date -u +%Y)
+          MONTH=$(date -u +%-m)
+          # Patch = DDHHMMSS so it strictly increases within each YEAR.MONTH.
+          # Max value 31235959 fits inside a semver numeric identifier.
+          PATCH=$((10#$(date -u +%d) * 1000000 + 10#$(date -u +%H%M%S)))
+          VERSION="${YEAR}.${MONTH}.${PATCH}"
+
+          # Safety net: if the registry already has a version >= computed
+          # (clock skew, manual rerun, month rollback), bump above it.
+          PKG_NAME=$(node -p "require('./package.json').name")
+          LATEST=$(npm view "$PKG_NAME" version 2>/dev/null || true)
+          if [ -n "$LATEST" ]; then
+            HIGHEST=$(printf '%s\n%s\n' "$VERSION" "$LATEST" | sort -V | tail -n1)
+            if [ "$VERSION" = "$LATEST" ] || [ "$HIGHEST" != "$VERSION" ]; then
+              LY=$(echo "$LATEST" | cut -d. -f1)
+              LM=$(echo "$LATEST" | cut -d. -f2)
+              LP=$(echo "$LATEST" | cut -d. -f3)
+              VERSION="${LY}.${LM}.$((LP + 1))"
+              echo "Computed version not greater than latest ($LATEST); bumping to $VERSION"
+            fi
+          fi
+
+          npm version "$VERSION" --no-git-tag-version
           echo "Publishing version: $VERSION"
       - name: Publish to GitHub Packages
         run: npm publish --access public
