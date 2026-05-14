@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/icco/etu-backend/internal/db"
 	"github.com/icco/etu-backend/internal/storage"
@@ -93,8 +94,16 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 			return nil, status.Errorf(codes.InvalidArgument, "invalid profile image: %v", err)
 		}
 
-		// Fixed path overwrites any existing avatar for this user.
-		objectName := fmt.Sprintf("profiles/%s/avatar", req.UserId)
+		// Capture any prior avatar object so we can delete it after a successful overwrite.
+		// Using a unique per-upload path avoids imgix's origin cache serving stale bytes
+		// from a fixed key, which it does even when the imgix request URL has a fresh
+		// cache-busting query param (imgix origin cache keys ignore query strings).
+		var oldObjectName string
+		if existing, getErr := s.db.GetUser(ctx, req.UserId); getErr == nil && existing != nil && existing.ProfileImageGCSObject != nil {
+			oldObjectName = *existing.ProfileImageGCSObject
+		}
+
+		objectName := fmt.Sprintf("profiles/%s/avatar-%d", req.UserId, time.Now().UnixNano())
 		if _, err := s.storage.UploadImage(ctx, objectName, req.ProfileImageUpload.Data, req.ProfileImageUpload.MimeType); err != nil {
 			l.Errorw("GCS upload failed", "user_id", req.UserId, "object_name", objectName, zap.Error(err))
 			return nil, status.Errorf(codes.Internal, "failed to upload profile image: %v", err)
@@ -103,6 +112,13 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		l.Infow("GCS upload succeeded", "user_id", req.UserId, "object_name", objectName, "bytes", len(req.ProfileImageUpload.Data))
 
 		profileImageGCSObject = &objectName
+
+		if oldObjectName != "" && oldObjectName != objectName {
+			if err := s.storage.DeleteImage(ctx, oldObjectName); err != nil {
+				l.Warnw("failed to delete previous avatar (orphaned object left in GCS)",
+					"user_id", req.UserId, "old_object_name", oldObjectName, zap.Error(err))
+			}
+		}
 	} else if req.ClearProfileImage != nil && *req.ClearProfileImage {
 		empty := ""
 		profileImageGCSObject = &empty
