@@ -66,25 +66,10 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 	}
 
 	l := logging.FromContext(ctx)
-	l.Infow("UpdateUserSettings received",
-		"user_id", req.UserId,
-		"has_profile_image_upload", req.ProfileImageUpload != nil,
-		"clear_profile_image", req.ClearProfileImage != nil && *req.ClearProfileImage,
-		"has_name", req.Name != nil,
-		"has_notion_key", req.NotionKey != nil,
-		"has_password", req.Password != nil,
-		"has_notion_db", req.NotionDatabaseName != nil,
-	)
 
 	var profileImageGCSObject *string
 
 	if req.ProfileImageUpload != nil {
-		l.Infow("ProfileImageUpload present",
-			"user_id", req.UserId,
-			"data_len", len(req.ProfileImageUpload.Data),
-			"mime_type", req.ProfileImageUpload.MimeType,
-		)
-
 		if s.storage == nil {
 			return nil, status.Error(codes.FailedPrecondition, "storage client not configured")
 		}
