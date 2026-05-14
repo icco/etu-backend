@@ -15,7 +15,7 @@ import (
 
 // userColumns lists all columns of the User table in the order GORM scans them.
 var userColumns = []string{
-	"id", colEmail, "name", "image", colPasswordHash, colSubscriptionStatus,
+	"id", colEmail, "name", colPasswordHash, colSubscriptionStatus,
 	"subscriptionEnd", colCreatedAt, "stripeCustomerId", "notionKey",
 	"notionDatabaseName", "profileImageGCSObject", colUpdatedAt,
 	colDisabled, "disabledReason", colFailedLoginAttempts, "lastFailedLogin",
@@ -54,7 +54,7 @@ func TestGetUserSettings_Basic(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", "Alice", "https://img.example/old.png", "hash",
+			testUserNameRow, "a@b.com", "Alice", "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
@@ -107,7 +107,7 @@ func TestGetUserSettings_ImageReturnsGCSKey(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", "Alice", nil, "hash",
+			testUserNameRow, "a@b.com", "Alice", "hash",
 			"active", nil, now, nil, nil, nil, &gcsObj, now,
 			false, nil, 0, nil,
 		))
@@ -186,7 +186,7 @@ func TestUpdateUserSettings_NoImageFieldInProto(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", "Alice", "https://old.example/img.png", "hash",
+			testUserNameRow, "a@b.com", "Alice", "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
@@ -200,7 +200,7 @@ func TestUpdateUserSettings_NoImageFieldInProto(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", "Alice", "https://old.example/img.png", "hash",
+			testUserNameRow, "a@b.com", "Alice", "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
@@ -237,7 +237,7 @@ func TestUpdateUserSettings_NameOnly(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", "Alice", nil, "hash",
+			testUserNameRow, "a@b.com", "Alice", "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
@@ -254,7 +254,7 @@ func TestUpdateUserSettings_NameOnly(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", &newName, nil, "hash",
+			testUserNameRow, "a@b.com", &newName, "hash",
 			"active", nil, now, nil, nil, nil, nil, now,
 			false, nil, 0, nil,
 		))
@@ -288,7 +288,7 @@ func TestUpdateUserSettings_ClearProfileImage(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", "Alice", "https://signed.example/img", "hash",
+			testUserNameRow, "a@b.com", "Alice", "hash",
 			"active", nil, now, nil, nil, nil, &gcsObj, now,
 			false, nil, 0, nil,
 		))
@@ -302,7 +302,7 @@ func TestUpdateUserSettings_ClearProfileImage(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "User"`).
 		WithArgs(testUserNameRow, testUserNameRow, 1).
 		WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
-			testUserNameRow, "a@b.com", "Alice", "", "hash",
+			testUserNameRow, "a@b.com", "Alice", "hash",
 			"active", nil, now, nil, nil, nil, "", now,
 			false, nil, 0, nil,
 		))

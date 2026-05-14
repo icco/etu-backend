@@ -120,7 +120,7 @@ func (db *DB) Close() error {
 
 // AutoMigrate runs auto migrations for all tables
 func (db *DB) AutoMigrate() error {
-	return db.conn.AutoMigrate(
+	if err := db.conn.AutoMigrate(
 		&models.User{},
 		&models.Note{},
 		&models.Tag{},
@@ -129,7 +129,17 @@ func (db *DB) AutoMigrate() error {
 		&models.SyncState{},
 		&models.NoteImage{},
 		&models.NoteAudio{},
-	)
+	); err != nil {
+		return err
+	}
+	// Avatar URLs are no longer stored — User.image was replaced by
+	// profileImageGCSObject and resolved on demand. Drop if still present.
+	if db.conn.Migrator().HasColumn(&models.User{}, "image") {
+		if err := db.conn.Migrator().DropColumn(&models.User{}, "image"); err != nil {
+			return fmt.Errorf("drop User.image: %w", err)
+		}
+	}
+	return nil
 }
 
 // ListNotes retrieves notes for a user with optional filtering
