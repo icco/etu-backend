@@ -52,7 +52,7 @@ func TestGetUser_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(userID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, colImageLegacy, colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
 			userID, "test@example.com", nil, nil, "hash", "free",
@@ -96,7 +96,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs("nonexistent", 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, colImageLegacy, colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}))
 
@@ -134,7 +134,7 @@ func TestGetUserByEmail_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(email, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, colImageLegacy, colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
 			userID, email, nil, nil, "hash", "free",
@@ -811,9 +811,13 @@ func TestGetAudiosByNoteID_SQL(t *testing.T) {
 	}
 }
 
+// Legacy column we still SELECT in tests even though the model no longer
+// scans into it; keeps row arity correct for `SELECT *`.
+const colImageLegacy = "image"
+
 // userRowColumns is the column set for scanning User in tests.
 var userRowColumns = []string{
-	"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
+	"id", colEmail, colName, colImageLegacy, colPasswordHash, colSubscriptionStatus,
 	colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, "notionDatabaseName", colUpdatedAt,
 }
 

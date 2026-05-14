@@ -42,8 +42,6 @@ func newTestUserSettingsService(t *testing.T, imgixDomain string) (*UserSettings
 	return svc, mock, cleanup
 }
 
-func strPtr(s string) *string { return &s }
-
 // ---------- GetUserSettings ----------
 
 func TestGetUserSettings_Basic(t *testing.T) {
