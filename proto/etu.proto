@@ -109,7 +109,9 @@ message User {
   string email = 2;
   // name is the user's display name when set.
   optional string name = 3;
-  // image is an optional avatar URL.
+  // image is the storage object key for the user's avatar. Resolve it to a
+  // URL via UserSettingsService.GetProfileImageURL — never use directly as
+  // an <img src>.
   optional string image = 4;
   // subscription_status is the billing tier, such as "free" or "pro".
   string subscription_status = 5;
@@ -478,6 +480,19 @@ service UserSettingsService {
   rpc GetUserSettings(GetUserSettingsRequest) returns (GetUserSettingsResponse);
   // UpdateUserSettings updates mutable user settings fields.
   rpc UpdateUserSettings(UpdateUserSettingsRequest) returns (UpdateUserSettingsResponse);
+  // GetProfileImageURL resolves a profile image key to a short-lived URL.
+  rpc GetProfileImageURL(GetProfileImageURLRequest) returns (GetProfileImageURLResponse);
+}
+
+// GetProfileImageURLRequest resolves a stored avatar key to a URL.
+message GetProfileImageURLRequest {
+  // key is the storage object key returned in User.image.
+  string key = 1;
+}
+
+// GetProfileImageURLResponse returns a short-lived URL for the image.
+message GetProfileImageURLResponse {
+  string url = 1;
 }
 
 // StatsService provides aggregate usage metrics.

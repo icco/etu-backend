@@ -52,7 +52,7 @@ func TestGetUser_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(userID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
 			userID, "test@example.com", nil, nil, "hash", "free",
@@ -96,7 +96,7 @@ func TestGetUser_NotFound(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs("nonexistent", 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}))
 
@@ -134,7 +134,7 @@ func TestGetUserByEmail_SQL(t *testing.T) {
 	mock.ExpectQuery(`SELECT (.+) FROM "User" (.+)`).
 		WithArgs(email, 1).
 		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+			"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
 			colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, colUpdatedAt,
 		}).AddRow(
 			userID, email, nil, nil, "hash", "free",
@@ -813,7 +813,7 @@ func TestGetAudiosByNoteID_SQL(t *testing.T) {
 
 // userRowColumns is the column set for scanning User in tests.
 var userRowColumns = []string{
-	"id", colEmail, colName, colImage, colPasswordHash, colSubscriptionStatus,
+	"id", colEmail, colName, "image", colPasswordHash, colSubscriptionStatus,
 	colSubscriptionEnd, colCreatedAt, colStripeCustomerID, colNotionKey, "notionDatabaseName", colUpdatedAt,
 }
 
@@ -832,7 +832,7 @@ func TestCreateUser_SQL(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectExec(`INSERT INTO "User"`).
 		WithArgs(
-			sqlmock.AnyArg(), "new@example.com", sqlmock.AnyArg(), sqlmock.AnyArg(), "hashed", "free",
+			sqlmock.AnyArg(), "new@example.com", sqlmock.AnyArg(), "hashed", "free",
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(),
@@ -1248,7 +1248,7 @@ func TestUpdateUserSettings_SQL(t *testing.T) {
 			AddRow(userID, "u@ex.com", &name, nil, "hash", "free", nil, now, nil, nil, nil, now))
 
 	ctx := context.Background()
-	user, err := db.UpdateUserSettings(ctx, userID, nil, &name, nil, nil, nil, nil)
+	user, err := db.UpdateUserSettings(ctx, userID, nil, &name, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("UpdateUserSettings: %v", err)
 	}

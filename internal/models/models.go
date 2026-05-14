@@ -89,7 +89,6 @@ type User struct {
 	ID                    string     `gorm:"column:id;primaryKey"`
 	Email                 string     `gorm:"column:email"`
 	Name                  *string    `gorm:"column:name"`
-	Image                 *string    `gorm:"column:image"`
 	PasswordHash          string     `gorm:"column:passwordHash"`
 	SubscriptionStatus    string     `gorm:"column:subscriptionStatus"`
 	SubscriptionEnd       *time.Time `gorm:"column:subscriptionEnd"`

@@ -5,7 +5,6 @@ const (
 	colUpdatedAt           = "updatedAt"
 	colDisabled            = "disabled"
 	colEmail               = "email"
-	colImage               = "image"
 	colCount               = "count"
 	colContent             = "content"
 	colExternalID          = "externalId"
