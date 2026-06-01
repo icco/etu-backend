@@ -35,7 +35,7 @@ func (s *mockTagsService) addTag(userID, name string, count int) {
 	s.tags[tag.ID] = tag
 }
 
-func (s *mockTagsService) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*pb.ListTagsResponse, error) {
+func (s *mockTagsService) ListTags(_ context.Context, req *pb.ListTagsRequest) (*pb.ListTagsResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}

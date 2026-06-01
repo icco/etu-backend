@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// Note size and pagination limits applied by the NotesService API.
 const (
 	MaxNotesLimit     = 100
 	DefaultNotesLimit = 50

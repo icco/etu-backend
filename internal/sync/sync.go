@@ -26,8 +26,8 @@ func NewSyncer(database *syncdb.DB, notionClient *notion.Client) *Syncer {
 	}
 }
 
-// SyncResult contains statistics from a sync operation.
-type SyncResult struct {
+// Result contains statistics from a sync operation.
+type Result struct {
 	Created   int
 	Updated   int
 	Unchanged int
@@ -35,8 +35,8 @@ type SyncResult struct {
 	Duration  time.Duration
 }
 
-// SyncToNotionResult contains statistics from syncing back to Notion.
-type SyncToNotionResult struct {
+// ToNotionResult contains statistics from syncing back to Notion.
+type ToNotionResult struct {
 	Created  int
 	Updated  int
 	Archived int
@@ -46,11 +46,11 @@ type SyncToNotionResult struct {
 
 // SyncUser syncs all Notion posts for a specific user to the database.
 // If fullSync is true, it fetches all posts; otherwise it only fetches posts modified since last sync.
-func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*SyncResult, error) {
+func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*Result, error) {
 	l := logging.FromContext(ctx).With("user_id", userID)
 
 	start := time.Now()
-	result := &SyncResult{}
+	result := &Result{}
 
 	var posts []*notion.Post
 	var err error
@@ -104,11 +104,12 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*S
 			continue
 		}
 
-		if isNew {
+		switch {
+		case isNew:
 			result.Created++
-		} else if existing != nil && (existing.Content != post.Text || !s.tagsChanged(existing.ID, post.Tags)) {
+		case existing != nil && (existing.Content != post.Text || !s.tagsChanged(existing.ID, post.Tags)):
 			result.Updated++
-		} else {
+		default:
 			result.Unchanged++
 		}
 	}
@@ -149,11 +150,11 @@ func (s *Syncer) tagsChanged(noteID string, newTags []string) bool {
 // SyncUserToNotion syncs local changes back to Notion for a specific user.
 // It creates new pages for notes without a Notion page ID, and updates
 // existing pages for notes that have been modified locally.
-func (s *Syncer) SyncUserToNotion(ctx context.Context, userID string) (*SyncToNotionResult, error) {
+func (s *Syncer) SyncUserToNotion(ctx context.Context, userID string) (*ToNotionResult, error) {
 	l := logging.FromContext(ctx).With("user_id", userID)
 
 	start := time.Now()
-	result := &SyncToNotionResult{}
+	result := &ToNotionResult{}
 
 	notes, err := s.db.GetNotesNeedingSyncToNotion(userID)
 	if err != nil {
@@ -225,7 +226,7 @@ func (s *Syncer) SyncUserToNotion(ctx context.Context, userID string) (*SyncToNo
 
 // SyncUserBidirectional performs a full bidirectional sync for a user.
 // It first syncs from Notion to the local DB, then syncs local changes back to Notion.
-func (s *Syncer) SyncUserBidirectional(ctx context.Context, userID string, fullSync bool) (*SyncResult, *SyncToNotionResult, error) {
+func (s *Syncer) SyncUserBidirectional(ctx context.Context, userID string, fullSync bool) (*Result, *ToNotionResult, error) {
 	fromNotionResult, err := s.SyncUser(ctx, userID, fullSync)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sync from Notion: %w", err)

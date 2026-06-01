@@ -121,7 +121,9 @@ func (User) TableName() string {
 	return "User"
 }
 
-// ApiKey represents an API key in the database
+// ApiKey represents an API key in the database.
+//
+//nolint:revive // matches proto-generated pb.ApiKey
 type ApiKey struct {
 	ID        string     `gorm:"column:id;primaryKey"`
 	Name      string     `gorm:"column:name"`
@@ -149,7 +151,7 @@ func (SyncState) TableName() string {
 }
 
 // BeforeCreate hook to generate CUID-like ID for notes
-func (n *Note) BeforeCreate(tx *gorm.DB) error {
+func (n *Note) BeforeCreate(_ *gorm.DB) error {
 	if n.ID == "" {
 		n.ID = GenerateCUID()
 	}
@@ -157,7 +159,7 @@ func (n *Note) BeforeCreate(tx *gorm.DB) error {
 }
 
 // BeforeCreate hook to generate CUID-like ID for tags
-func (t *Tag) BeforeCreate(tx *gorm.DB) error {
+func (t *Tag) BeforeCreate(_ *gorm.DB) error {
 	if t.ID == "" {
 		t.ID = GenerateCUID()
 	}
@@ -165,7 +167,7 @@ func (t *Tag) BeforeCreate(tx *gorm.DB) error {
 }
 
 // BeforeCreate hook to generate CUID-like ID for users
-func (u *User) BeforeCreate(tx *gorm.DB) error {
+func (u *User) BeforeCreate(_ *gorm.DB) error {
 	if u.ID == "" {
 		u.ID = GenerateCUID()
 	}
@@ -173,7 +175,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 }
 
 // BeforeCreate hook to generate CUID-like ID for API keys
-func (a *ApiKey) BeforeCreate(tx *gorm.DB) error {
+func (a *ApiKey) BeforeCreate(_ *gorm.DB) error {
 	if a.ID == "" {
 		a.ID = GenerateCUID()
 	}
@@ -181,7 +183,7 @@ func (a *ApiKey) BeforeCreate(tx *gorm.DB) error {
 }
 
 // BeforeCreate hook to generate CUID-like ID for note images
-func (ni *NoteImage) BeforeCreate(tx *gorm.DB) error {
+func (ni *NoteImage) BeforeCreate(_ *gorm.DB) error {
 	if ni.ID == "" {
 		ni.ID = GenerateCUID()
 	}
@@ -189,7 +191,7 @@ func (ni *NoteImage) BeforeCreate(tx *gorm.DB) error {
 }
 
 // BeforeCreate hook to generate CUID-like ID for note audios
-func (na *NoteAudio) BeforeCreate(tx *gorm.DB) error {
+func (na *NoteAudio) BeforeCreate(_ *gorm.DB) error {
 	if na.ID == "" {
 		na.ID = GenerateCUID()
 	}

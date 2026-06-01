@@ -107,11 +107,9 @@ func TestSanitizeUserContent(t *testing.T) {
 						t.Errorf("sanitizeUserContent() should contain [filtered] marker for injection attempt, got %q", got)
 					}
 				}
-			} else {
+			} else if got != tt.input {
 				// Content should pass through unchanged
-				if got != tt.input {
-					t.Errorf("sanitizeUserContent() = %q, want %q (clean content should not be modified)", got, tt.input)
-				}
+				t.Errorf("sanitizeUserContent() = %q, want %q (clean content should not be modified)", got, tt.input)
 			}
 		})
 	}
