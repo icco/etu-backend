@@ -129,7 +129,9 @@ func (s *AuthService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 	}, nil
 }
 
-// GetUserByStripeCustomerId retrieves a user by Stripe customer ID
+// GetUserByStripeCustomerId retrieves a user by Stripe customer ID.
+//
+//nolint:revive // proto-generated naming
 func (s *AuthService) GetUserByStripeCustomerId(ctx context.Context, req *pb.GetUserByStripeCustomerIdRequest) (*pb.GetUserByStripeCustomerIdResponse, error) {
 	if req.StripeCustomerId == "" {
 		return nil, status.Error(codes.InvalidArgument, "stripe_customer_id is required")

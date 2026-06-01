@@ -14,18 +14,27 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// ApiKeysService implements the ApiKeysService gRPC service
+// ApiKeysService implements the ApiKeysService gRPC service.
+// The "Api" naming mirrors the proto-generated identifiers
+// (pb.ApiKey, pb.ApiKeysServiceServer); renaming to the Go-idiomatic
+// "APIKey" would break the gRPC server interface contract.
+//
+//nolint:revive // proto-generated naming
 type ApiKeysService struct {
 	pb.UnimplementedApiKeysServiceServer
 	db *db.DB
 }
 
-// NewApiKeysService creates a new ApiKeysService
+// NewApiKeysService creates a new ApiKeysService.
+//
+//nolint:revive // proto-generated naming
 func NewApiKeysService(database *db.DB) *ApiKeysService {
 	return &ApiKeysService{db: database}
 }
 
-// CreateApiKey creates a new API key for a user
+// CreateApiKey creates a new API key for a user.
+//
+//nolint:revive // proto-generated naming
 func (s *ApiKeysService) CreateApiKey(ctx context.Context, req *pb.CreateApiKeyRequest) (*pb.CreateApiKeyResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
@@ -67,7 +76,9 @@ func (s *ApiKeysService) CreateApiKey(ctx context.Context, req *pb.CreateApiKeyR
 	}, nil
 }
 
-// ListApiKeys lists all API keys for a user
+// ListApiKeys lists all API keys for a user.
+//
+//nolint:revive // proto-generated naming
 func (s *ApiKeysService) ListApiKeys(ctx context.Context, req *pb.ListApiKeysRequest) (*pb.ListApiKeysResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
@@ -93,7 +104,9 @@ func (s *ApiKeysService) ListApiKeys(ctx context.Context, req *pb.ListApiKeysReq
 	}, nil
 }
 
-// DeleteApiKey deletes an API key
+// DeleteApiKey deletes an API key.
+//
+//nolint:revive // proto-generated naming
 func (s *ApiKeysService) DeleteApiKey(ctx context.Context, req *pb.DeleteApiKeyRequest) (*pb.DeleteApiKeyResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
@@ -117,7 +130,9 @@ func (s *ApiKeysService) DeleteApiKey(ctx context.Context, req *pb.DeleteApiKeyR
 	}, nil
 }
 
-// VerifyApiKey verifies an API key and returns the associated user ID
+// VerifyApiKey verifies an API key and returns the associated user ID.
+//
+//nolint:revive,contextcheck // proto-generated naming; background goroutine intentionally detached from request context
 func (s *ApiKeysService) VerifyApiKey(ctx context.Context, req *pb.VerifyApiKeyRequest) (*pb.VerifyApiKeyResponse, error) {
 	if req.RawKey == "" {
 		return nil, status.Error(codes.InvalidArgument, "raw_key is required")

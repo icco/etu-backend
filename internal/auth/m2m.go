@@ -22,9 +22,9 @@ func NewM2MConfig(ctx context.Context) *M2MConfig {
 	l := logging.FromContext(ctx)
 	config := &M2MConfig{}
 
-	grpcApiKeys := os.Getenv("GRPC_API_KEYS")
-	if grpcApiKeys != "" {
-		rawTokens := strings.Split(grpcApiKeys, ",")
+	grpcAPIKeys := os.Getenv("GRPC_API_KEYS")
+	if grpcAPIKeys != "" {
+		rawTokens := strings.Split(grpcAPIKeys, ",")
 		for _, token := range rawTokens {
 			trimmed := strings.TrimSpace(token)
 			if trimmed != "" {

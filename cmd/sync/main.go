@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,6 +25,13 @@ const (
 
 func main() {
 	log := logger.New("etu-backend-sync")
+	if err := run(log); err != nil {
+		log.Errorw("sync exited with error", zap.Error(err))
+		os.Exit(1)
+	}
+}
+
+func run(log *zap.SugaredLogger) error {
 	rootCtx := logging.NewContext(context.Background(), log)
 
 	fullSync := flag.Bool("full", false, "Perform a full sync instead of incremental")
@@ -37,8 +45,7 @@ func main() {
 		dirBidirectional: true,
 	}
 	if !validDirections[*direction] {
-		log.Errorw("invalid direction value", "direction", *direction, "valid_options", []string{dirFromNotion, dirToNotion, dirBidirectional})
-		os.Exit(1)
+		return fmt.Errorf("invalid direction value %q (valid: %s, %s, %s)", *direction, dirFromNotion, dirToNotion, dirBidirectional)
 	}
 
 	intervalStr := "once"
@@ -54,8 +61,7 @@ func main() {
 
 	database, err := syncdb.New()
 	if err != nil {
-		log.Errorw("failed to connect to database", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer func() {
 		if err := database.Close(); err != nil {
@@ -64,8 +70,7 @@ func main() {
 	}()
 
 	if err := database.AutoMigrate(); err != nil {
-		log.Errorw("failed to run migrations", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 	log.Infow("database connected and migrations completed")
 
@@ -86,6 +91,7 @@ func main() {
 	} else {
 		runOnce(ctx, database, *fullSync, *direction)
 	}
+	return nil
 }
 
 func runOnce(ctx context.Context, database *syncdb.DB, fullSync bool, syncMode string) {

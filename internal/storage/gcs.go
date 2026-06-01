@@ -71,7 +71,7 @@ func (c *Client) UploadImage(ctx context.Context, objectName string, data []byte
 
 // GetSignedURL generates a signed URL for accessing an object.
 // The URL is valid for SignedURLDuration.
-func (c *Client) GetSignedURL(ctx context.Context, objectName string) (string, error) {
+func (c *Client) GetSignedURL(_ context.Context, objectName string) (string, error) {
 	opts := &storage.SignedURLOptions{
 		Scheme:  storage.SigningSchemeV4,
 		Method:  "GET",

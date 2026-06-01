@@ -17,7 +17,7 @@ type mockStatsDB struct {
 	shouldError  bool
 }
 
-func (m *mockStatsDB) GetStats(ctx context.Context, userID string) (int64, int64, int64, error) {
+func (m *mockStatsDB) GetStats(_ context.Context, _ string) (int64, int64, int64, error) {
 	if m.shouldError {
 		return 0, 0, 0, status.Error(codes.Internal, "database error")
 	}

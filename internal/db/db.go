@@ -26,13 +26,23 @@ type DB struct {
 	conn *gorm.DB
 }
 
-// Re-export models for backwards compatibility
-type Note = models.Note
-type Tag = models.Tag
-type User = models.User
-type ApiKey = models.ApiKey
-type NoteImage = models.NoteImage
-type NoteAudio = models.NoteAudio
+// Re-exported model types for backwards compatibility.
+type (
+	// Note is an alias for models.Note.
+	Note = models.Note
+	// Tag is an alias for models.Tag.
+	Tag = models.Tag
+	// User is an alias for models.User.
+	User = models.User
+	// ApiKey is an alias for models.ApiKey.
+	//
+	//nolint:revive // matches proto-generated pb.ApiKey
+	ApiKey = models.ApiKey
+	// NoteImage is an alias for models.NoteImage.
+	NoteImage = models.NoteImage
+	// NoteAudio is an alias for models.NoteAudio.
+	NoteAudio = models.NoteAudio
+)
 
 // encryptNotionKey encrypts a Notion API key if encryption is available.
 // If ENCRYPTION_KEY is not set, it logs a warning and returns the plaintext.
@@ -933,7 +943,9 @@ func (db *DB) EnableUser(ctx context.Context, userID string) error {
 	return nil
 }
 
-// CreateApiKey creates a new API key for a user
+// CreateApiKey creates a new API key for a user.
+//
+//nolint:revive // matches proto-generated naming
 func (db *DB) CreateApiKey(ctx context.Context, userID, name, keyPrefix, keyHash string) (*ApiKey, error) {
 	now := time.Now()
 	apiKey := ApiKey{
@@ -952,7 +964,9 @@ func (db *DB) CreateApiKey(ctx context.Context, userID, name, keyPrefix, keyHash
 	return &apiKey, nil
 }
 
-// ListApiKeys retrieves all API keys for a user (without the hash)
+// ListApiKeys retrieves all API keys for a user (without the hash).
+//
+//nolint:revive // matches proto-generated naming
 func (db *DB) ListApiKeys(ctx context.Context, userID string) ([]ApiKey, error) {
 	var keys []ApiKey
 	err := db.conn.WithContext(ctx).
@@ -966,7 +980,9 @@ func (db *DB) ListApiKeys(ctx context.Context, userID string) ([]ApiKey, error) 
 	return keys, nil
 }
 
-// DeleteApiKey deletes an API key for a user
+// DeleteApiKey deletes an API key for a user.
+//
+//nolint:revive // matches proto-generated naming
 func (db *DB) DeleteApiKey(ctx context.Context, userID, keyID string) (bool, error) {
 	result := db.conn.WithContext(ctx).Where(`id = ? AND "userId" = ?`, keyID, userID).Delete(&ApiKey{})
 	if result.Error != nil {
@@ -975,7 +991,9 @@ func (db *DB) DeleteApiKey(ctx context.Context, userID, keyID string) (bool, err
 	return result.RowsAffected > 0, nil
 }
 
-// GetApiKeysByPrefix retrieves API keys by prefix for verification
+// GetApiKeysByPrefix retrieves API keys by prefix for verification.
+//
+//nolint:revive // matches proto-generated naming
 func (db *DB) GetApiKeysByPrefix(ctx context.Context, keyPrefix string) ([]ApiKey, error) {
 	var keys []ApiKey
 	err := db.conn.WithContext(ctx).Where(`"keyPrefix" = ?`, keyPrefix).Find(&keys).Error
@@ -985,7 +1003,9 @@ func (db *DB) GetApiKeysByPrefix(ctx context.Context, keyPrefix string) ([]ApiKe
 	return keys, nil
 }
 
-// UpdateApiKeyLastUsed updates the lastUsed timestamp for an API key
+// UpdateApiKeyLastUsed updates the lastUsed timestamp for an API key.
+//
+//nolint:revive // matches proto-generated naming
 func (db *DB) UpdateApiKeyLastUsed(ctx context.Context, keyID string) error {
 	return db.conn.WithContext(ctx).Model(&ApiKey{}).Where("id = ?", keyID).Update("lastUsed", time.Now()).Error
 }

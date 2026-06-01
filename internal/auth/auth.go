@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/icco/gutil/logging"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // register the postgres database/sql driver
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -73,7 +73,9 @@ func New() (*Authenticator, error) {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	if err := conn.Ping(); err != nil {
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := conn.PingContext(pingCtx); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -121,6 +123,10 @@ func (a *Authenticator) VerifyAPIKey(ctx context.Context, apiKey string) (string
 		}
 
 		if err := bcrypt.CompareHashAndPassword([]byte(keyHash), []byte(apiKey)); err == nil {
+			// Detach from request ctx so the audit write can outlive the
+			// request, but preserve the logger so the async update stays
+			// correlated.
+			//nolint:contextcheck // background goroutine intentionally detached
 			go a.updateLastUsed(logging.NewContext(context.Background(), l), id)
 			return userID, nil
 		}

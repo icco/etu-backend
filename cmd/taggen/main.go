@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -21,7 +22,13 @@ import (
 
 func main() {
 	log := logger.New("etu-backend-taggen")
+	if err := run(log); err != nil {
+		log.Errorw("taggen exited with error", zap.Error(err))
+		os.Exit(1)
+	}
+}
 
+func run(log *zap.SugaredLogger) error {
 	// rootCtx carries the application logger so descendant contexts
 	// (signal-cancellable, per-task) can retrieve it via logging.FromContext.
 	rootCtx := logging.NewContext(context.Background(), log)
@@ -32,26 +39,22 @@ func main() {
 
 	geminiProject := os.Getenv("GEMINI_PROJECT")
 	if geminiProject == "" {
-		log.Errorw("GEMINI_PROJECT environment variable not set")
-		os.Exit(1)
+		return fmt.Errorf("GEMINI_PROJECT environment variable not set")
 	}
 
 	gcsBucket := os.Getenv("GCS_BUCKET")
 	if gcsBucket == "" {
-		log.Errorw("GCS_BUCKET environment variable not set")
-		os.Exit(1)
+		return fmt.Errorf("GCS_BUCKET environment variable not set")
 	}
 
 	aiClient, err := ai.NewClient(geminiProject, os.Getenv("GEMINI_LOCATION"))
 	if err != nil {
-		log.Errorw("failed to initialize AI client", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize AI client: %w", err)
 	}
 
 	storageClient, err := storage.New(rootCtx, gcsBucket)
 	if err != nil {
-		log.Errorw("failed to initialize storage client", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize storage client: %w", err)
 	}
 	defer func() {
 		if err := storageClient.Close(); err != nil {
@@ -71,8 +74,7 @@ func main() {
 
 	database, err := db.New()
 	if err != nil {
-		log.Errorw("failed to connect to database", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer func() {
 		if err := database.Close(); err != nil {
@@ -106,24 +108,20 @@ func main() {
 			select {
 			case <-processCtx.Done():
 				log.Infow("shutting down AI processing job")
-				return
+				return nil
 			case <-ticker.C:
 				processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter)
 			}
 		}
-	} else {
-		processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter)
 	}
+	processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter)
+	return nil
 }
 
 func processOnce(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) {
 	l := logging.FromContext(ctx)
 
-	result, err := processAllTasks(ctx, database, aiClient, storageClient, dryRun, rateLimiter)
-	if err != nil {
-		l.Errorw("AI processing failed", zap.Error(err))
-		return
-	}
+	result := processAllTasks(ctx, database, aiClient, storageClient, dryRun, rateLimiter)
 
 	l.Infow("AI processing completed",
 		"duration", result.Duration.String(),
@@ -146,8 +144,8 @@ type ProcessResult struct {
 	Duration        time.Duration
 }
 
-// processAllTasks runs all AI processing tasks in parallel: tag generation, OCR, and audio transcription
-func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) (*ProcessResult, error) {
+// processAllTasks runs all AI processing tasks in parallel: tag generation, OCR, and audio transcription.
+func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) *ProcessResult {
 	l := logging.FromContext(ctx)
 
 	start := time.Now()
@@ -196,7 +194,7 @@ func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, 
 	wg.Wait()
 
 	result.Duration = time.Since(start)
-	return result, nil
+	return result
 }
 
 // processImagesWithoutText processes all images that don't have extracted text yet

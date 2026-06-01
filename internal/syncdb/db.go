@@ -23,12 +23,19 @@ type DB struct {
 	conn *gorm.DB
 }
 
-// Re-export models for backwards compatibility
-type Note = models.Note
-type Tag = models.Tag
-type NoteTag = models.NoteTag
-type User = models.User
-type SyncState = models.SyncState
+// Re-exported model types for backwards compatibility.
+type (
+	// Note is an alias for models.Note.
+	Note = models.Note
+	// Tag is an alias for models.Tag.
+	Tag = models.Tag
+	// NoteTag is an alias for models.NoteTag.
+	NoteTag = models.NoteTag
+	// User is an alias for models.User.
+	User = models.User
+	// SyncState is an alias for models.SyncState.
+	SyncState = models.SyncState
+)
 
 // decryptNotionKey decrypts a Notion API key if it's encrypted.
 // If ENCRYPTION_KEY is not set or decryption fails, it assumes the key is plaintext.
@@ -140,7 +147,8 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 			result = tx.Where(`"userId" = ? AND "externalId" = ?`, userID, pageID).First(&note)
 		}
 
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		switch {
+		case errors.Is(result.Error, gorm.ErrRecordNotFound):
 			// Create new note
 			isNew = true
 			note = Note{
@@ -155,9 +163,9 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 			if err := tx.Create(&note).Error; err != nil {
 				return fmt.Errorf("failed to create note: %w", err)
 			}
-		} else if result.Error != nil {
+		case result.Error != nil:
 			return result.Error
-		} else {
+		default:
 			// Update existing note
 			isNew = false
 			note.Content = content
@@ -307,10 +315,10 @@ func (db *DB) UpdateNoteNotionSyncTime(noteID string) error {
 		Update("lastSyncedToNotion", now).Error
 }
 
-// GetDeletedNotesWithNotionID returns notes that have been soft-deleted
-// but still have a Notion page ID (for archiving in Notion).
+// GetArchivedNotePageIDs returns Notion page IDs for notes that have been
+// soft-deleted but still need to be archived in Notion.
 // Note: This assumes you have a soft-delete mechanism. If not, this is a placeholder.
-func (db *DB) GetArchivedNotePageIDs(userID string) ([]string, error) {
+func (db *DB) GetArchivedNotePageIDs(_ string) ([]string, error) {
 	// Placeholder: This would query for soft-deleted notes
 	// For now, return empty since we don't have soft-delete implemented
 	return []string{}, nil

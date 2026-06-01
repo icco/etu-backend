@@ -41,7 +41,13 @@ const statusKey = "status"
 
 func main() {
 	log := logger.New("etu-backend-server")
+	if err := run(log); err != nil {
+		log.Errorw("server exited with error", zap.Error(err))
+		os.Exit(1)
+	}
+}
 
+func run(log *zap.SugaredLogger) error {
 	// rootCtx carries the application logger so any code path that derives a
 	// context (HTTP handlers, gRPC interceptors, background goroutines) can
 	// retrieve a logger via logging.FromContext.
@@ -65,8 +71,7 @@ func main() {
 	registry := prometheus.NewRegistry()
 	exporter, err := otelprom.New(otelprom.WithRegisterer(registry))
 	if err != nil {
-		log.Errorw("failed to init prometheus exporter", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to init prometheus exporter: %w", err)
 	}
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
 	otel.SetMeterProvider(mp)
@@ -80,8 +85,7 @@ func main() {
 
 	database, err := db.New()
 	if err != nil {
-		log.Errorw("failed to connect to database", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer func() {
 		if err := database.Close(); err != nil {
@@ -90,15 +94,13 @@ func main() {
 	}()
 
 	if err := database.AutoMigrate(); err != nil {
-		log.Errorw("failed to run database migrations", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to run database migrations: %w", err)
 	}
 	log.Infow("database initialized and migrations completed")
 
 	authenticator, err := auth.New()
 	if err != nil {
-		log.Errorw("failed to initialize authenticator", zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize authenticator: %w", err)
 	}
 	defer func() {
 		if err := authenticator.Close(); err != nil {
@@ -167,10 +169,10 @@ func main() {
 
 	reflection.Register(server)
 
-	grpcListener, err := net.Listen("tcp", ":"+grpcPort)
+	var lc net.ListenConfig
+	grpcListener, err := lc.Listen(rootCtx, "tcp", ":"+grpcPort)
 	if err != nil {
-		log.Errorw("failed to listen on gRPC port", "port", grpcPort, zap.Error(err))
-		os.Exit(1)
+		return fmt.Errorf("failed to listen on gRPC port %s: %w", grpcPort, err)
 	}
 
 	// Create HTTP server for health checks.
@@ -217,6 +219,7 @@ func main() {
 	server.GracefulStop()
 
 	log.Infow("servers stopped gracefully")
+	return nil
 }
 
 // newHealthHandler creates an HTTP handler for health check and metrics
@@ -242,7 +245,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		}
 	})
 
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{
@@ -253,7 +256,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		}
 	})
 
-	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		if _, err := fmt.Fprint(w, "User-agent: *\nDisallow: /\n"); err != nil {
@@ -261,7 +264,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		}
 	})
 
-	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{

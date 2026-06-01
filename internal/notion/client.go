@@ -227,7 +227,7 @@ func (c *Client) processPages(ctx context.Context, client *notionapi.Client, pag
 
 	// Collect results in order
 	posts := make([]*Post, len(pages))
-	for i := 0; i < len(pages); i++ {
+	for range pages {
 		result := <-results
 		if result.err != nil {
 			return nil, result.err
@@ -427,7 +427,7 @@ func (c *Client) replacePageContent(ctx context.Context, client *notionapi.Clien
 		}
 
 		for _, block := range blockResp.Results {
-			blockIDs = append(blockIDs, notionapi.BlockID(block.GetID()))
+			blockIDs = append(blockIDs, block.GetID())
 		}
 
 		if !blockResp.HasMore {

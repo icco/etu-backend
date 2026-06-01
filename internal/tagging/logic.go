@@ -97,7 +97,9 @@ func SelectGeneratedTags(generatedTags []string, existingNoteTagNames map[string
 		}
 	}
 
-	newTags := append(preferredTags, otherTags...)
+	newTags := make([]string, 0, len(preferredTags)+len(otherTags))
+	newTags = append(newTags, preferredTags...)
+	newTags = append(newTags, otherTags...)
 	if len(newTags) > maxNewTags {
 		newTags = newTags[:maxNewTags]
 	}

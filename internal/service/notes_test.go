@@ -51,7 +51,7 @@ func mockNoteToProto(n *db.Note) *pb.Note {
 	}
 }
 
-func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest) (*pb.CreateNoteResponse, error) {
+func (s *mockNotesService) CreateNote(_ context.Context, req *pb.CreateNoteRequest) (*pb.CreateNoteResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -86,7 +86,7 @@ func (s *mockNotesService) CreateNote(ctx context.Context, req *pb.CreateNoteReq
 	}, nil
 }
 
-func (s *mockNotesService) GetNote(ctx context.Context, req *pb.GetNoteRequest) (*pb.GetNoteResponse, error) {
+func (s *mockNotesService) GetNote(_ context.Context, req *pb.GetNoteRequest) (*pb.GetNoteResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -104,7 +104,7 @@ func (s *mockNotesService) GetNote(ctx context.Context, req *pb.GetNoteRequest) 
 	}, nil
 }
 
-func (s *mockNotesService) ListNotes(ctx context.Context, req *pb.ListNotesRequest) (*pb.ListNotesResponse, error) {
+func (s *mockNotesService) ListNotes(_ context.Context, req *pb.ListNotesRequest) (*pb.ListNotesResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -124,7 +124,7 @@ func (s *mockNotesService) ListNotes(ctx context.Context, req *pb.ListNotesReque
 	}, nil
 }
 
-func (s *mockNotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest) (*pb.DeleteNoteResponse, error) {
+func (s *mockNotesService) DeleteNote(_ context.Context, req *pb.DeleteNoteRequest) (*pb.DeleteNoteResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -141,7 +141,7 @@ func (s *mockNotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteReq
 	return &pb.DeleteNoteResponse{Success: true}, nil
 }
 
-func (s *mockNotesService) GetRandomNotes(ctx context.Context, req *pb.GetRandomNotesRequest) (*pb.GetRandomNotesResponse, error) {
+func (s *mockNotesService) GetRandomNotes(_ context.Context, req *pb.GetRandomNotesRequest) (*pb.GetRandomNotesResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -169,7 +169,7 @@ func (s *mockNotesService) GetRandomNotes(ctx context.Context, req *pb.GetRandom
 	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
 
 	notes := make([]*pb.Note, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		notes[i] = mockNoteToProto(shuffled[i])
 	}
 
@@ -590,7 +590,7 @@ func TestGetRandomNotes(t *testing.T) {
 
 		// Collect orderings from multiple calls (by note IDs)
 		orderings := make([][]string, 0, 20)
-		for i := 0; i < 20; i++ {
+		for range 20 {
 			resp, err := svc.GetRandomNotes(ctx, &pb.GetRandomNotesRequest{
 				UserId: testUserID1,
 				Count:  5,
@@ -610,7 +610,7 @@ func TestGetRandomNotes(t *testing.T) {
 
 		// At least two responses must differ in order (proves we're not always returning same order)
 		var seenDifferent bool
-		for i := 0; i < len(orderings); i++ {
+		for i := range orderings {
 			for j := i + 1; j < len(orderings); j++ {
 				if !sliceEqual(orderings[i], orderings[j]) {
 					seenDifferent = true
