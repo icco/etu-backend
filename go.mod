@@ -17,7 +17,7 @@ require (
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.52.0
 	golang.org/x/time v0.15.0
-	google.golang.org/genai v1.58.0
+	google.golang.org/genai v1.60.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
 	gorm.io/driver/postgres v1.6.0
