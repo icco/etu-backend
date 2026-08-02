@@ -4,8 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/genai"
+	"github.com/icco/gutil/vertex"
 )
+
+// model is the Gemini model used for every call in this package. Flash-lite is
+// enough for OCR, transcription, and three-word tagging, and is the cheapest
+// option that handles inline media.
+const model = "gemini-2.5-flash-lite"
 
 // Client wraps the Gemini API client with shared configuration
 type Client struct {
@@ -20,7 +25,7 @@ func NewClient(project, location string) (*Client, error) {
 		return nil, fmt.Errorf("GCP project is required")
 	}
 	if location == "" {
-		location = "us-central1"
+		location = vertex.DefaultLocation
 	}
 	return &Client{
 		project:  project,
@@ -28,15 +33,15 @@ func NewClient(project, location string) (*Client, error) {
 	}, nil
 }
 
-// newGenaiClient creates a new Gemini client via Vertex AI.
+// newVertexClient creates a Gemini client via Vertex AI.
 // Note: Creates a new client for each call. If performance becomes an issue,
 // consider caching the client in the Client struct. However, the genai library
 // manages connection pooling internally, so this approach is acceptable for now.
-func (c *Client) newGenaiClient(ctx context.Context) (*genai.Client, error) {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+func (c *Client) newVertexClient(ctx context.Context) (*vertex.Client, error) {
+	client, err := vertex.New(ctx, vertex.Config{
 		Project:  c.project,
 		Location: c.location,
-		Backend:  genai.BackendVertexAI,
+		Model:    model,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)

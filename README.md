@@ -33,7 +33,8 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `PORT` - Server port (default: 50051)
 - `GRPC_API_KEYS` - Comma-separated list of M2M tokens for server-to-server auth (supports rotation)
-- `GEMINI_API_KEY` - Gemini API key (for AI processing: tag generation, OCR, audio transcription)
+- `GEMINI_PROJECT` - GCP project for Vertex AI (for AI processing: tag generation, OCR, audio transcription). Auth is Application Default Credentials; there is no API key
+- `GEMINI_LOCATION` - Vertex AI region (default: `us-central1`)
 - `GCS_BUCKET` - Google Cloud Storage bucket name (for image and audio file access)
 - `GCP_SECRET_NAME` - GCP Secret Manager secret name for encryption key (required for encryption, format: `projects/PROJECT_ID/secrets/SECRET_NAME/versions/VERSION`)
 
@@ -119,7 +120,7 @@ Automatically processes notes using Google Gemini AI for three tasks:
 2. **Image OCR**: Extracts text from uploaded images
 3. **Audio Transcription**: Transcribes uploaded audio files
 
-Requires `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/app/apikey) and `GCS_BUCKET` for accessing uploaded files.
+Requires `GEMINI_PROJECT` plus Application Default Credentials (`gcloud auth application-default login` locally), and `GCS_BUCKET` for accessing uploaded files.
 
 **Usage:**
 ```bash

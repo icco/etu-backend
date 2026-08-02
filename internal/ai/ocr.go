@@ -2,9 +2,11 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/icco/gutil/vertex"
 	"google.golang.org/genai"
 )
 
@@ -21,7 +23,7 @@ func (c *Client) ExtractTextFromImage(ctx context.Context, imageData []byte, mim
 		return "", fmt.Errorf("unsupported image MIME type: %s", mimeType)
 	}
 
-	client, err := c.newGenaiClient(ctx)
+	client, err := c.newVertexClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -40,42 +42,20 @@ Extract all text from this image exactly as it appears, preserving line breaks a
 
 Return ONLY the extracted text, nothing else.`
 
-	// Build the content with image and text
-	content := &genai.Content{
-		Role: genai.RoleUser,
-		Parts: []*genai.Part{
-			{
-				InlineData: &genai.Blob{
-					MIMEType: mimeType,
-					Data:     imageData,
-				},
-			},
-			{
-				Text: prompt,
-			},
-		},
-	}
-
-	resp, err := client.Models.GenerateContent(ctx, "gemini-2.5-flash-lite", []*genai.Content{content}, &genai.GenerateContentConfig{
-		Temperature: genai.Ptr(float32(0.1)), // Very low temperature for accurate extraction
+	// Image first, then the prompt. Keeping that order because the prompt's
+	// security instructions are written to be the last thing the model reads.
+	resp, err := client.Generate(ctx, vertex.Request{
+		Parts:       []*genai.Part{vertex.Blob(mimeType, imageData), {Text: prompt}},
+		Temperature: vertex.Temperature(0.1), // Very low temperature for accurate extraction
 	})
-	if err != nil {
+	switch {
+	case errors.Is(err, vertex.ErrEmptyResponse):
+		return "", nil // No text found
+	case err != nil:
 		return "", fmt.Errorf("failed to extract text from image: %w", err)
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return "", nil // No text found
-	}
-
-	// Collect all text parts from the response
-	var extractedText strings.Builder
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if part.Text != "" {
-			extractedText.WriteString(part.Text)
-		}
-	}
-
-	return strings.TrimSpace(extractedText.String()), nil
+	return strings.TrimSpace(resp.Text), nil
 }
 
 // supportedImageTypes is the map of supported image MIME types

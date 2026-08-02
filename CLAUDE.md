@@ -12,7 +12,7 @@ Go gRPC backend for Etu, a journaling product: notes + tags CRUD with PostgreSQL
 - `task proto` — regenerate Go protobuf/gRPC code from `proto/etu.proto`
 - `task proto-ts` — regenerate the TypeScript proto package (`packages/etu-proto`)
 - `task deps` — `go mod download` + install protoc-gen-go / protoc-gen-go-grpc
-- `task sync` / `task taggen` — run jobs locally (need `USER_ID`; taggen also needs `GEMINI_API_KEY`)
+- `task sync` / `task taggen` — run jobs locally (need `USER_ID`; taggen also needs `GEMINI_PROJECT` and ADC)
 
 ## Architecture
 
@@ -23,7 +23,7 @@ Go gRPC backend for Etu, a journaling product: notes + tags CRUD with PostgreSQL
 - `internal/db`, `internal/models` — PostgreSQL via GORM (`gorm.io/gorm`)
 - `internal/auth` — dual auth: client API keys (`authorization: etu_<64 hex>` metadata) and M2M tokens (`GRPC_API_KEYS` env, comma-separated for rotation)
 - `internal/storage` — Google Cloud Storage for image/audio attachments (`GCS_BUCKET`)
-- `internal/ai`, `internal/tagging` — Gemini tag generation, OCR, audio transcription (`GEMINI_API_KEY`)
+- `internal/ai`, `internal/tagging` — Gemini tag generation, OCR, audio transcription via `github.com/icco/gutil/vertex` on the Vertex AI backend. Auth is ADC; config is `GEMINI_PROJECT` and optional `GEMINI_LOCATION`. There is no API key.
 - `internal/notion`, `internal/sync`, `internal/syncdb` — Notion sync pipeline
 - `internal/crypto` — encryption; key from GCP Secret Manager (`GCP_SECRET_NAME`)
 - `proto/` — `.proto` source plus generated `.pb.go` files (committed)
