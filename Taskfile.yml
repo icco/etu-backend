@@ -40,7 +40,7 @@ tasks:
         fi
         go run ./cmd/sync $ARGS
   taggen:
-    desc: Run tag generation job (requires USER_ID and GEMINI_API_KEY env vars, optionally DRY_RUN=true and INTERVAL=1h)
+    desc: Run tag generation job (requires USER_ID and GEMINI_PROJECT env vars plus ADC, optionally GEMINI_LOCATION, DRY_RUN=true and INTERVAL=1h)
     cmds:
       - |
         ARGS="-user=${USER_ID}"
