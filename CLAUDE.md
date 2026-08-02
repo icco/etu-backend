@@ -23,7 +23,7 @@ Go gRPC backend for Etu, a journaling product: notes + tags CRUD with PostgreSQL
 - `internal/db`, `internal/models` — PostgreSQL via GORM (`gorm.io/gorm`)
 - `internal/auth` — dual auth: client API keys (`authorization: etu_<64 hex>` metadata) and M2M tokens (`GRPC_API_KEYS` env, comma-separated for rotation)
 - `internal/storage` — Google Cloud Storage for image/audio attachments (`GCS_BUCKET`)
-- `internal/ai`, `internal/tagging` — Gemini tag generation, OCR, audio transcription (`GEMINI_API_KEY`)
+- `internal/ai`, `internal/tagging` — Gemini tag generation, OCR, audio transcription via `github.com/icco/gutil/vertex` on the Vertex AI backend (ADC; `GEMINI_API_KEY` is only used by the standalone taggen job)
 - `internal/notion`, `internal/sync`, `internal/syncdb` — Notion sync pipeline
 - `internal/crypto` — encryption; key from GCP Secret Manager (`GCP_SECRET_NAME`)
 - `proto/` — `.proto` source plus generated `.pb.go` files (committed)
