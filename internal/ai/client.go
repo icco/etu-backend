@@ -36,9 +36,8 @@ func NewClient(project, location string) (*Client, error) {
 
 // newVertexClient creates a Gemini client via Vertex AI.
 // Note: Creates a new client for each call. If performance becomes an issue,
-// consider caching the client in the Client struct. However, the underlying
-// genai library manages connection pooling internally, so this approach is
-// acceptable for now.
+// consider caching the client in the Client struct. However, the genai library
+// manages connection pooling internally, so this approach is acceptable for now.
 func (c *Client) newVertexClient(ctx context.Context) (*vertex.Client, error) {
 	client, err := vertex.New(ctx, vertex.Config{
 		Project:  c.project,
