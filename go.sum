@@ -76,8 +76,8 @@ github.com/googleapis/gax-go/v2 v2.23.0 h1:Tchl7qkvE7Ip3y+ztvNufYFvkfqTe7NfLTYGI
 github.com/googleapis/gax-go/v2 v2.23.0/go.mod h1:rBQKOVJCdb8IFEzg+FCwlt1LP/xMDGuqUXhUG+XMXEg=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
-github.com/icco/gutil v1.0.6 h1:nXei5bypKhLZ/n4wSdHuezCkGLqjWAACVKqeElzlTWM=
-github.com/icco/gutil v1.0.6/go.mod h1:JgkIYBS3g2yTSGZ7Akjnc/a7fTQXa01sLzab8Tlb5cI=
+github.com/icco/gutil v1.0.8 h1:iuWR8MHtCcHaiYvzW+DpD2py29ZzdfA8Mjfw2KRwDs8=
+github.com/icco/gutil v1.0.8/go.mod h1:zemHUK1sGtDtJLzC736Aruo3vs47hgkVIXFDa+logvI=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
 github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
 github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=

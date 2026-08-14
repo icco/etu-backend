@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/storage v1.64.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/google/go-cmp v0.7.0
-	github.com/icco/gutil v1.0.6
+	github.com/icco/gutil v1.0.8
 	github.com/jomei/notionapi v1.13.3
 	github.com/lib/pq v1.12.3
 	github.com/prometheus/client_golang v1.24.1
