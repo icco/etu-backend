@@ -10,8 +10,6 @@ import (
 
 	"github.com/icco/etu-backend/internal/crypto"
 	"github.com/icco/etu-backend/internal/models"
-	"github.com/icco/gutil/logging"
-	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -37,20 +35,10 @@ type (
 	SyncState = models.SyncState
 )
 
-// decryptNotionKey decrypts a Notion API key if it's encrypted.
-// If ENCRYPTION_KEY is not set or decryption fails, it assumes the key is plaintext.
+// decryptNotionKey decrypts a Notion API key, falling back to treating it as
+// plaintext if it was never encrypted.
 func (db *DB) decryptNotionKey(ctx context.Context, encrypted string) string {
-	if encrypted == "" {
-		return ""
-	}
-
-	decrypted, err := crypto.Decrypt(encrypted)
-	if err != nil {
-		logging.FromContext(ctx).Warnw("failed to decrypt Notion key, assuming plaintext", zap.Error(err))
-		return encrypted
-	}
-
-	return decrypted
+	return crypto.DecryptOrPlaintext(ctx, encrypted)
 }
 
 // New creates a new GORM database connection
