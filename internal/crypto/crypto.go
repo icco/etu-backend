@@ -14,13 +14,43 @@ import (
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
+	"github.com/icco/gutil/logging"
+	"go.uber.org/zap"
 )
 
 var (
 	encryptionKey     []byte
 	encryptionKeyErr  error
 	encryptionKeyOnce sync.Once
+	keyErrLogOnce     sync.Once
 )
+
+// DecryptOrPlaintext decrypts a stored secret, returning it unchanged if it
+// was never encrypted.
+//
+// An unavailable encryption key is a process-wide configuration fault, not
+// evidence that this particular value is plaintext, so it is reported once at
+// error level instead of once per value.
+func DecryptOrPlaintext(ctx context.Context, stored string) string {
+	if stored == "" {
+		return ""
+	}
+
+	if _, err := GetEncryptionKey(); err != nil {
+		keyErrLogOnce.Do(func() {
+			logging.FromContext(ctx).Errorw("encryption key unavailable, storing and reading secrets as plaintext", zap.Error(err))
+		})
+		return stored
+	}
+
+	decrypted, err := Decrypt(stored)
+	if err != nil {
+		logging.FromContext(ctx).Debugw("secret is not ciphertext, using as plaintext", zap.Error(err))
+		return stored
+	}
+
+	return decrypted
+}
 
 // GetEncryptionKey retrieves the encryption key from GCP Secret Manager.
 // The key should be a base64-encoded 32-byte key for AES-256.
