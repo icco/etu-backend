@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"testing"
 	"time"
 
@@ -166,7 +167,9 @@ func (s *mockNotesService) GetRandomNotes(_ context.Context, req *pb.GetRandomNo
 	// Shuffle so we don't always return map/insertion order
 	shuffled := make([]*db.Note, len(userNotes))
 	copy(shuffled, userNotes)
-	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+	if err := cryptoShuffle(shuffled); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to shuffle notes: %v", err)
+	}
 
 	notes := make([]*pb.Note, count)
 	for i := range count {
@@ -625,6 +628,18 @@ func TestGetRandomNotes(t *testing.T) {
 			t.Error("GetRandomNotes returned the same order 20 times in a row; expected random order to vary across calls")
 		}
 	})
+}
+
+func cryptoShuffle(notes []*db.Note) error {
+	for i := len(notes) - 1; i > 0; i-- {
+		j, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return err
+		}
+		notes[i], notes[j.Int64()] = notes[j.Int64()], notes[i]
+	}
+
+	return nil
 }
 
 func sliceEqual(a, b []string) bool {
