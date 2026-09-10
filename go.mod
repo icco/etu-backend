@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	cloud.google.com/go/secretmanager v1.21.0
-	cloud.google.com/go/storage v1.65.0
+	cloud.google.com/go/storage v1.67.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/google/go-cmp v0.7.0
 	github.com/icco/gutil v1.0.15
