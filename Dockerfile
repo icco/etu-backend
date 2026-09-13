@@ -1,4 +1,4 @@
-FROM golang:1.26-bookworm AS builder
+FROM golang:1.27-bookworm AS builder
 
 # Install task via go install to avoid supply-chain risk from curl|bash.
 # The Go module proxy verifies the checksum of the downloaded module.
