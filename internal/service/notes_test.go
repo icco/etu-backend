@@ -166,7 +166,7 @@ func (s *mockNotesService) GetRandomNotes(_ context.Context, req *pb.GetRandomNo
 	// Shuffle so we don't always return map/insertion order
 	shuffled := make([]*db.Note, len(userNotes))
 	copy(shuffled, userNotes)
-	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+	rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] }) //nolint:gosec // weak random is acceptable in test mock
 
 	notes := make([]*pb.Note, count)
 	for i := range count {
