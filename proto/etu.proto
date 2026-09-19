@@ -517,6 +517,9 @@ service AuthService {
   rpc Register(RegisterRequest) returns (RegisterResponse);
   // Authenticate validates credentials and returns user context.
   rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse);
+  // Login validates credentials and issues a revocable user API key for a native client.
+  // The raw key is returned only once; use VerifyApiKey/GetUser to restore user context.
+  rpc Login(AuthenticateRequest) returns (CreateApiKeyResponse);
   // GetUser fetches a user by id.
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
   // GetUserByStripeCustomerId fetches a user by Stripe customer id.

@@ -239,7 +239,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{
 			statusKey: "ok",
-			"commit": CommitSHA,
+			"commit":  CommitSHA,
 		}); err != nil {
 			log.Errorw("error encoding health response", zap.Error(err))
 		}
@@ -250,7 +250,7 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(map[string]string{
 			statusKey: "ok",
-			"commit": CommitSHA,
+			"commit":  CommitSHA,
 		}); err != nil {
 			log.Errorw("error encoding health response", zap.Error(err))
 		}
@@ -284,6 +284,7 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 	publicMethods := map[string]bool{
 		"/etu.AuthService/Register":        true,
 		"/etu.AuthService/Authenticate":    true,
+		"/etu.AuthService/Login":           true,
 		"/etu.ApiKeysService/VerifyApiKey": true,
 	}
 
