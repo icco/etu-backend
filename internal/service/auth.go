@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
+	"time"
 
-	"github.com/icco/etu-backend/internal/auth"
 	"github.com/icco/etu-backend/internal/db"
 	pb "github.com/icco/etu-backend/proto"
 	"golang.org/x/crypto/bcrypt"
@@ -15,12 +16,13 @@ import (
 // AuthService implements the AuthService gRPC service
 type AuthService struct {
 	pb.UnimplementedAuthServiceServer
-	db *db.DB
+	db          *db.DB
+	loginLimits *loginLimits
 }
 
 // NewAuthService creates a new AuthService
 func NewAuthService(database *db.DB) *AuthService {
-	return &AuthService{db: database}
+	return &AuthService{db: database, loginLimits: newLoginLimits()}
 }
 
 // Register creates a new user account
@@ -109,6 +111,10 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 // Login exchanges valid credentials for a revocable, user-scoped API key.
 // Authenticate remains side-effect-free with respect to keys for existing web clients.
 func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*pb.CreateApiKeyResponse, error) {
+	if !s.loginLimits.acquire(req.GetEmail(), time.Now()) {
+		return nil, status.Error(codes.ResourceExhausted, "too many login requests; retry later")
+	}
+	defer s.loginLimits.release()
 	result, err := s.Authenticate(ctx, req)
 	if err != nil {
 		return nil, err
@@ -116,12 +122,25 @@ func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*
 	if !result.Success || result.User == nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid email or password")
 	}
-	// Ownership comes exclusively from verified credentials, never client metadata.
-	ctx = auth.SetAuthContext(ctx, result.User.Id, "apikey")
-	return NewApiKeysService(s.db).CreateApiKey(ctx, &pb.CreateApiKeyRequest{
-		UserId: result.User.Id,
-		Name:   "etu-mobile",
+	// Ownership comes exclusively from verified credentials. Check the shared
+	// session cap under a database lock before paying for another key hash.
+	var rawKey string
+	key, err := s.db.CreateMobileSession(ctx, result.User.Id, func() (string, string, error) {
+		var hash string
+		var generateErr error
+		rawKey, hash, generateErr = generateAPIKey()
+		if generateErr != nil {
+			return "", "", generateErr
+		}
+		return rawKey[:12], hash, nil
 	})
+	if errors.Is(err, db.ErrMobileSessionLimit) {
+		return nil, status.Error(codes.ResourceExhausted, "mobile session limit reached; revoke an old etu-mobile key in Settings")
+	}
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to create mobile session")
+	}
+	return &pb.CreateApiKeyResponse{ApiKey: apiKeyToProto(key), RawKey: rawKey}, nil
 }
 
 // GetUser retrieves a user by ID

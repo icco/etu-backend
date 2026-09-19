@@ -36,6 +36,7 @@ func TestLogin(t *testing.T) {
 		found, disabled bool
 		attempts        int
 		insertError     bool
+		sessions        int
 		want            codes.Code
 	}{
 		{name: "success uses verified owner", email: testEmail, found: true, want: codes.OK},
@@ -44,6 +45,7 @@ func TestLogin(t *testing.T) {
 		{name: "disabled", email: testEmail, found: true, disabled: true, want: codes.PermissionDenied},
 		{name: "locked", email: testEmail, found: true, attempts: 10, want: codes.PermissionDenied},
 		{name: "key storage failure", email: testEmail, found: true, insertError: true, want: codes.Internal},
+		{name: "session cap", email: testEmail, found: true, sessions: db.MaxMobileSessions, want: codes.ResourceExhausted},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			conn, mock, err := sqlmock.New()
@@ -68,13 +70,19 @@ func TestLogin(t *testing.T) {
 				mock.ExpectExec(`UPDATE "User"`).WithArgs(0, nil, sqlmock.AnyArg(), "verified-owner").WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 				mock.ExpectBegin()
-				insert := mock.ExpectExec(`INSERT INTO "ApiKey"`).WithArgs(sqlmock.AnyArg(), "etu-mobile", sqlmock.AnyArg(), captureKeyHash{&storedHash}, "verified-owner", sqlmock.AnyArg(), sqlmock.AnyArg())
-				if tc.insertError {
-					insert.WillReturnError(errors.New("database unavailable"))
+				mock.ExpectQuery(`SELECT id FROM "User" WHERE id = \$1 FOR UPDATE`).WithArgs("verified-owner").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("verified-owner"))
+				mock.ExpectQuery(`SELECT count\(\*\) FROM "ApiKey"`).WithArgs("verified-owner", "etu-mobile").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.sessions))
+				if tc.sessions >= db.MaxMobileSessions {
 					mock.ExpectRollback()
 				} else {
-					insert.WillReturnResult(sqlmock.NewResult(0, 1))
-					mock.ExpectCommit()
+					insert := mock.ExpectExec(`INSERT INTO "ApiKey"`).WithArgs(sqlmock.AnyArg(), "etu-mobile", sqlmock.AnyArg(), captureKeyHash{&storedHash}, "verified-owner", sqlmock.AnyArg(), sqlmock.AnyArg())
+					if tc.insertError {
+						insert.WillReturnError(errors.New("database unavailable"))
+						mock.ExpectRollback()
+					} else {
+						insert.WillReturnResult(sqlmock.NewResult(0, 1))
+						mock.ExpectCommit()
+					}
 				}
 			}
 			ctx := auth.SetAuthContext(context.Background(), "attacker", "m2m")

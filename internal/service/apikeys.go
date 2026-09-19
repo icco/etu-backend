@@ -48,32 +48,33 @@ func (s *ApiKeysService) CreateApiKey(ctx context.Context, req *pb.CreateApiKeyR
 		return nil, err
 	}
 
+	rawKey, keyHash, err := generateAPIKey()
+	if err != nil {
+		return nil, err
+	}
+	apiKey, err := s.db.CreateApiKey(ctx, req.UserId, req.Name, rawKey[:12], keyHash)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to create API key: %v", err)
+	}
+	return &pb.CreateApiKeyResponse{ApiKey: apiKeyToProto(apiKey), RawKey: rawKey}, nil
+}
+
+// generateAPIKey returns the one-time raw key and its storage hash.
+func generateAPIKey() (string, string, error) {
 	// Generate a random API key: etu_<64 hex characters>
 	randomBytes := make([]byte, 32)
 	if _, err := rand.Read(randomBytes); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to generate random bytes: %v", err)
+		return "", "", status.Errorf(codes.Internal, "failed to generate random bytes: %v", err)
 	}
 	rawKey := "etu_" + hex.EncodeToString(randomBytes)
-
-	// Extract prefix for lookup (first 12 chars)
-	keyPrefix := rawKey[:12]
 
 	// Hash the full key for storage
 	keyHash, err := bcrypt.GenerateFromPassword([]byte(rawKey), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to hash API key: %v", err)
+		return "", "", status.Errorf(codes.Internal, "failed to hash API key: %v", err)
 	}
 
-	// Create the API key in database
-	apiKey, err := s.db.CreateApiKey(ctx, req.UserId, req.Name, keyPrefix, string(keyHash))
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create API key: %v", err)
-	}
-
-	return &pb.CreateApiKeyResponse{
-		ApiKey: apiKeyToProto(apiKey),
-		RawKey: rawKey,
-	}, nil
+	return rawKey, string(keyHash), nil
 }
 
 // ListApiKeys lists all API keys for a user.
