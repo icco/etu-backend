@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/icco/etu-backend/internal/auth"
 	"github.com/icco/etu-backend/internal/db"
 	pb "github.com/icco/etu-backend/proto"
 	"golang.org/x/crypto/bcrypt"
@@ -103,6 +104,24 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 		Success: true,
 		User:    userToProto(user),
 	}, nil
+}
+
+// Login exchanges valid credentials for a revocable, user-scoped API key.
+// Authenticate remains side-effect-free with respect to keys for existing web clients.
+func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*pb.CreateApiKeyResponse, error) {
+	result, err := s.Authenticate(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if !result.Success || result.User == nil {
+		return nil, status.Error(codes.Unauthenticated, "invalid email or password")
+	}
+	// Ownership comes exclusively from verified credentials, never client metadata.
+	ctx = auth.SetAuthContext(ctx, result.User.Id, "apikey")
+	return NewApiKeysService(s.db).CreateApiKey(ctx, &pb.CreateApiKeyRequest{
+		UserId: result.User.Id,
+		Name:   "etu-mobile",
+	})
 }
 
 // GetUser retrieves a user by ID
