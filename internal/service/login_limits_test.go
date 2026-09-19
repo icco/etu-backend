@@ -16,7 +16,7 @@ import (
 func TestLoginLimitsAccountAndRefill(t *testing.T) {
 	l := newLoginLimits()
 	now := time.Now()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if !l.acquire("Test@example.com", now) {
 			t.Fatal("burst denied")
 		}
@@ -35,7 +35,7 @@ func TestLoginLimitsGlobal(t *testing.T) {
 	l := newLoginLimits()
 	now := time.Now()
 	allowed := 0
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		if l.acquire(fmt.Sprintf("user%d@example.com", i), now) {
 			allowed++
 			l.release()
@@ -55,7 +55,7 @@ func TestLoginLimitsConcurrent(t *testing.T) {
 	var allowed atomic.Int32
 	var wg sync.WaitGroup
 	now := time.Now()
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		wg.Go(func() {
 			if l.acquire("test@example.com", now) {
 				allowed.Add(1)
@@ -78,7 +78,7 @@ func TestLoginLimitsConcurrent(t *testing.T) {
 func TestLoginThrottledBeforeDatabaseAccess(t *testing.T) {
 	s := NewAuthService(nil) // Any database access would panic.
 	now := time.Now()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if !s.loginLimits.acquire(testEmail, now) {
 			t.Fatal("burst denied")
 		}
