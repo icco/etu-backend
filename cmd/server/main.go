@@ -142,7 +142,7 @@ func run(log *zap.SugaredLogger) error {
 
 	imgixDomain := os.Getenv("MEDIA_BASE_URL")
 	if imgixDomain != "" && os.Getenv("MEDIA_SIGNING_KEY") == "" {
-		log.Fatal("MEDIA_SIGNING_KEY is required with MEDIA_BASE_URL")
+		return errors.New("MEDIA_SIGNING_KEY is required with MEDIA_BASE_URL")
 	}
 
 	log.Infow("optional features configured",

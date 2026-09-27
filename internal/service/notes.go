@@ -77,7 +77,7 @@ func (s *NotesService) ListNotes(ctx context.Context, req *pb.ListNotesRequest) 
 
 	pbNotes := make([]*pb.Note, len(notes))
 	for i, n := range notes {
-		pbNotes[i] = s.noteToProto(&n)
+		pbNotes[i] = s.noteToProto(ctx, &n)
 	}
 
 	return &pb.ListNotesResponse{
@@ -170,7 +170,7 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 	}
 
 	return &pb.CreateNoteResponse{
-		Note: s.noteToProto(note),
+		Note: s.noteToProto(ctx, note),
 	}, nil
 }
 
@@ -291,7 +291,7 @@ func (s *NotesService) GetNote(ctx context.Context, req *pb.GetNoteRequest) (*pb
 	}
 
 	return &pb.GetNoteResponse{
-		Note: s.noteToProto(note),
+		Note: s.noteToProto(ctx, note),
 	}, nil
 }
 
@@ -371,7 +371,7 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 	}
 
 	return &pb.UpdateNoteResponse{
-		Note: s.noteToProto(note),
+		Note: s.noteToProto(ctx, note),
 	}, nil
 }
 
@@ -429,14 +429,14 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 
 // getImageURL returns the appropriate URL for an image.
 // The shared image gateway gets a short-lived capability for the stored object.
-func (s *NotesService) getImageURL(img *models.NoteImage) string {
+func (s *NotesService) getImageURL(ctx context.Context, img *models.NoteImage) string {
 	if s.imgixDomain != "" && img.GCSObjectName != "" {
 		if signed := mediaURL(s.imgixDomain, img.GCSObjectName, time.Now()); signed != "" {
 			return signed
 		}
 	}
 	if s.storage != nil && img.GCSObjectName != "" {
-		signed, err := s.storage.GetSignedURL(context.Background(), img.GCSObjectName)
+		signed, err := s.storage.GetSignedURL(ctx, img.GCSObjectName)
 		if err == nil {
 			return signed
 		}
@@ -448,9 +448,9 @@ func (s *NotesService) getImageURL(img *models.NoteImage) string {
 // getAudioURL returns the appropriate URL for an audio file.
 // Audio bypasses image processing. Refresh the signed URL on every response,
 // rather than returning the expired upload-time URL stored in the database.
-func (s *NotesService) getAudioURL(aud *models.NoteAudio) string {
+func (s *NotesService) getAudioURL(ctx context.Context, aud *models.NoteAudio) string {
 	if s.storage != nil && aud.GCSObjectName != "" {
-		signed, err := s.storage.GetSignedURL(context.Background(), aud.GCSObjectName)
+		signed, err := s.storage.GetSignedURL(ctx, aud.GCSObjectName)
 		if err == nil {
 			return signed
 		}
@@ -460,7 +460,7 @@ func (s *NotesService) getAudioURL(aud *models.NoteAudio) string {
 }
 
 // noteToProto converts a db.Note to a protobuf Note
-func (s *NotesService) noteToProto(n *db.Note) *pb.Note {
+func (s *NotesService) noteToProto(ctx context.Context, n *db.Note) *pb.Note {
 	// Convert []Tag to []string
 	tagNames := make([]string, len(n.Tags))
 	for i, t := range n.Tags {
@@ -472,7 +472,7 @@ func (s *NotesService) noteToProto(n *db.Note) *pb.Note {
 	for i, img := range n.Images {
 		pbImages[i] = &pb.NoteImage{
 			Id:            img.ID,
-			Url:           s.getImageURL(&img),
+			Url:           s.getImageURL(ctx, &img),
 			ExtractedText: img.ExtractedText,
 			MimeType:      img.MimeType,
 			CreatedAt:     timestamppb.New(img.CreatedAt),
@@ -484,7 +484,7 @@ func (s *NotesService) noteToProto(n *db.Note) *pb.Note {
 	for i, aud := range n.Audios {
 		pbAudios[i] = &pb.NoteAudio{
 			Id:              aud.ID,
-			Url:             s.getAudioURL(&aud),
+			Url:             s.getAudioURL(ctx, &aud),
 			TranscribedText: aud.TranscribedText,
 			MimeType:        aud.MimeType,
 			CreatedAt:       timestamppb.New(aud.CreatedAt),
@@ -525,7 +525,7 @@ func (s *NotesService) GetRandomNotes(ctx context.Context, req *pb.GetRandomNote
 
 	pbNotes := make([]*pb.Note, len(notes))
 	for i, n := range notes {
-		pbNotes[i] = s.noteToProto(&n)
+		pbNotes[i] = s.noteToProto(ctx, &n)
 	}
 
 	return &pb.GetRandomNotesResponse{
