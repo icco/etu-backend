@@ -339,16 +339,16 @@ func TestGetProfileImageURL_MissingKey(t *testing.T) {
 }
 
 func TestGetProfileImageURL_Imgix(t *testing.T) {
-	svc, _, cleanup := newTestUserSettingsService(t, "my-cdn.imgix.net")
+	t.Setenv("MEDIA_SIGNING_KEY", "test-key")
+	svc, _, cleanup := newTestUserSettingsService(t, "https://images.natwelch.com/etu")
 	defer cleanup()
 
 	resp, err := svc.GetProfileImageURL(context.Background(), &pb.GetProfileImageURLRequest{Key: testProfileImageGCSObject})
 	if err != nil {
 		t.Fatalf("GetProfileImageURL: %v", err)
 	}
-	expected := "https://my-cdn.imgix.net/profiles/user1/avatar"
-	if resp.Url != expected {
-		t.Errorf("expected %q, got %q", expected, resp.Url)
+	if resp.Url == "" {
+		t.Fatal("expected a signed image URL")
 	}
 }
 

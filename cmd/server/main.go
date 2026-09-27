@@ -140,12 +140,15 @@ func run(log *zap.SugaredLogger) error {
 		log.Infow("AI client not configured (OCR, transcription disabled)")
 	}
 
-	imgixDomain := os.Getenv("IMGIX_DOMAIN")
+	imgixDomain := os.Getenv("MEDIA_BASE_URL")
+	if imgixDomain != "" && os.Getenv("MEDIA_SIGNING_KEY") == "" {
+		return errors.New("MEDIA_SIGNING_KEY is required with MEDIA_BASE_URL")
+	}
 
 	log.Infow("optional features configured",
 		"ai_enabled", aiClient != nil,
-		"imgix_enabled", imgixDomain != "",
-		"imgix_domain", imgixDomain)
+		"media_enabled", imgixDomain != "",
+		"media_base_url", imgixDomain)
 
 	m2mConfig := auth.NewM2MConfig(rootCtx)
 

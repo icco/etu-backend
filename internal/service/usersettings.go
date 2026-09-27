@@ -127,8 +127,12 @@ func (s *UserSettingsService) GetProfileImageURL(ctx context.Context, req *pb.Ge
 	}
 
 	if s.imgixDomain != "" {
+		signed := mediaURL(s.imgixDomain, req.Key, time.Now())
+		if signed == "" {
+			return nil, status.Error(codes.FailedPrecondition, "media signing not configured")
+		}
 		return &pb.GetProfileImageURLResponse{
-			Url: fmt.Sprintf("https://%s/%s", s.imgixDomain, req.Key),
+			Url: signed,
 		}, nil
 	}
 
