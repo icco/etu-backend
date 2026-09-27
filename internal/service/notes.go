@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/icco/etu-backend/internal/ai"
 	"github.com/icco/etu-backend/internal/db"
@@ -427,21 +428,33 @@ func (s *NotesService) DeleteNote(ctx context.Context, req *pb.DeleteNoteRequest
 }
 
 // getImageURL returns the appropriate URL for an image.
-// If imgix is configured, it returns an imgix URL using the GCS object name.
-// Otherwise, it returns the original GCS signed URL.
+// The shared image gateway gets a short-lived capability for the stored object.
 func (s *NotesService) getImageURL(img *models.NoteImage) string {
 	if s.imgixDomain != "" && img.GCSObjectName != "" {
-		return fmt.Sprintf("https://%s/%s", s.imgixDomain, img.GCSObjectName)
+		if signed := mediaURL(s.imgixDomain, img.GCSObjectName, time.Now()); signed != "" {
+			return signed
+		}
+	}
+	if s.storage != nil && img.GCSObjectName != "" {
+		signed, err := s.storage.GetSignedURL(context.Background(), img.GCSObjectName)
+		if err == nil {
+			return signed
+		}
+		return ""
 	}
 	return img.URL
 }
 
 // getAudioURL returns the appropriate URL for an audio file.
-// If imgix is configured, it returns an imgix URL using the GCS object name.
-// Otherwise, it returns the original GCS signed URL.
+// Audio bypasses image processing. Refresh the signed URL on every response,
+// rather than returning the expired upload-time URL stored in the database.
 func (s *NotesService) getAudioURL(aud *models.NoteAudio) string {
-	if s.imgixDomain != "" && aud.GCSObjectName != "" {
-		return fmt.Sprintf("https://%s/%s", s.imgixDomain, aud.GCSObjectName)
+	if s.storage != nil && aud.GCSObjectName != "" {
+		signed, err := s.storage.GetSignedURL(context.Background(), aud.GCSObjectName)
+		if err == nil {
+			return signed
+		}
+		return ""
 	}
 	return aud.URL
 }
