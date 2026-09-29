@@ -6,12 +6,12 @@ import (
 	"math"
 	"time"
 
-	"github.com/icco/gutil/logging"
 	"go.icco.me/etu-backend/internal/ai"
 	"go.icco.me/etu-backend/internal/db"
 	"go.icco.me/etu-backend/internal/models"
 	"go.icco.me/etu-backend/internal/storage"
 	pb "go.icco.me/etu-backend/proto"
+	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

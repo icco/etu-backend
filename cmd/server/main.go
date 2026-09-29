@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/icco/gutil/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.icco.me/etu-backend/internal/ai"
@@ -22,6 +21,7 @@ import (
 	"go.icco.me/etu-backend/internal/service"
 	"go.icco.me/etu-backend/internal/storage"
 	pb "go.icco.me/etu-backend/proto"
+	"go.icco.me/gutil/logging"
 	"go.opentelemetry.io/otel"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"

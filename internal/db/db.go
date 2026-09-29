@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/icco/gutil/logging"
 	"go.icco.me/etu-backend/internal/crypto"
 	"go.icco.me/etu-backend/internal/models"
+	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"

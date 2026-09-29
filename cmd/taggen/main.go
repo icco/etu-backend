@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/icco/gutil/logging"
 	"go.icco.me/etu-backend/internal/ai"
 	"go.icco.me/etu-backend/internal/db"
 	"go.icco.me/etu-backend/internal/logger"
 	"go.icco.me/etu-backend/internal/storage"
 	"go.icco.me/etu-backend/internal/tagging"
+	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )

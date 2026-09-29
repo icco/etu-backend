@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/icco/gutil/logging"
 	_ "github.com/lib/pq" // register the postgres database/sql driver
+	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )

@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/icco/gutil/logging"
+	"go.icco.me/gutil/logging"
 )
 
 // M2MConfig holds configuration for M2M token authentication
