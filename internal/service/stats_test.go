@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	pb "github.com/icco/etu-backend/proto"
+	pb "go.icco.me/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

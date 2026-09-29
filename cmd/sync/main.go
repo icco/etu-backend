@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/icco/etu-backend/internal/logger"
-	"github.com/icco/etu-backend/internal/notion"
-	"github.com/icco/etu-backend/internal/sync"
-	"github.com/icco/etu-backend/internal/syncdb"
 	"github.com/icco/gutil/logging"
+	"go.icco.me/etu-backend/internal/logger"
+	"go.icco.me/etu-backend/internal/notion"
+	"go.icco.me/etu-backend/internal/sync"
+	"go.icco.me/etu-backend/internal/syncdb"
 	"go.uber.org/zap"
 )
 

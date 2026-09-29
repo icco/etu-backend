@@ -4,7 +4,7 @@ package etu;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/icco/etu-backend/proto";
+option go_package = "go.icco.me/etu-backend/proto";
 
 // etu defines the public gRPC API for ETU notes, auth, tags, and settings.
 //

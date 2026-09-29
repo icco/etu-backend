@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/icco/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/auth"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

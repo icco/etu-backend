@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/icco/etu-backend/internal/db"
-	"github.com/icco/etu-backend/internal/models"
-	pb "github.com/icco/etu-backend/proto"
+	"go.icco.me/etu-backend/internal/db"
+	"go.icco.me/etu-backend/internal/models"
+	pb "go.icco.me/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

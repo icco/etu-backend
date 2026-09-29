@@ -3527,7 +3527,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x12UpdateUserSettings\x12\x1e.etu.UpdateUserSettingsRequest\x1a\x1f.etu.UpdateUserSettingsResponse\x12U\n" +
 	"\x12GetProfileImageURL\x12\x1e.etu.GetProfileImageURLRequest\x1a\x1f.etu.GetProfileImageURLResponse2G\n" +
 	"\fStatsService\x127\n" +
-	"\bGetStats\x12\x14.etu.GetStatsRequest\x1a\x15.etu.GetStatsResponseB#Z!github.com/icco/etu-backend/protob\x06proto3"
+	"\bGetStats\x12\x14.etu.GetStatsRequest\x1a\x15.etu.GetStatsResponseB\x1eZ\x1cgo.icco.me/etu-backend/protob\x06proto3"
 
 var (
 	file_proto_etu_proto_rawDescOnce sync.Once

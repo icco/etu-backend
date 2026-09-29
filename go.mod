@@ -1,4 +1,4 @@
-module github.com/icco/etu-backend
+module go.icco.me/etu-backend
 
 go 1.26.2
 
