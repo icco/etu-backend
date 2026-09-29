@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/icco/gutil/vertex"
+	"go.icco.me/gutil/vertex"
 )
 
 // model is the Gemini model used for every call in this package. Flash-lite is

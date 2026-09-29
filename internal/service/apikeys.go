@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 
-	"github.com/icco/etu-backend/internal/db"
-	pb "github.com/icco/etu-backend/proto"
-	"github.com/icco/gutil/logging"
+	"go.icco.me/etu-backend/internal/db"
+	pb "go.icco.me/etu-backend/proto"
+	"go.icco.me/gutil/logging"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

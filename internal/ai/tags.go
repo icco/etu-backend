@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/icco/gutil/vertex"
+	"go.icco.me/gutil/vertex"
 	"google.golang.org/genai"
 )
 

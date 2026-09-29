@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/icco/etu-backend/internal/notion"
-	"github.com/icco/etu-backend/internal/syncdb"
-	"github.com/icco/gutil/logging"
+	"go.icco.me/etu-backend/internal/notion"
+	"go.icco.me/etu-backend/internal/syncdb"
+	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
 )
 

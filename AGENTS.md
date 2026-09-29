@@ -26,7 +26,7 @@ Run via `task <name>`:
 - `internal/db`, `internal/models` — PostgreSQL via GORM.
 - `internal/auth` — Client API keys (`etu_<64 hex>` metadata) & M2M tokens (`GRPC_API_KEYS`).
 - `internal/storage` — Google Cloud Storage for media attachments (`GCS_BUCKET`).
-- `internal/ai`, `internal/tagging` — Gemini features via `github.com/icco/gutil/vertex` on Vertex AI (ADC auth via `GEMINI_PROJECT`; no API key).
+- `internal/ai`, `internal/tagging` — Gemini features via `go.icco.me/gutil/vertex` on Vertex AI (ADC auth via `GEMINI_PROJECT`; no API key).
 - `proto/` — Source `.proto` files and committed generated `.pb.go` code.
 
 ## Conventions

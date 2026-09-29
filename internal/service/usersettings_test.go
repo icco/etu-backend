@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/icco/etu-backend/internal/auth"
-	"github.com/icco/etu-backend/internal/db"
-	pb "github.com/icco/etu-backend/proto"
+	"go.icco.me/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/db"
+	pb "go.icco.me/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

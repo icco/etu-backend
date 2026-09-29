@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/icco/etu-backend/internal/crypto"
-	"github.com/icco/etu-backend/internal/models"
+	"go.icco.me/etu-backend/internal/crypto"
+	"go.icco.me/etu-backend/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"

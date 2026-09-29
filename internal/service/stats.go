@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/icco/etu-backend/internal/db"
-	pb "github.com/icco/etu-backend/proto"
+	"go.icco.me/etu-backend/internal/db"
+	pb "go.icco.me/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/icco/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/auth"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

@@ -1,6 +1,6 @@
 # etu-backend
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/icco/etu-backend.svg)](https://pkg.go.dev/github.com/icco/etu-backend)
+[![Go Reference](https://pkg.go.dev/badge/go.icco.me/etu-backend.svg)](https://pkg.go.dev/go.icco.me/etu-backend)
 [![Test Go](https://github.com/icco/etu-backend/actions/workflows/test.yml/badge.svg)](https://github.com/icco/etu-backend/actions/workflows/test.yml)
 [![golangci-lint](https://github.com/icco/etu-backend/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/icco/etu-backend/actions/workflows/golangci-lint.yml)
 
@@ -52,7 +52,7 @@ docker run -e DATABASE_URL="postgres://..." -p 50051:50051 etu-backend
 
 ## API
 
-The server exposes gRPC services on port 50051. Full API documentation: [pkg.go.dev](https://pkg.go.dev/github.com/icco/etu-backend)
+The server exposes gRPC services on port 50051. Full API documentation: [pkg.go.dev](https://pkg.go.dev/go.icco.me/etu-backend)
 
 **Authentication:** All endpoints require an API key in gRPC metadata:
 ```
