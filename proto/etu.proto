@@ -585,3 +585,51 @@ service StatsService {
   // GetStats returns aggregate note, tag, and word-count statistics.
   rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
 }
+
+// DeleteAccountRequest permanently deletes a user and all of their data.
+message DeleteAccountRequest {
+  // user_id is the account to delete.
+  string user_id = 1;
+  // password is the account's current password; required unless called with M2M auth.
+  string password = 2;
+}
+
+// DeleteAccountResponse reports the outcome of an account deletion.
+message DeleteAccountResponse {
+  // success is true when the account no longer exists.
+  bool success = 1;
+}
+
+// ExportDataRequest requests a full export of a user's data.
+message ExportDataRequest {
+  // user_id is the account to export.
+  string user_id = 1;
+}
+
+// ExportDataResponse is one item of a streamed data export. The stream sends
+// the user first, then profile_image_url if the user has an uploaded profile
+// image, then every tag, then every note in creation order. Media
+// URLs are signed GCS URLs that expire one hour after they are streamed.
+message ExportDataResponse {
+  oneof item {
+    // user is the account profile and settings.
+    User user = 1;
+    // tag is one of the user's tags.
+    Tag tag = 2;
+    // note is one note with its tags and media.
+    Note note = 3;
+    // profile_image_url is a signed URL for the uploaded profile image.
+    string profile_image_url = 4;
+  }
+}
+
+// AccountService manages whole-account operations.
+service AccountService {
+  // DeleteAccount disables the account and revokes its API keys, cancels billing,
+  // deletes stored media, and removes all account data. If a step after the
+  // disable fails, the user is signed out and an M2M (support) call with the same
+  // user_id completes the deletion.
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+  // ExportData streams all of the caller's data.
+  rpc ExportData(ExportDataRequest) returns (stream ExportDataResponse);
+}

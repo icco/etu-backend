@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -99,6 +100,9 @@ func (s *Syncer) SyncUser(ctx context.Context, userID string, fullSync bool) (*R
 			post.ModifiedAt,
 		)
 		if upsertErr != nil {
+			if errors.Is(upsertErr, syncdb.ErrUserDisabled) {
+				return nil, fmt.Errorf("stop sync: %w", upsertErr)
+			}
 			l.Errorw("error upserting note", "notion_uuid", post.ID, zap.Error(upsertErr))
 			result.Errors++
 			continue

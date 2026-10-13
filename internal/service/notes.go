@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -135,6 +136,9 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 
 	note, err := s.db.CreateNote(ctx, req.UserId, req.Content, req.Tags)
 	if err != nil {
+		if errors.Is(err, db.ErrUserDisabled) {
+			return nil, status.Error(codes.FailedPrecondition, "account is disabled")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create note: %v", err)
 	}
 
@@ -334,6 +338,9 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 
 	note, err := s.db.UpdateNote(ctx, req.UserId, req.Id, content, req.Tags, req.UpdateTags)
 	if err != nil {
+		if errors.Is(err, db.ErrUserDisabled) {
+			return nil, status.Error(codes.FailedPrecondition, "account is disabled")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to update note: %v", err)
 	}
 	if note == nil {

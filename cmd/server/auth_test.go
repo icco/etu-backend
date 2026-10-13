@@ -30,6 +30,38 @@ func TestLoginPublicButKeyCreationProtected(t *testing.T) {
 	}
 }
 
+type testServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s testServerStream) Context() context.Context { return s.ctx }
+
+func TestStreamAuthInterceptor(t *testing.T) {
+	interceptor := streamAuthInterceptor(authInterceptor(nil, &auth.M2MConfig{}, zap.NewNop().Sugar()))
+	tests := []struct {
+		name       string
+		ctx        context.Context
+		wantCalled bool
+		wantCode   codes.Code
+	}{
+		{name: "missing metadata is rejected", ctx: context.Background(), wantCode: codes.Unauthenticated},
+		{name: "missing authorization is rejected", ctx: metadata.NewIncomingContext(context.Background(), metadata.MD{}), wantCode: codes.Unauthenticated},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			err := interceptor(nil, testServerStream{ctx: tt.ctx}, &grpc.StreamServerInfo{FullMethod: "/etu.AccountService/ExportData"}, func(any, grpc.ServerStream) error {
+				called = true
+				return nil
+			})
+			if called != tt.wantCalled || status.Code(err) != tt.wantCode {
+				t.Fatalf("called=%v code=%v, want called=%v code=%v", called, status.Code(err), tt.wantCalled, tt.wantCode)
+			}
+		})
+	}
+}
+
 func TestPublicMethodsRecognizeM2M(t *testing.T) {
 	t.Setenv("GRPC_API_KEYS", "m2m-secret")
 	interceptor := authInterceptor(nil, auth.NewM2MConfig(context.Background()), zap.NewNop().Sugar())
@@ -59,5 +91,20 @@ func TestPublicMethodsRecognizeM2M(t *testing.T) {
 				t.Fatalf("IsM2MAuth = %v, want %v", got, tc.wantM2)
 			}
 		})
+	}
+}
+
+func TestStreamAuthInterceptorPassesAuthContext(t *testing.T) {
+	unary := func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		return handler(auth.SetAuthContext(ctx, "alice", "apikey"), req)
+	}
+	var gotUser string
+	err := streamAuthInterceptor(unary)(nil, testServerStream{ctx: context.Background()}, &grpc.StreamServerInfo{}, func(_ any, ss grpc.ServerStream) error {
+		var err error
+		gotUser, err = auth.GetUserID(ss.Context())
+		return err
+	})
+	if err != nil || gotUser != "alice" {
+		t.Fatalf("user = %q, err = %v", gotUser, err)
 	}
 }

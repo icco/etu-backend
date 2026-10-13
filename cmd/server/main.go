@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.icco.me/etu-backend/internal/ai"
 	"go.icco.me/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/billing"
 	"go.icco.me/etu-backend/internal/db"
 	"go.icco.me/etu-backend/internal/logger"
 	"go.icco.me/etu-backend/internal/service"
@@ -152,10 +153,11 @@ func run(log *zap.SugaredLogger) error {
 
 	m2mConfig := auth.NewM2MConfig(rootCtx)
 
+	unaryAuth := authInterceptor(authenticator, m2mConfig, log)
 	recoverUnary, recoverStream := recoveryInterceptors(log)
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(recoverUnary, authInterceptor(authenticator, m2mConfig, log)),
-		grpc.ChainStreamInterceptor(recoverStream),
+		grpc.ChainUnaryInterceptor(recoverUnary, unaryAuth),
+		grpc.ChainStreamInterceptor(recoverStream, streamAuthInterceptor(unaryAuth)),
 		grpc.MaxRecvMsgSize(maxRecvMsgSize),
 	)
 
@@ -166,12 +168,21 @@ func run(log *zap.SugaredLogger) error {
 	userSettingsService := service.NewUserSettingsService(database, storageClient, imgixDomain)
 	statsService := service.NewStatsService(database)
 
+	var billingClient service.SubscriptionCanceler
+	if key := os.Getenv("STRIPE_SECRET_KEY"); key != "" {
+		billingClient = billing.NewStripe(key)
+	} else {
+		log.Warnw("STRIPE_SECRET_KEY not set; account deletion will refuse users with Stripe subscriptions")
+	}
+	accountService := service.NewAccountService(database, storageClient, billingClient)
+
 	pb.RegisterNotesServiceServer(server, notesService)
 	pb.RegisterTagsServiceServer(server, tagsService)
 	pb.RegisterAuthServiceServer(server, authService)
 	pb.RegisterApiKeysServiceServer(server, apiKeysService)
 	pb.RegisterUserSettingsServiceServer(server, userSettingsService)
 	pb.RegisterStatsServiceServer(server, statsService)
+	pb.RegisterAccountServiceServer(server, accountService)
 
 	reflection.Register(server)
 
@@ -342,5 +353,22 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 		l.Infow("authenticated request", "user_id", userID, "auth_type", "apikey")
 
 		return handler(ctx, req)
+	}
+}
+
+type authedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s authedServerStream) Context() context.Context { return s.ctx }
+
+// streamAuthInterceptor applies the unary auth interceptor to streaming RPCs so both share one auth path.
+func streamAuthInterceptor(unary grpc.UnaryServerInterceptor) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		_, err := unary(ss.Context(), nil, &grpc.UnaryServerInfo{Server: srv, FullMethod: info.FullMethod}, func(ctx context.Context, _ interface{}) (interface{}, error) {
+			return nil, handler(srv, authedServerStream{ServerStream: ss, ctx: ctx})
+		})
+		return err
 	}
 }

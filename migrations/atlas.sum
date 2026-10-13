@@ -1,4 +1,5 @@
-h1:fsOaaBkUCG11WFff/Ld1yuFwsyHzPS97ezd1h03JP2Q=
+h1:bhTU098Txy7KRMx9AiQl3kSnwyRxO6kqMoUP7vmdInU=
 20261013124430_baseline.sql h1:0243unv+IMZZICgNUFgQW9qxm6jKCQELwsjf6BQ7ZWQ=
 20261013140000_user_email_normalized_key.sql h1:hzL0DDvDZMfpYVTXLjeJLCiJnwzHp+zIKoS/KyGSK7U=
 20261013150000_ai_opt_in_and_usage.sql h1:wH3gYd/ifoi30lxeqqagj2hPQ5kS73NkvcwXDg1OTjk=
+20261013160000_account_deletion_cleanup.sql h1:ftnav4hm1BawXyE6DpbQhaXdChFFPlmXR9TfERvp/xY=

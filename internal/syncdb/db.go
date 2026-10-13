@@ -2,6 +2,7 @@ package syncdb
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -14,6 +15,9 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
+
+// ErrUserDisabled is returned when syncing into a missing or disabled account.
+var ErrUserDisabled = errors.New("user is disabled")
 
 // DB wraps the GORM database connection.
 // Loggers are sourced from per-call ctx via gutil/logging.
@@ -70,6 +74,17 @@ func New() (*DB, error) {
 	}, nil
 }
 
+// NewFromConn creates a DB from an existing *sql.DB, such as a sqlmock connection in tests.
+func NewFromConn(sqlDB *sql.DB) (*DB, error) {
+	conn, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
+	return &DB{conn: conn}, nil
+}
+
 // Close closes the database connection
 func (db *DB) Close() error {
 	sqlDB, err := db.conn.DB()
@@ -116,6 +131,14 @@ func (db *DB) UpsertNoteFromNotion(userID, notionUUID, pageID, content string, t
 	var isNew bool
 
 	err := db.conn.Transaction(func(tx *gorm.DB) error {
+		var active []string
+		if err := tx.Raw(`SELECT id FROM "User" WHERE id = ? AND disabled IS NOT TRUE FOR SHARE`, userID).Scan(&active).Error; err != nil {
+			return fmt.Errorf("lock user: %w", err)
+		}
+		if len(active) == 0 {
+			return ErrUserDisabled
+		}
+
 		// Try to find existing note by Notion UUID first, then by page ID
 		result := tx.Where(`"userId" = ? AND "notionUuid" = ?`, userID, notionUUID).First(&note)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -304,7 +327,7 @@ func (db *DB) GetArchivedNotePageIDs(_ string) ([]string, error) {
 func (db *DB) GetUsersWithNotionKeys(ctx context.Context) ([]User, error) {
 	var users []User
 	err := db.conn.WithContext(ctx).
-		Where(`"notionKey" IS NOT NULL AND "notionKey" != ''`).
+		Where(`"notionKey" IS NOT NULL AND "notionKey" != '' AND disabled IS NOT TRUE`).
 		Find(&users).Error
 	if err != nil {
 		return nil, err

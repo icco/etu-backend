@@ -130,6 +130,7 @@ func (db *DB) AutoMigrate() error {
 		&models.SyncState{},
 		&models.NoteImage{},
 		&models.NoteAudio{},
+		&models.AccountDeletionCleanup{},
 		&models.AIUsage{},
 	); err != nil {
 		return err
@@ -328,6 +329,9 @@ func (db *DB) CreateNote(ctx context.Context, userID, content string, tagNames [
 	var note Note
 
 	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lockActiveUser(tx, userID); err != nil {
+			return err
+		}
 		now := time.Now()
 		note = Note{
 			ID:        models.GenerateCUID(),
@@ -399,6 +403,9 @@ func (db *DB) UpdateNote(ctx context.Context, userID, noteID string, content *st
 	var note Note
 
 	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lockActiveUser(tx, userID); err != nil {
+			return err
+		}
 		// Verify ownership and get current note
 		result := tx.Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -497,10 +504,15 @@ func (db *DB) AddImageToNote(ctx context.Context, noteID string, image *NoteImag
 	if image.CreatedAt.IsZero() {
 		image.CreatedAt = time.Now()
 	}
-	if err := db.conn.WithContext(ctx).Create(image).Error; err != nil {
-		return fmt.Errorf("failed to add image to note: %w", err)
-	}
-	return nil
+	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lockActiveNoteOwner(tx, noteID); err != nil {
+			return err
+		}
+		if err := tx.Create(image).Error; err != nil {
+			return fmt.Errorf("failed to add image to note: %w", err)
+		}
+		return nil
+	})
 }
 
 // RemoveImageFromNote removes an image from a note and returns the GCS object name for cleanup
@@ -554,10 +566,15 @@ func (db *DB) AddAudioToNote(ctx context.Context, noteID string, audio *NoteAudi
 	if audio.CreatedAt.IsZero() {
 		audio.CreatedAt = time.Now()
 	}
-	if err := db.conn.WithContext(ctx).Create(audio).Error; err != nil {
-		return fmt.Errorf("failed to add audio to note: %w", err)
-	}
-	return nil
+	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lockActiveNoteOwner(tx, noteID); err != nil {
+			return err
+		}
+		if err := tx.Create(audio).Error; err != nil {
+			return fmt.Errorf("failed to add audio to note: %w", err)
+		}
+		return nil
+	})
 }
 
 // RemoveAudioFromNote removes an audio file from a note and returns the GCS object name for cleanup
@@ -1028,6 +1045,9 @@ func (db *DB) GetNotesWithFewTags(ctx context.Context, userID string, maxTags in
 // AddTagsToNote adds tags to a note without removing existing tags
 func (db *DB) AddTagsToNote(ctx context.Context, userID, noteID string, tagNames []string) error {
 	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lockActiveUser(tx, userID); err != nil {
+			return err
+		}
 		// Verify note ownership
 		var note Note
 		result := tx.Where(`id = ? AND "userId" = ?`, noteID, userID).First(&note)
