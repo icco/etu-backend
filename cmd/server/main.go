@@ -39,6 +39,9 @@ var (
 
 const statusKey = "status"
 
+// maxRecvMsgSize fits a request carrying the maximum number of max-size attachments plus 1MB for note text and framing.
+const maxRecvMsgSize = service.MaxImagesPerRequest*service.MaxImageSize + service.MaxAudiosPerRequest*service.MaxAudioSize + 1<<20
+
 func main() {
 	log := logger.New("etu-backend-server")
 	if err := run(log); err != nil {
@@ -93,10 +96,7 @@ func run(log *zap.SugaredLogger) error {
 		}
 	}()
 
-	if err := database.AutoMigrate(); err != nil {
-		return fmt.Errorf("failed to run database migrations: %w", err)
-	}
-	log.Infow("database initialized and migrations completed")
+	log.Infow("database initialized")
 
 	authenticator, err := auth.New()
 	if err != nil {
@@ -154,6 +154,7 @@ func run(log *zap.SugaredLogger) error {
 
 	server := grpc.NewServer(
 		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
+		grpc.MaxRecvMsgSize(maxRecvMsgSize),
 	)
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
