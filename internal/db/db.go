@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.icco.me/etu-backend/internal/crypto"
 	"go.icco.me/etu-backend/internal/models"
 	"go.icco.me/gutil/logging"
@@ -118,7 +119,7 @@ func (db *DB) Close() error {
 	return sqlDB.Close()
 }
 
-// AutoMigrate runs auto migrations for all tables
+// AutoMigrate applies the GORM models to the connected database. Only cmd/schemagen calls it; deployed databases are migrated by Atlas from the migrations directory.
 func (db *DB) AutoMigrate() error {
 	if err := db.conn.AutoMigrate(
 		&models.User{},
@@ -140,7 +141,7 @@ func (db *DB) AutoMigrate() error {
 			return fmt.Errorf("drop User.image: %w", err)
 		}
 	}
-	return nil
+	return db.ensureEmailIndex(context.Background())
 }
 
 // ListNotes retrieves notes for a user with optional filtering
@@ -661,6 +662,7 @@ func (db *DB) ListTags(ctx context.Context, userID string) ([]Tag, error) {
 
 // CreateUser creates a new user with email and password
 func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User, error) {
+	email = NormalizeEmail(email)
 	now := time.Now()
 	user := User{
 		ID:                 models.GenerateCUID(),
@@ -671,6 +673,10 @@ func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User
 	}
 
 	if err := db.conn.WithContext(ctx).Create(&user).Error; err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrEmailTaken
+		}
 		return nil, fmt.Errorf("failed to insert user: %w", err)
 	}
 
@@ -680,7 +686,7 @@ func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User
 // GetUserByEmail retrieves a user by email address
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
-	result := db.conn.WithContext(ctx).Where("email = ?", email).First(&user)
+	result := db.conn.WithContext(ctx).Where("lower(trim(email)) = ?", NormalizeEmail(email)).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -840,7 +846,7 @@ func (db *DB) UpdateUserStripeCustomer(ctx context.Context, userID string, in St
 // IsAccountLocked checks if a user account is locked or disabled
 func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) {
 	var user User
-	result := db.conn.WithContext(ctx).Select("disabled, \"failedLoginAttempts\"").Where("id = ?", userID).First(&user)
+	result := db.conn.WithContext(ctx).Select(`disabled, "failedLoginAttempts", "lastFailedLogin"`).Where("id = ?", userID).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return false, fmt.Errorf("user not found")
 	}
@@ -853,34 +859,22 @@ func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) 
 		return true, nil
 	}
 
-	// Check if account is locked due to too many failed attempts
-	if user.FailedLoginAttempts >= 10 {
-		return true, nil
-	}
-
-	return false, nil
+	return LockoutRemaining(user.FailedLoginAttempts, user.LastFailedLogin, time.Now()) > 0, nil
 }
 
-// RecordFailedLogin increments failed login attempts and locks account if threshold reached
+// RecordFailedLogin increments consecutive failed login attempts, which drive LockoutRemaining
 func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
-	now := time.Now()
-
-	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var user User
-		if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
-			return fmt.Errorf("failed to get user: %w", err)
-		}
-
-		// Increment failed attempts
-		user.FailedLoginAttempts++
-		user.LastFailedLogin = &now
-
-		if err := tx.Save(&user).Error; err != nil {
-			return fmt.Errorf("failed to update user: %w", err)
-		}
-
-		return nil
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).UpdateColumns(map[string]interface{}{
+		colFailedLoginAttempts: gorm.Expr(`"failedLoginAttempts" + 1`),
+		colLastFailedLogin:     time.Now(),
 	})
+	if result.Error != nil {
+		return fmt.Errorf("failed to record failed login: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
 }
 
 // RecordSuccessfulLogin clears failed login attempts

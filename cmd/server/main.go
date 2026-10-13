@@ -39,6 +39,9 @@ var (
 
 const statusKey = "status"
 
+// maxRecvMsgSize fits a request carrying the maximum number of max-size attachments plus 1MB for note text and framing.
+const maxRecvMsgSize = service.MaxImagesPerRequest*service.MaxImageSize + service.MaxAudiosPerRequest*service.MaxAudioSize + 1<<20
+
 func main() {
 	log := logger.New("etu-backend-server")
 	if err := run(log); err != nil {
@@ -93,10 +96,7 @@ func run(log *zap.SugaredLogger) error {
 		}
 	}()
 
-	if err := database.AutoMigrate(); err != nil {
-		return fmt.Errorf("failed to run database migrations: %w", err)
-	}
-	log.Infow("database initialized and migrations completed")
+	log.Infow("database initialized")
 
 	authenticator, err := auth.New()
 	if err != nil {
@@ -152,8 +152,11 @@ func run(log *zap.SugaredLogger) error {
 
 	m2mConfig := auth.NewM2MConfig(rootCtx)
 
+	recoverUnary, recoverStream := recoveryInterceptors(log)
 	server := grpc.NewServer(
-		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
+		grpc.ChainUnaryInterceptor(recoverUnary, authInterceptor(authenticator, m2mConfig, log)),
+		grpc.ChainStreamInterceptor(recoverStream),
+		grpc.MaxRecvMsgSize(maxRecvMsgSize),
 	)
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
@@ -297,6 +300,13 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 		l := logging.FromContext(ctx).With("method", info.FullMethod)
 
 		if publicMethods[info.FullMethod] {
+			if md, ok := metadata.FromIncomingContext(ctx); ok && m2mConfig.IsEnabled() {
+				if tokens := md.Get("authorization"); len(tokens) > 0 {
+					if valid, _ := m2mConfig.ValidateToken(tokens[0]); valid {
+						ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
+					}
+				}
+			}
 			l.Infow("public request")
 			return handler(ctx, req)
 		}
