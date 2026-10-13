@@ -389,17 +389,12 @@ func TestUpdateUserSettings_AIEnabled(t *testing.T) {
 				)
 			}
 
+			mock.ExpectQuery(`SELECT \* FROM "User"`).
+				WithArgs(testUserNameRow, 1).
+				WillReturnRows(row(!tt.enabled))
 			mock.ExpectBegin()
 			mock.ExpectExec(`UPDATE "User" SET "aiEnabled"=\$1,"updatedAt"=\$2 WHERE "id" = \$3`).
 				WithArgs(tt.enabled, sqlmock.AnyArg(), testUserNameRow).
-				WillReturnResult(sqlmock.NewResult(0, 1))
-			mock.ExpectCommit()
-			mock.ExpectQuery(`SELECT \* FROM "User"`).
-				WithArgs(testUserNameRow, 1).
-				WillReturnRows(row(tt.enabled))
-			mock.ExpectBegin()
-			mock.ExpectExec(`UPDATE "User"`).
-				WithArgs(sqlmock.AnyArg(), testUserNameRow).
 				WillReturnResult(sqlmock.NewResult(0, 1))
 			mock.ExpectCommit()
 			mock.ExpectQuery(`SELECT \* FROM "User"`).

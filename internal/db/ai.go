@@ -34,20 +34,6 @@ func (db *DB) ListAIEligibleUsers(ctx context.Context) ([]User, error) {
 	return users, nil
 }
 
-// SetUserAIEnabled sets whether a user has opted in to AI processing.
-func (db *DB) SetUserAIEnabled(ctx context.Context, userID string, enabled bool) error {
-	result := db.conn.WithContext(ctx).Model(&User{}).
-		Where(`"id" = ?`, userID).
-		Updates(map[string]interface{}{"aiEnabled": enabled, colUpdatedAt: time.Now()})
-	if result.Error != nil {
-		return fmt.Errorf("failed to update aiEnabled: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("user not found")
-	}
-	return nil
-}
-
 // ConsumeAIQuota atomically records one AI operation for userID on the UTC day
 // of now. It returns false without recording when the user is not currently
 // AI eligible or already reached limit.

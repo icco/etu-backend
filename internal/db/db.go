@@ -1119,6 +1119,11 @@ func (db *DB) GetUserSettings(ctx context.Context, userID string) (*User, error)
 
 // UpdateUserSettings updates or creates user settings
 func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, name, password, notionDatabaseName, profileImageGCSObject *string) (*User, error) {
+	return db.UpdateUserSettingsWithAI(ctx, userID, notionKey, name, password, notionDatabaseName, profileImageGCSObject, nil)
+}
+
+// UpdateUserSettingsWithAI is UpdateUserSettings that also sets aiEnabled in the same update when non-nil.
+func (db *DB) UpdateUserSettingsWithAI(ctx context.Context, userID string, notionKey, name, password, notionDatabaseName, profileImageGCSObject *string, aiEnabled *bool) (*User, error) {
 	now := time.Now()
 
 	var user User
@@ -1154,6 +1159,9 @@ func (db *DB) UpdateUserSettings(ctx context.Context, userID string, notionKey, 
 	}
 	if profileImageGCSObject != nil {
 		updates["profileImageGCSObject"] = *profileImageGCSObject
+	}
+	if aiEnabled != nil {
+		updates["aiEnabled"] = *aiEnabled
 	}
 
 	if err := db.conn.WithContext(ctx).Model(&user).Updates(updates).Error; err != nil {
