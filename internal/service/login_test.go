@@ -43,7 +43,7 @@ func TestLogin(t *testing.T) {
 		{name: "missing email", want: codes.InvalidArgument},
 		{name: "unknown user", email: testEmail, want: codes.Unauthenticated},
 		{name: "disabled", email: testEmail, found: true, disabled: true, want: codes.PermissionDenied},
-		{name: "locked", email: testEmail, found: true, attempts: 10, want: codes.PermissionDenied},
+		{name: "locked", email: testEmail, found: true, attempts: 5, want: codes.PermissionDenied},
 		{name: "key storage failure", email: testEmail, found: true, insertError: true, want: codes.Internal},
 		{name: "session cap", email: testEmail, found: true, sessions: db.MaxMobileSessions, want: codes.ResourceExhausted},
 	} {
@@ -59,13 +59,13 @@ func TestLogin(t *testing.T) {
 			}
 			var storedHash string
 			if tc.email != "" {
-				rows := sqlmock.NewRows([]string{"id", "email", "passwordHash", "disabled", "failedLoginAttempts", "createdAt", "updatedAt"})
+				rows := sqlmock.NewRows([]string{"id", "email", "passwordHash", "disabled", "failedLoginAttempts", "lastFailedLogin", "createdAt", "updatedAt"})
 				if tc.found {
-					rows.AddRow("verified-owner", tc.email, string(passwordHash), tc.disabled, tc.attempts, time.Now(), time.Now())
+					rows.AddRow("verified-owner", tc.email, string(passwordHash), tc.disabled, tc.attempts, time.Now(), time.Now(), time.Now())
 				}
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(tc.email, 1).WillReturnRows(rows)
 			}
-			if tc.found && !tc.disabled && tc.attempts < 10 {
+			if tc.found && !tc.disabled && tc.attempts < 5 {
 				mock.ExpectBegin()
 				mock.ExpectExec(`UPDATE "User"`).WithArgs(0, nil, sqlmock.AnyArg(), "verified-owner").WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()

@@ -83,8 +83,7 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 		return nil, status.Error(codes.PermissionDenied, "account is disabled")
 	}
 
-	// Check if account is locked due to too many failed attempts
-	if user.FailedLoginAttempts >= 10 {
+	if db.LockoutRemaining(user.FailedLoginAttempts, user.LastFailedLogin, time.Now()) > 0 {
 		return nil, status.Error(codes.PermissionDenied, "account is locked")
 	}
 

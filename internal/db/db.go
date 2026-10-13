@@ -839,7 +839,7 @@ func (db *DB) UpdateUserStripeCustomer(ctx context.Context, userID string, in St
 // IsAccountLocked checks if a user account is locked or disabled
 func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) {
 	var user User
-	result := db.conn.WithContext(ctx).Select("disabled, \"failedLoginAttempts\"").Where("id = ?", userID).First(&user)
+	result := db.conn.WithContext(ctx).Select(`disabled, "failedLoginAttempts", "lastFailedLogin"`).Where("id = ?", userID).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return false, fmt.Errorf("user not found")
 	}
@@ -852,15 +852,10 @@ func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) 
 		return true, nil
 	}
 
-	// Check if account is locked due to too many failed attempts
-	if user.FailedLoginAttempts >= 10 {
-		return true, nil
-	}
-
-	return false, nil
+	return LockoutRemaining(user.FailedLoginAttempts, user.LastFailedLogin, time.Now()) > 0, nil
 }
 
-// RecordFailedLogin increments failed login attempts and locks account if threshold reached
+// RecordFailedLogin increments consecutive failed login attempts, which drive LockoutRemaining
 func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
 	now := time.Now()
 

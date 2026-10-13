@@ -157,10 +157,10 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 			WithArgs(testEmail, 1).
 			WillReturnRows(sqlmock.NewRows([]string{
 				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
-				colDisabled, colFailedLoginAttempts,
+				colDisabled, colFailedLoginAttempts, "lastFailedLogin",
 			}).AddRow(
 				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
-				false, 10,
+				false, 5, time.Now(),
 			))
 
 		_, err := service.Authenticate(ctx, &pb.AuthenticateRequest{

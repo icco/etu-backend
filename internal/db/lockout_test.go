@@ -143,6 +143,7 @@ func TestIsAccountLocked(t *testing.T) {
 		name                string
 		disabled            bool
 		failedLoginAttempts int
+		lastFailedAgo       time.Duration
 		expectLocked        bool
 	}{
 		{
@@ -152,21 +153,24 @@ func TestIsAccountLocked(t *testing.T) {
 			expectLocked:        true,
 		},
 		{
-			name:                "account locked (10 failed attempts)",
+			name:                "account locked (5 recent failed attempts)",
 			disabled:            false,
-			failedLoginAttempts: 10,
+			failedLoginAttempts: 5,
+			lastFailedAgo:       30 * time.Second,
 			expectLocked:        true,
 		},
 		{
-			name:                "account locked (more than 10 failed attempts)",
+			name:                "lock expired after backoff window",
 			disabled:            false,
-			failedLoginAttempts: 15,
-			expectLocked:        true,
+			failedLoginAttempts: 5,
+			lastFailedAgo:       2 * time.Minute,
+			expectLocked:        false,
 		},
 		{
-			name:                "account not locked (9 failed attempts)",
+			name:                "account not locked (4 failed attempts)",
 			disabled:            false,
-			failedLoginAttempts: 9,
+			failedLoginAttempts: 4,
+			lastFailedAgo:       time.Second,
 			expectLocked:        false,
 		},
 		{
@@ -179,10 +183,10 @@ func TestIsAccountLocked(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rows := sqlmock.NewRows([]string{colDisabled, colFailedLoginAttempts})
-			rows.AddRow(tt.disabled, tt.failedLoginAttempts)
+			rows := sqlmock.NewRows([]string{colDisabled, colFailedLoginAttempts, "lastFailedLogin"})
+			rows.AddRow(tt.disabled, tt.failedLoginAttempts, time.Now().Add(-tt.lastFailedAgo))
 
-			mock.ExpectQuery(`SELECT disabled, "failedLoginAttempts" FROM "User"`).
+			mock.ExpectQuery(`SELECT disabled, "failedLoginAttempts", "lastFailedLogin" FROM "User"`).
 				WithArgs("user123", 1).
 				WillReturnRows(rows)
 
