@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -21,10 +22,7 @@ func run() error {
 		return fmt.Errorf("connect: %w", err)
 	}
 	if err := database.AutoMigrate(); err != nil {
-		if cerr := database.Close(); cerr != nil {
-			return fmt.Errorf("automigrate: %w (close: %v)", err, cerr)
-		}
-		return fmt.Errorf("automigrate: %w", err)
+		return errors.Join(fmt.Errorf("automigrate: %w", err), database.Close())
 	}
 	return database.Close()
 }
