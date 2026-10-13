@@ -27,6 +27,7 @@ Run via `task <name>`:
 - `internal/auth` — Client API keys (`etu_<64 hex>` metadata) & M2M tokens (`GRPC_API_KEYS`).
 - `internal/storage` — Google Cloud Storage for media attachments (`GCS_BUCKET`).
 - `internal/ai`, `internal/tagging` — Gemini features via `go.icco.me/gutil/vertex` on Vertex AI (ADC auth via `GEMINI_PROJECT`; no API key).
+- `migrations/` — Atlas versioned migrations applied at server startup; see [docs/migrations.md](docs/migrations.md).
 - `proto/` — Source `.proto` files and committed generated `.pb.go` code.
 
 ## Conventions
