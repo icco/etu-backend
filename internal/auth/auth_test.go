@@ -32,7 +32,15 @@ func TestVerifyAPIKeyMalformed(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer conn.Close()
+			mock.ExpectClose()
+			defer func() {
+				if err := conn.Close(); err != nil {
+					t.Errorf("close: %v", err)
+				}
+				if err := mock.ExpectationsWereMet(); err != nil {
+					t.Errorf("unexpected db calls: %v", err)
+				}
+			}()
 			a := &Authenticator{db: conn}
 
 			got, err := a.VerifyAPIKey(context.Background(), tt.key)
@@ -41,9 +49,6 @@ func TestVerifyAPIKeyMalformed(t *testing.T) {
 			}
 			if diff := cmp.Diff(codes.Unauthenticated, status.Code(err)); diff != "" {
 				t.Errorf("code mismatch (-want +got):\n%s", diff)
-			}
-			if err := mock.ExpectationsWereMet(); err != nil {
-				t.Errorf("unexpected db calls: %v", err)
 			}
 		})
 	}
