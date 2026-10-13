@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/go-cmp/cmp"
 	"go.icco.me/etu-backend/internal/auth"
 	"go.icco.me/etu-backend/internal/db"
 	pb "go.icco.me/etu-backend/proto"
@@ -325,46 +327,6 @@ func TestUpdateUserSettings_ClearProfileImage(t *testing.T) {
 
 // ---------- GetProfileImageURL ----------
 
-func TestGetProfileImageURL_MissingKey(t *testing.T) {
-	svc, _, cleanup := newTestUserSettingsService(t, "")
-	defer cleanup()
-
-	_, err := svc.GetProfileImageURL(context.Background(), &pb.GetProfileImageURLRequest{Key: ""})
-	if err == nil {
-		t.Fatal("expected error for empty key")
-	}
-	if st, _ := status.FromError(err); st.Code() != codes.InvalidArgument {
-		t.Errorf("expected InvalidArgument, got %v", st.Code())
-	}
-}
-
-func TestGetProfileImageURL_Imgix(t *testing.T) {
-	t.Setenv("MEDIA_SIGNING_KEY", "test-key")
-	svc, _, cleanup := newTestUserSettingsService(t, "https://images.natwelch.com/etu")
-	defer cleanup()
-
-	resp, err := svc.GetProfileImageURL(context.Background(), &pb.GetProfileImageURLRequest{Key: testProfileImageGCSObject})
-	if err != nil {
-		t.Fatalf("GetProfileImageURL: %v", err)
-	}
-	if resp.Url == "" {
-		t.Fatal("expected a signed image URL")
-	}
-}
-
-func TestGetProfileImageURL_NoImgixNoStorage(t *testing.T) {
-	svc, _, cleanup := newTestUserSettingsService(t, "")
-	defer cleanup()
-
-	_, err := svc.GetProfileImageURL(context.Background(), &pb.GetProfileImageURLRequest{Key: testProfileImageGCSObject})
-	if err == nil {
-		t.Fatal("expected error when storage is nil and no imgix")
-	}
-	if st, _ := status.FromError(err); st.Code() != codes.FailedPrecondition {
-		t.Errorf("expected FailedPrecondition, got %v", st.Code())
-	}
-}
-
 func TestUserToProtoNotionKey(t *testing.T) {
 	key := "secret_notion"
 	empty := ""
@@ -385,6 +347,73 @@ func TestUserToProtoNotionKey(t *testing.T) {
 			}
 			if got.HasNotionKey != tt.wantHasNotion {
 				t.Errorf("HasNotionKey = %v, want %v", got.HasNotionKey, tt.wantHasNotion)
+			}
+		})
+	}
+}
+
+func TestGetProfileImageURL(t *testing.T) {
+	m2m := auth.SetAuthContext(context.Background(), "m2m", "m2m")
+	owner := auth.SetAuthContext(context.Background(), testUserNameRow, "apikey")
+	other := auth.SetAuthContext(context.Background(), testUserID2, "apikey")
+	stored := testProfileImageGCSObject
+	otherImage := "profiles/user-456/avatar"
+
+	tests := []struct {
+		name       string
+		ctx        context.Context
+		req        *pb.GetProfileImageURLRequest
+		imgix      string
+		lookupUser string
+		image      *string
+		wantErr    codes.Code
+	}{
+		{name: "apikey own image by key", ctx: owner, req: &pb.GetProfileImageURLRequest{Key: stored}, imgix: "https://images.example.com/etu", lookupUser: testUserNameRow, image: &stored},
+		{name: "apikey own image without key", ctx: owner, req: &pb.GetProfileImageURLRequest{}, imgix: "https://images.example.com/etu", lookupUser: testUserNameRow, image: &stored},
+		{name: "apikey other user's key denied", ctx: other, req: &pb.GetProfileImageURLRequest{Key: stored}, imgix: "https://images.example.com/etu", lookupUser: testUserID2, image: &otherImage, wantErr: codes.PermissionDenied},
+		{name: "apikey other user_id denied", ctx: other, req: &pb.GetProfileImageURLRequest{UserId: testUserNameRow}, imgix: "https://images.example.com/etu", wantErr: codes.PermissionDenied},
+		{name: "apikey arbitrary key denied", ctx: owner, req: &pb.GetProfileImageURLRequest{Key: "notes/secret/blob"}, imgix: "https://images.example.com/etu", lookupUser: testUserNameRow, image: &stored, wantErr: codes.PermissionDenied},
+		{name: "unauthenticated", ctx: context.Background(), req: &pb.GetProfileImageURLRequest{Key: stored}, wantErr: codes.Unauthenticated},
+		{name: "m2m with user_id", ctx: m2m, req: &pb.GetProfileImageURLRequest{UserId: testUserNameRow}, imgix: "https://images.example.com/etu", lookupUser: testUserNameRow, image: &stored},
+		{name: "m2m derives user from key", ctx: m2m, req: &pb.GetProfileImageURLRequest{Key: stored}, imgix: "https://images.example.com/etu", lookupUser: testUserNameRow, image: &stored},
+		{name: "m2m non-profile key rejected", ctx: m2m, req: &pb.GetProfileImageURLRequest{Key: "notes/secret/blob"}, wantErr: codes.InvalidArgument},
+		{name: "m2m missing key and user", ctx: m2m, req: &pb.GetProfileImageURLRequest{}, wantErr: codes.InvalidArgument},
+		{name: "no image stored", ctx: owner, req: &pb.GetProfileImageURLRequest{}, lookupUser: testUserNameRow, wantErr: codes.NotFound},
+		{name: "no imgix no storage", ctx: owner, req: &pb.GetProfileImageURLRequest{}, lookupUser: testUserNameRow, image: &stored, wantErr: codes.FailedPrecondition},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("MEDIA_SIGNING_KEY", "test-key")
+			svc, mock, cleanup := newTestUserSettingsService(t, tt.imgix)
+			defer cleanup()
+
+			if tt.lookupUser != "" {
+				now := time.Now()
+				mock.ExpectQuery(`SELECT \* FROM "User"`).
+					WithArgs(tt.lookupUser, 1).
+					WillReturnRows(sqlmock.NewRows(userColumns).AddRow(
+						tt.lookupUser, "a@b.com", "Alice", "hash",
+						"active", nil, now, nil, nil, nil, tt.image, now,
+						false, nil, 0, nil,
+					))
+			}
+
+			resp, err := svc.GetProfileImageURL(tt.ctx, tt.req)
+			if got := status.Code(err); got != tt.wantErr {
+				t.Fatalf("GetProfileImageURL code = %v, want %v (err %v)", got, tt.wantErr, err)
+			}
+			if tt.wantErr == codes.OK {
+				u, err := url.Parse(resp.GetUrl())
+				if err != nil {
+					t.Fatalf("parse url: %v", err)
+				}
+				if diff := cmp.Diff("/etu/"+stored, u.Path); diff != "" {
+					t.Errorf("url mismatch (-want +got):\n%s", diff)
+				}
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled expectations: %v", err)
 			}
 		})
 	}
