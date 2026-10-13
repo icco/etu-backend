@@ -155,7 +155,6 @@ func run(log *zap.SugaredLogger) error {
 	server := grpc.NewServer(
 		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
 		grpc.MaxRecvMsgSize(maxRecvMsgSize),
-		grpc.MaxSendMsgSize(32 << 20),
 	)
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
