@@ -9,92 +9,37 @@ import (
 )
 
 func TestRecordFailedLogin(t *testing.T) {
-	sqlDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New: %v", err)
-	}
-	defer func() { _ = sqlDB.Close() }()
-
-	db, err := NewFromConn(sqlDB)
-	if err != nil {
-		t.Fatalf("NewFromConn: %v", err)
-	}
-
-	// Test recording failed login - first attempt
-	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user123", 1).
-		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, "updatedAt",
-			colDisabled, colFailedLoginAttempts, "lastFailedLogin",
-		}).AddRow(
-			"user123", "test@example.com", "hash", "free", time.Now(), time.Now(),
-			false, 0, nil,
-		))
-	mock.ExpectExec(`UPDATE "User"`).
-		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), "user123").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
-
-	ctx := context.Background()
-	err = db.RecordFailedLogin(ctx, "user123")
-	if err != nil {
-		t.Fatalf("RecordFailedLogin: %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unfulfilled mock expectations: %v", err)
-	}
-}
-
-func TestRecordFailedLogin_LockAfterMaxAttempts(t *testing.T) {
-	sqlDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New: %v", err)
-	}
-	defer func() { _ = sqlDB.Close() }()
-
-	db, err := NewFromConn(sqlDB)
-	if err != nil {
-		t.Fatalf("NewFromConn: %v", err)
-	}
-
-	// Test recording failed login that triggers lockout (10th attempt)
-	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT \* FROM "User"`).
-		WithArgs("user123", 1).
-		WillReturnRows(sqlmock.NewRows([]string{
-			"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, "updatedAt",
-			colDisabled, colFailedLoginAttempts, "lastFailedLogin",
-		}).AddRow(
-			"user123", "test@example.com", "hash", "free", time.Now(), time.Now(),
-			false, 9, nil,
-		))
-	mock.ExpectExec(`UPDATE "User"`).
-		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-			sqlmock.AnyArg(), "user123").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectCommit()
-
-	ctx := context.Background()
-	err = db.RecordFailedLogin(ctx, "user123")
-	if err != nil {
-		t.Fatalf("RecordFailedLogin: %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unfulfilled mock expectations: %v", err)
+	for _, tc := range []struct {
+		name    string
+		rows    int64
+		wantErr bool
+	}{
+		{name: "increments atomically", rows: 1},
+		{name: "missing user", rows: 0, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sqlDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer func() { _ = sqlDB.Close() }()
+			db, err := NewFromConn(sqlDB)
+			if err != nil {
+				t.Fatalf("NewFromConn: %v", err)
+			}
+			mock.ExpectBegin()
+			mock.ExpectExec(`UPDATE "User" SET "failedLoginAttempts"="failedLoginAttempts" \+ 1,"lastFailedLogin"=\$1 WHERE id = \$2`).
+				WithArgs(sqlmock.AnyArg(), "user123").
+				WillReturnResult(sqlmock.NewResult(0, tc.rows))
+			mock.ExpectCommit()
+			err = db.RecordFailedLogin(context.Background(), "user123")
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("RecordFailedLogin err = %v, wantErr %v", err, tc.wantErr)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled mock expectations: %v", err)
+			}
+		})
 	}
 }
 

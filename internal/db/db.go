@@ -863,24 +863,17 @@ func (db *DB) IsAccountLocked(ctx context.Context, userID string) (bool, error) 
 
 // RecordFailedLogin increments consecutive failed login attempts, which drive LockoutRemaining
 func (db *DB) RecordFailedLogin(ctx context.Context, userID string) error {
-	now := time.Now()
-
-	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var user User
-		if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
-			return fmt.Errorf("failed to get user: %w", err)
-		}
-
-		// Increment failed attempts
-		user.FailedLoginAttempts++
-		user.LastFailedLogin = &now
-
-		if err := tx.Save(&user).Error; err != nil {
-			return fmt.Errorf("failed to update user: %w", err)
-		}
-
-		return nil
+	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).UpdateColumns(map[string]interface{}{
+		colFailedLoginAttempts: gorm.Expr(`"failedLoginAttempts" + 1`),
+		colLastFailedLogin:     time.Now(),
 	})
+	if result.Error != nil {
+		return fmt.Errorf("failed to record failed login: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
 }
 
 // RecordSuccessfulLogin clears failed login attempts

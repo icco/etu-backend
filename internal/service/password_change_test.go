@@ -49,8 +49,7 @@ func TestUpdateUserSettings_PasswordChange(t *testing.T) {
 			switch tc.name {
 			case "wrong current password records failure":
 				mock.ExpectBegin()
-				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs("u1", 1).WillReturnRows(row())
-				mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec(`UPDATE "User" SET "failedLoginAttempts"="failedLoginAttempts" \+ 1`).WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 			case "success revokes keys":
 				mock.ExpectBegin()
