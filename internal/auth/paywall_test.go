@@ -42,6 +42,10 @@ func TestPaywallAuthorize(t *testing.T) {
 		{"canceled subscription write", "/etu.AuthService/UpdateUserSubscription", AccountState{Status: "canceled"}, codes.PermissionDenied},
 		{"unknown method denied", "/etu.Nope/Nope", AccountState{Status: "none"}, codes.PermissionDenied},
 		{"disabled active", notes, AccountState{Status: "active", Disabled: true}, codes.PermissionDenied},
+		{"canceled delete account", "/etu.AccountService/DeleteAccount", AccountState{Status: "canceled"}, codes.OK},
+		{"canceled export data", "/etu.AccountService/ExportData", AccountState{Status: "canceled"}, codes.OK},
+		{"disabled delete account", "/etu.AccountService/DeleteAccount", AccountState{Status: "canceled", Disabled: true}, codes.PermissionDenied},
+		{"disabled export data", "/etu.AccountService/ExportData", AccountState{Status: "active", Disabled: true}, codes.PermissionDenied},
 		{"disabled allowlisted", getUser, AccountState{Status: "active", Disabled: true}, codes.PermissionDenied},
 	}
 	p := Paywall{Grace: 7 * 24 * time.Hour}
