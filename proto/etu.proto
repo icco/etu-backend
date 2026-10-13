@@ -156,7 +156,7 @@ message User {
   optional string billing_country = 24;
   // ai_enabled reports whether the user opted in to AI processing such as
   // tag generation, OCR, and audio transcription. Defaults to false.
-  bool ai_enabled = 25;
+  bool ai_enabled = 26;
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -469,7 +469,7 @@ message UpdateUserSettingsRequest {
   optional ImageUpload profile_image_upload = 8;
   optional bool clear_profile_image = 9;
   // ai_enabled opts the user in or out of AI processing when set.
-  optional bool ai_enabled = 10;
+  optional bool ai_enabled = 11;
 }
 
 // UpdateUserSettingsResponse returns the updated user settings view.

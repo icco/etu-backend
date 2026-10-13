@@ -589,7 +589,7 @@ type User struct {
 	BillingCountry *string `protobuf:"bytes,24,opt,name=billing_country,json=billingCountry,proto3,oneof" json:"billing_country,omitempty"`
 	// ai_enabled reports whether the user opted in to AI processing such as
 	// tag generation, OCR, and audio transcription. Defaults to false.
-	AiEnabled     bool `protobuf:"varint,25,opt,name=ai_enabled,json=aiEnabled,proto3" json:"ai_enabled,omitempty"`
+	AiEnabled     bool `protobuf:"varint,26,opt,name=ai_enabled,json=aiEnabled,proto3" json:"ai_enabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2909,7 +2909,7 @@ type UpdateUserSettingsRequest struct {
 	ProfileImageUpload *ImageUpload           `protobuf:"bytes,8,opt,name=profile_image_upload,json=profileImageUpload,proto3,oneof" json:"profile_image_upload,omitempty"`
 	ClearProfileImage  *bool                  `protobuf:"varint,9,opt,name=clear_profile_image,json=clearProfileImage,proto3,oneof" json:"clear_profile_image,omitempty"`
 	// ai_enabled opts the user in or out of AI processing when set.
-	AiEnabled     *bool `protobuf:"varint,10,opt,name=ai_enabled,json=aiEnabled,proto3,oneof" json:"ai_enabled,omitempty"`
+	AiEnabled     *bool `protobuf:"varint,11,opt,name=ai_enabled,json=aiEnabled,proto3,oneof" json:"ai_enabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3316,7 +3316,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x13billing_postal_code\x18\x17 \x01(\tH\x0eR\x11billingPostalCode\x88\x01\x01\x12,\n" +
 	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01\x12\x1d\n" +
 	"\n" +
-	"ai_enabled\x18\x19 \x01(\bR\taiEnabledB\a\n" +
+	"ai_enabled\x18\x1a \x01(\bR\taiEnabledB\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
@@ -3491,8 +3491,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x14profile_image_upload\x18\b \x01(\v2\x10.etu.ImageUploadH\x04R\x12profileImageUpload\x88\x01\x01\x123\n" +
 	"\x13clear_profile_image\x18\t \x01(\bH\x05R\x11clearProfileImage\x88\x01\x01\x12\"\n" +
 	"\n" +
-	"ai_enabled\x18\n" +
-	" \x01(\bH\x06R\taiEnabled\x88\x01\x01B\r\n" +
+	"ai_enabled\x18\v \x01(\bH\x06R\taiEnabled\x88\x01\x01B\r\n" +
 	"\v_notion_keyB\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_passwordB\x17\n" +
