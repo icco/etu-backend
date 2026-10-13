@@ -40,7 +40,7 @@ func TestBillingRPCsRequireM2M(t *testing.T) {
 				if err != nil {
 					t.Fatalf("sqlmock.New: %v", err)
 				}
-				defer conn.Close()
+				defer func() { _ = conn.Close() }()
 				database, err := db.NewFromConn(conn)
 				if err != nil {
 					t.Fatalf("db.NewFromConn: %v", err)
