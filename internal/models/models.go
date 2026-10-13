@@ -114,6 +114,8 @@ type User struct {
 	DisabledReason      *string    `gorm:"column:disabledReason"`
 	FailedLoginAttempts int        `gorm:"column:failedLoginAttempts;default:0"`
 	LastFailedLogin     *time.Time `gorm:"column:lastFailedLogin"`
+
+	AIEnabled bool `gorm:"column:aiEnabled;not null;default:false"`
 }
 
 // TableName specifies the table name for User
@@ -220,4 +222,16 @@ func GenerateCUID() string {
 	}
 
 	return string(result)
+}
+
+// AIUsage counts AI operations performed for a user on a UTC day.
+type AIUsage struct {
+	UserID string    `gorm:"column:userId;primaryKey"`
+	Day    time.Time `gorm:"column:day;primaryKey;type:date"`
+	Count  int       `gorm:"column:count;not null;default:0"`
+}
+
+// TableName specifies the table name for AIUsage
+func (AIUsage) TableName() string {
+	return "AIUsage"
 }
