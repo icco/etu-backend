@@ -39,8 +39,8 @@ var (
 
 const statusKey = "status"
 
-// maxMsgSize leaves room for one max-size audio upload (25MB) plus request overhead.
-const maxMsgSize = 32 << 20
+// maxRecvMsgSize fits a request carrying the maximum number of max-size attachments plus 1MB for note text and framing.
+const maxRecvMsgSize = service.MaxImagesPerRequest*service.MaxImageSize + service.MaxAudiosPerRequest*service.MaxAudioSize + 1<<20
 
 func main() {
 	log := logger.New("etu-backend-server")
@@ -154,8 +154,8 @@ func run(log *zap.SugaredLogger) error {
 
 	server := grpc.NewServer(
 		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
-		grpc.MaxRecvMsgSize(maxMsgSize),
-		grpc.MaxSendMsgSize(maxMsgSize),
+		grpc.MaxRecvMsgSize(maxRecvMsgSize),
+		grpc.MaxSendMsgSize(32 << 20),
 	)
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
