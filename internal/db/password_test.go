@@ -111,3 +111,46 @@ func TestChangePasswordWithSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestChangePasswordWithSettingsAndAI(t *testing.T) {
+	const current, next = "0ld-passw0rd", "n3w-passw0rd"
+	hash, err := bcrypt.GenerateFromPassword([]byte(current), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, enabled := range []bool{true, false} {
+		t.Run(map[bool]string{true: "opt in", false: "opt out"}[enabled], func(t *testing.T) {
+			sqlDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = sqlDB.Close() }()
+			database, err := NewFromConn(sqlDB)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mock.ExpectBegin()
+			mock.ExpectQuery(`SELECT \* FROM "User" WHERE id = \$1 ORDER BY "User"."id" LIMIT \$2 FOR UPDATE`).WithArgs("u1", 1).
+				WillReturnRows(sqlmock.NewRows([]string{"id", colPasswordHash, colCreatedAt}).AddRow("u1", string(hash), time.Now()))
+			mock.ExpectExec(`UPDATE "User" SET`).WithArgs(0, nil, bcryptOf(next), sqlmock.AnyArg(), "u1").WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectExec(`DELETE FROM "ApiKey" WHERE "userId" = \$1`).WithArgs("u1").WillReturnResult(sqlmock.NewResult(0, 0))
+			mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs("u1", 1).
+				WillReturnRows(sqlmock.NewRows([]string{"id", colCreatedAt}).AddRow("u1", time.Now()))
+			mock.ExpectExec(`UPDATE "User" SET "aiEnabled"=\$1,"updatedAt"=\$2 WHERE "id" = \$3`).WithArgs(enabled, sqlmock.AnyArg(), "u1").WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectQuery(`SELECT \* FROM "User"`).
+				WillReturnRows(sqlmock.NewRows([]string{"id", colCreatedAt, "aiEnabled"}).AddRow("u1", time.Now(), enabled))
+			mock.ExpectCommit()
+
+			user, err := database.ChangePasswordWithSettingsAndAI(context.Background(), "u1", current, next, nil, nil, nil, nil, &enabled)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if user.AIEnabled != enabled {
+				t.Errorf("AIEnabled = %v, want %v", user.AIEnabled, enabled)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

@@ -158,6 +158,9 @@ message User {
   // has_notion_key reports whether a Notion API token is stored. The token
   // itself is never returned.
   bool has_notion_key = 25;
+  // ai_enabled reports whether the user opted in to AI processing such as
+  // tag generation, OCR, and audio transcription. Defaults to false.
+  bool ai_enabled = 26;
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -471,6 +474,8 @@ message UpdateUserSettingsRequest {
   optional bool clear_profile_image = 9;
   // Required when password is set; must match the stored password.
   optional string current_password = 10;
+  // ai_enabled opts the user in or out of AI processing when set.
+  optional bool ai_enabled = 11;
 }
 
 // UpdateUserSettingsResponse returns the updated user settings view.

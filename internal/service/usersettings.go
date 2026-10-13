@@ -115,9 +115,9 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 	var user *db.User
 	var err error
 	if changingPassword {
-		user, err = s.db.ChangePasswordWithSettings(ctx, req.UserId, req.GetCurrentPassword(), *req.Password, req.NotionKey, req.Name, req.NotionDatabaseName, profileImageGCSObject)
+		user, err = s.db.ChangePasswordWithSettingsAndAI(ctx, req.UserId, req.GetCurrentPassword(), *req.Password, req.NotionKey, req.Name, req.NotionDatabaseName, profileImageGCSObject, req.AiEnabled)
 	} else {
-		user, err = s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, nil, req.NotionDatabaseName, profileImageGCSObject)
+		user, err = s.db.UpdateUserSettingsWithAI(ctx, req.UserId, req.NotionKey, req.Name, nil, req.NotionDatabaseName, profileImageGCSObject, req.AiEnabled)
 	}
 	if err != nil {
 		if newObjectName != "" {

@@ -27,6 +27,11 @@ var (
 // key and mobile session, and applies UpdateUserSettings, all in one
 // transaction. A wrong current password is recorded as a failed login.
 func (db *DB) ChangePasswordWithSettings(ctx context.Context, userID, currentPassword, newPassword string, notionKey, name, notionDatabaseName, profileImageGCSObject *string) (*User, error) {
+	return db.ChangePasswordWithSettingsAndAI(ctx, userID, currentPassword, newPassword, notionKey, name, notionDatabaseName, profileImageGCSObject, nil)
+}
+
+// ChangePasswordWithSettingsAndAI is ChangePasswordWithSettings that also sets aiEnabled in the same transaction when non-nil.
+func (db *DB) ChangePasswordWithSettingsAndAI(ctx context.Context, userID, currentPassword, newPassword string, notionKey, name, notionDatabaseName, profileImageGCSObject *string, aiEnabled *bool) (*User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
@@ -65,7 +70,7 @@ func (db *DB) ChangePasswordWithSettings(ctx context.Context, userID, currentPas
 			return fmt.Errorf("failed to revoke API keys: %w", err)
 		}
 		var err error
-		user, err = txDB.UpdateUserSettings(ctx, userID, notionKey, name, nil, notionDatabaseName, profileImageGCSObject)
+		user, err = txDB.UpdateUserSettingsWithAI(ctx, userID, notionKey, name, nil, notionDatabaseName, profileImageGCSObject, aiEnabled)
 		return err
 	})
 	if err != nil {

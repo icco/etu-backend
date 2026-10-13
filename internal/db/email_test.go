@@ -61,7 +61,7 @@ func TestCreateUser_NormalizesEmail(t *testing.T) {
 		t.Fatal(err)
 	}
 	args := []driver.Value{sqlmock.AnyArg(), "bob@example.com"}
-	for range 24 {
+	for range 25 {
 		args = append(args, sqlmock.AnyArg())
 	}
 	mock.ExpectBegin()

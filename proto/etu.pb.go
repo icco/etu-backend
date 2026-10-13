@@ -590,7 +590,10 @@ type User struct {
 	BillingCountry *string `protobuf:"bytes,24,opt,name=billing_country,json=billingCountry,proto3,oneof" json:"billing_country,omitempty"`
 	// has_notion_key reports whether a Notion API token is stored. The token
 	// itself is never returned.
-	HasNotionKey  bool `protobuf:"varint,25,opt,name=has_notion_key,json=hasNotionKey,proto3" json:"has_notion_key,omitempty"`
+	HasNotionKey bool `protobuf:"varint,25,opt,name=has_notion_key,json=hasNotionKey,proto3" json:"has_notion_key,omitempty"`
+	// ai_enabled reports whether the user opted in to AI processing such as
+	// tag generation, OCR, and audio transcription. Defaults to false.
+	AiEnabled     bool `protobuf:"varint,26,opt,name=ai_enabled,json=aiEnabled,proto3" json:"ai_enabled,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -789,6 +792,13 @@ func (x *User) GetBillingCountry() string {
 func (x *User) GetHasNotionKey() bool {
 	if x != nil {
 		return x.HasNotionKey
+	}
+	return false
+}
+
+func (x *User) GetAiEnabled() bool {
+	if x != nil {
+		return x.AiEnabled
 	}
 	return false
 }
@@ -2911,8 +2921,10 @@ type UpdateUserSettingsRequest struct {
 	ClearProfileImage  *bool                  `protobuf:"varint,9,opt,name=clear_profile_image,json=clearProfileImage,proto3,oneof" json:"clear_profile_image,omitempty"`
 	// Required when password is set; must match the stored password.
 	CurrentPassword *string `protobuf:"bytes,10,opt,name=current_password,json=currentPassword,proto3,oneof" json:"current_password,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// ai_enabled opts the user in or out of AI processing when set.
+	AiEnabled     *bool `protobuf:"varint,11,opt,name=ai_enabled,json=aiEnabled,proto3,oneof" json:"ai_enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateUserSettingsRequest) Reset() {
@@ -2999,6 +3011,13 @@ func (x *UpdateUserSettingsRequest) GetCurrentPassword() string {
 		return *x.CurrentPassword
 	}
 	return ""
+}
+
+func (x *UpdateUserSettingsRequest) GetAiEnabled() bool {
+	if x != nil && x.AiEnabled != nil {
+		return *x.AiEnabled
+	}
+	return false
 }
 
 // UpdateUserSettingsResponse returns the updated user settings view.
@@ -3299,7 +3318,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x97\v\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb6\v\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -3328,7 +3347,9 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\rbilling_state\x18\x16 \x01(\tH\rR\fbillingState\x88\x01\x01\x123\n" +
 	"\x13billing_postal_code\x18\x17 \x01(\tH\x0eR\x11billingPostalCode\x88\x01\x01\x12,\n" +
 	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01\x12$\n" +
-	"\x0ehas_notion_key\x18\x19 \x01(\bR\fhasNotionKeyB\a\n" +
+	"\x0ehas_notion_key\x18\x19 \x01(\bR\fhasNotionKey\x12\x1d\n" +
+	"\n" +
+	"ai_enabled\x18\x1a \x01(\bR\taiEnabledB\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
@@ -3492,7 +3513,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x16GetUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\">\n" +
 	"\x17GetUserSettingsResponse\x12\x1d\n" +
-	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\x87\x04\n" +
+	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xba\x04\n" +
 	"\x19UpdateUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
 	"\n" +
@@ -3503,14 +3524,17 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x14profile_image_upload\x18\b \x01(\v2\x10.etu.ImageUploadH\x04R\x12profileImageUpload\x88\x01\x01\x123\n" +
 	"\x13clear_profile_image\x18\t \x01(\bH\x05R\x11clearProfileImage\x88\x01\x01\x12.\n" +
 	"\x10current_password\x18\n" +
-	" \x01(\tH\x06R\x0fcurrentPassword\x88\x01\x01B\r\n" +
+	" \x01(\tH\x06R\x0fcurrentPassword\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"ai_enabled\x18\v \x01(\bH\aR\taiEnabled\x88\x01\x01B\r\n" +
 	"\v_notion_keyB\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_passwordB\x17\n" +
 	"\x15_notion_database_nameB\x17\n" +
 	"\x15_profile_image_uploadB\x16\n" +
 	"\x14_clear_profile_imageB\x13\n" +
-	"\x11_current_passwordJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06\"A\n" +
+	"\x11_current_passwordB\r\n" +
+	"\v_ai_enabledJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06\"A\n" +
 	"\x1aUpdateUserSettingsResponse\x12\x1d\n" +
 	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"*\n" +
 	"\x0fGetStatsRequest\x12\x17\n" +
