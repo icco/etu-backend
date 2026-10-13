@@ -36,6 +36,7 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 - `GEMINI_PROJECT` - GCP project for Vertex AI (for AI processing: tag generation, OCR, audio transcription). Auth is Application Default Credentials; there is no API key
 - `GEMINI_LOCATION` - Vertex AI region (default: `us-central1`)
 - `GCS_BUCKET` - Google Cloud Storage bucket name (for image and audio file access)
+- `STRIPE_SECRET_KEY` - Stripe secret key; account deletion cancels Stripe subscriptions and refuses subscribed users when unset
 - `GCP_SECRET_NAME` - GCP Secret Manager secret name for encryption key (required for encryption, format: `projects/PROJECT_ID/secrets/SECRET_NAME/versions/VERSION`)
 
 **Run locally:**
