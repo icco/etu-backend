@@ -9,7 +9,7 @@ import (
 )
 
 // AIEligibleSubscriptionStatuses lists subscription statuses that may use AI features.
-var AIEligibleSubscriptionStatuses = []string{"active", "trialing", "past_due"}
+var AIEligibleSubscriptionStatuses = []string{"active", "trial", "trialing", "pro", "premium", "past_due"}
 
 // AIEligible reports whether a user has opted in to AI and has a paid, enabled account.
 func AIEligible(u *User) bool {

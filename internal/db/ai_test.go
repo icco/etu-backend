@@ -21,6 +21,14 @@ func TestAIEligible(t *testing.T) {
 		{name: "active opted in", user: &User{SubscriptionStatus: "active", AIEnabled: true}, want: true},
 		{name: "trialing opted in", user: &User{SubscriptionStatus: "trialing", AIEnabled: true}, want: true},
 		{name: "past_due opted in", user: &User{SubscriptionStatus: "past_due", AIEnabled: true}, want: true},
+		{name: "trial opted in", user: &User{SubscriptionStatus: "trial", AIEnabled: true}, want: true},
+		{name: "pro opted in", user: &User{SubscriptionStatus: "pro", AIEnabled: true}, want: true},
+		{name: "premium opted in", user: &User{SubscriptionStatus: "premium", AIEnabled: true}, want: true},
+		{name: "uppercase active", user: &User{SubscriptionStatus: "Active", AIEnabled: true}, want: false},
+		{name: "uppercase pro", user: &User{SubscriptionStatus: "PRO", AIEnabled: true}, want: false},
+		{name: "empty status", user: &User{SubscriptionStatus: "", AIEnabled: true}, want: false},
+		{name: "incomplete opted in", user: &User{SubscriptionStatus: "incomplete", AIEnabled: true}, want: false},
+		{name: "unpaid opted in", user: &User{SubscriptionStatus: "unpaid", AIEnabled: true}, want: false},
 		{name: "active not opted in", user: &User{SubscriptionStatus: "active"}, want: false},
 		{name: "free opted in", user: &User{SubscriptionStatus: "free", AIEnabled: true}, want: false},
 		{name: "canceled opted in", user: &User{SubscriptionStatus: "canceled", AIEnabled: true}, want: false},
@@ -49,8 +57,8 @@ func TestConsumeAIQuota(t *testing.T) {
 			name:  "under cap",
 			limit: 200,
 			setup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`INSERT INTO "AIUsage" \(.+\) SELECT "id", \$1, 1 FROM "User" WHERE "id" = \$2 AND "aiEnabled" AND NOT "disabled" AND "subscriptionStatus" IN \(\$3,\$4,\$5\) ON CONFLICT (.+) DO UPDATE SET "count" = "AIUsage"."count" \+ 1 WHERE "AIUsage"."count" < \$6 RETURNING "count"`).
-					WithArgs(day, testUserID, "active", "trialing", "past_due", 200).
+				mock.ExpectQuery(`INSERT INTO "AIUsage" \(.+\) SELECT "id", \$1, 1 FROM "User" WHERE "id" = \$2 AND "aiEnabled" AND NOT "disabled" AND "subscriptionStatus" IN \(\$3,\$4,\$5,\$6,\$7,\$8\) ON CONFLICT (.+) DO UPDATE SET "count" = "AIUsage"."count" \+ 1 WHERE "AIUsage"."count" < \$9 RETURNING "count"`).
+					WithArgs(day, testUserID, "active", "trial", "trialing", "pro", "premium", "past_due", 200).
 					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
 			},
 			want: true,
@@ -60,7 +68,7 @@ func TestConsumeAIQuota(t *testing.T) {
 			limit: 200,
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`INSERT INTO "AIUsage"`).
-					WithArgs(day, testUserID, "active", "trialing", "past_due", 200).
+					WithArgs(day, testUserID, "active", "trial", "trialing", "pro", "premium", "past_due", 200).
 					WillReturnRows(sqlmock.NewRows([]string{"count"}))
 			},
 			want: false,
@@ -109,7 +117,7 @@ func TestConsumeAIQuota(t *testing.T) {
 }
 
 func TestListPendingAIMedia(t *testing.T) {
-	eligible := `JOIN "Note" ON "Note"\."id" = "%[1]s"\."noteId" JOIN "User" ON "User"\."id" = "Note"\."userId" WHERE "%[1]s"\."%[2]s" = \$1 AND "User"\."aiEnabled" AND NOT "User"\."disabled" AND "User"\."subscriptionStatus" IN \(\$2,\$3,\$4\) ORDER BY "Note"\."userId"`
+	eligible := `JOIN "Note" ON "Note"\."id" = "%[1]s"\."noteId" JOIN "User" ON "User"\."id" = "Note"\."userId" WHERE "%[1]s"\."%[2]s" = \$1 AND "User"\."aiEnabled" AND NOT "User"\."disabled" AND "User"\."subscriptionStatus" IN \(\$2,\$3,\$4,\$5,\$6,\$7\) ORDER BY "Note"\."userId"`
 	tests := []struct {
 		name  string
 		query string
@@ -152,7 +160,7 @@ func TestListPendingAIMedia(t *testing.T) {
 				t.Fatalf("NewFromConn: %v", err)
 			}
 			mock.ExpectQuery(tt.query).
-				WithArgs("", "active", "trialing", "past_due").
+				WithArgs("", "active", "trial", "trialing", "pro", "premium", "past_due").
 				WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, "ownerId"}).
 					AddRow("m1", testNoteID, testUserID).
 					AddRow("m2", testNoteID, testUserID))
