@@ -119,7 +119,7 @@ func (db *DB) Close() error {
 	return sqlDB.Close()
 }
 
-// AutoMigrate runs auto migrations for all tables
+// AutoMigrate applies the GORM models to the connected database. Only cmd/schemagen calls it; deployed databases are migrated by Atlas from the migrations directory.
 func (db *DB) AutoMigrate() error {
 	if err := db.conn.AutoMigrate(
 		&models.User{},
