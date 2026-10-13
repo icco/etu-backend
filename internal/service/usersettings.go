@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	pb "go.icco.me/etu-backend/proto"
 	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -79,10 +79,9 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		}
 	}
 
-	if req.Password != nil && *req.Password != "" {
-		if err := s.verifyCurrentPassword(ctx, req.UserId, req.GetCurrentPassword()); err != nil {
-			return nil, err
-		}
+	changingPassword := req.Password != nil && *req.Password != ""
+	if changingPassword && req.GetCurrentPassword() == "" {
+		return nil, status.Error(codes.InvalidArgument, "current_password is required to change password")
 	}
 
 	var profileImageGCSObject *string
@@ -111,14 +110,20 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		profileImageGCSObject = &empty
 	}
 
-	user, err := s.db.UpdateUserSettingsWithPassword(ctx, req.UserId, req.NotionKey, req.Name, req.Password, req.NotionDatabaseName, profileImageGCSObject)
+	var user *db.User
+	var err error
+	if changingPassword {
+		user, err = s.db.ChangePasswordWithSettings(ctx, req.UserId, req.GetCurrentPassword(), *req.Password, req.NotionKey, req.Name, req.NotionDatabaseName, profileImageGCSObject)
+	} else {
+		user, err = s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, nil, req.NotionDatabaseName, profileImageGCSObject)
+	}
 	if err != nil {
 		if newObjectName != "" {
 			if delErr := s.storage.DeleteImage(ctx, newObjectName); delErr != nil {
 				l.Errorw("failed to delete uploaded avatar after settings update failed", "user_id", req.UserId, "object_name", newObjectName, zap.Error(delErr))
 			}
 		}
-		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
+		return nil, settingsError(err)
 	}
 
 	if oldObjectName != "" && oldObjectName != newObjectName && newObjectName != "" {
@@ -162,30 +167,14 @@ func (s *UserSettingsService) GetProfileImageURL(ctx context.Context, req *pb.Ge
 	return &pb.GetProfileImageURLResponse{Url: url}, nil
 }
 
-// verifyCurrentPassword gates a password change, which revokes every API key
-// and mobile session, including the caller's.
-func (s *UserSettingsService) verifyCurrentPassword(ctx context.Context, userID, current string) error {
-	if current == "" {
-		return status.Error(codes.InvalidArgument, "current_password is required to change password")
-	}
-	user, err := s.db.GetUser(ctx, userID)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to get user: %v", err)
-	}
-	if user == nil {
+// settingsError maps settings and password-change failures to gRPC statuses.
+func settingsError(err error) error {
+	switch {
+	case errors.Is(err, db.ErrUserNotFound):
 		return status.Error(codes.NotFound, "user not found")
+	case errors.Is(err, db.ErrAccountDisabled), errors.Is(err, db.ErrAccountLocked), errors.Is(err, db.ErrWrongPassword):
+		return status.Error(codes.PermissionDenied, err.Error())
+	default:
+		return status.Errorf(codes.Internal, "failed to update user settings: %v", err)
 	}
-	if user.Disabled {
-		return status.Error(codes.PermissionDenied, "account is disabled")
-	}
-	if db.LockoutRemaining(user.FailedLoginAttempts, user.LastFailedLogin, time.Now()) > 0 {
-		return status.Error(codes.PermissionDenied, "account is locked")
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)); err != nil {
-		if recordErr := s.db.RecordFailedLogin(ctx, userID); recordErr != nil {
-			return status.Errorf(codes.Internal, "failed to record failed attempt: %v", recordErr)
-		}
-		return status.Error(codes.PermissionDenied, "current password is incorrect")
-	}
-	return nil
 }

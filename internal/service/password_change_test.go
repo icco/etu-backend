@@ -46,15 +46,16 @@ func TestUpdateUserSettings_PasswordChange(t *testing.T) {
 				)
 			}
 			if tc.current != nil && !tc.image {
-				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs("u1", 1).WillReturnRows(row())
+				mock.ExpectBegin()
+				mock.ExpectQuery(`SELECT \* FROM "User" WHERE id = \$1 ORDER BY "User"."id" LIMIT \$2 FOR UPDATE`).WithArgs("u1", 1).WillReturnRows(row())
 			}
 			switch tc.name {
+			case "locked account", "disabled account":
+				mock.ExpectRollback()
 			case "wrong current password records failure":
-				mock.ExpectBegin()
 				mock.ExpectExec(`UPDATE "User" SET "failedLoginAttempts"="failedLoginAttempts" \+ 1`).WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 			case "success revokes keys":
-				mock.ExpectBegin()
 				mock.ExpectExec(`UPDATE "User" SET`).WithArgs(0, nil, sqlmock.AnyArg(), sqlmock.AnyArg(), "u1").WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectExec(`DELETE FROM "ApiKey" WHERE "userId" = \$1`).WithArgs("u1").WillReturnResult(sqlmock.NewResult(0, 2))
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs("u1", 1).WillReturnRows(row())
