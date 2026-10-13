@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -107,67 +108,35 @@ func TestConsumeAIQuota(t *testing.T) {
 	}
 }
 
-func TestListAIEligibleUsers(t *testing.T) {
-	sqlDB, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("sqlmock.New: %v", err)
-	}
-	defer func() { _ = sqlDB.Close() }()
-	d, err := NewFromConn(sqlDB)
-	if err != nil {
-		t.Fatalf("NewFromConn: %v", err)
-	}
-
-	mock.ExpectQuery(`SELECT \* FROM "User" WHERE "aiEnabled" = \$1 AND "disabled" = \$2 AND "subscriptionStatus" IN \(\$3,\$4,\$5\)`).
-		WithArgs(true, false, "active", "trialing", "past_due").
-		WillReturnRows(sqlmock.NewRows([]string{"id", colSubscriptionStatus, "aiEnabled"}).
-			AddRow("u1", "active", true).
-			AddRow("u2", "past_due", true))
-
-	users, err := d.ListAIEligibleUsers(context.Background())
-	if err != nil {
-		t.Fatalf("ListAIEligibleUsers: %v", err)
-	}
-	ids := make([]string, 0, len(users))
-	for _, u := range users {
-		ids = append(ids, u.ID)
-	}
-	if diff := cmp.Diff([]string{"u1", "u2"}, ids); diff != "" {
-		t.Errorf("ids mismatch (-want +got):\n%s", diff)
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unfulfilled mock expectations: %v", err)
-	}
-}
-
-func TestGetUserMediaWithoutAIText(t *testing.T) {
+func TestListPendingAIMedia(t *testing.T) {
+	eligible := `JOIN "Note" ON "Note"\."id" = "%[1]s"\."noteId" JOIN "User" ON "User"\."id" = "Note"\."userId" WHERE "%[1]s"\."%[2]s" = \$1 AND "User"\."aiEnabled" AND NOT "User"\."disabled" AND "User"\."subscriptionStatus" IN \(\$2,\$3,\$4\) ORDER BY "Note"\."userId"`
 	tests := []struct {
 		name  string
 		query string
-		run   func(d *DB) ([]string, error)
+		run   func(d *DB) ([][2]string, error)
 	}{
 		{
 			name:  "images",
-			query: `SELECT "NoteImage"\.\* FROM "NoteImage" JOIN "Note" ON "Note"\."id" = "NoteImage"\."noteId" WHERE "Note"\."userId" = \$1 AND "NoteImage"\."extractedText" = \$2`,
-			run: func(d *DB) ([]string, error) {
-				imgs, err := d.GetImagesWithoutExtractedTextForUser(context.Background(), testUserID)
-				ids := make([]string, 0, len(imgs))
-				for _, i := range imgs {
-					ids = append(ids, i.ID)
+			query: `SELECT "NoteImage"\.\*, "Note"\."userId" AS "ownerId" FROM "NoteImage" ` + fmt.Sprintf(eligible, "NoteImage", "extractedText"),
+			run: func(d *DB) ([][2]string, error) {
+				rows, err := d.ListPendingAIImages(context.Background())
+				out := make([][2]string, 0, len(rows))
+				for _, r := range rows {
+					out = append(out, [2]string{r.ID, r.OwnerID})
 				}
-				return ids, err
+				return out, err
 			},
 		},
 		{
 			name:  "audios",
-			query: `SELECT "NoteAudio"\.\* FROM "NoteAudio" JOIN "Note" ON "Note"\."id" = "NoteAudio"\."noteId" WHERE "Note"\."userId" = \$1 AND "NoteAudio"\."transcribedText" = \$2`,
-			run: func(d *DB) ([]string, error) {
-				auds, err := d.GetAudiosWithoutTranscriptionForUser(context.Background(), testUserID)
-				ids := make([]string, 0, len(auds))
-				for _, a := range auds {
-					ids = append(ids, a.ID)
+			query: `SELECT "NoteAudio"\.\*, "Note"\."userId" AS "ownerId" FROM "NoteAudio" ` + fmt.Sprintf(eligible, "NoteAudio", "transcribedText"),
+			run: func(d *DB) ([][2]string, error) {
+				rows, err := d.ListPendingAIAudios(context.Background())
+				out := make([][2]string, 0, len(rows))
+				for _, r := range rows {
+					out = append(out, [2]string{r.ID, r.OwnerID})
 				}
-				return ids, err
+				return out, err
 			},
 		},
 	}
@@ -183,15 +152,18 @@ func TestGetUserMediaWithoutAIText(t *testing.T) {
 				t.Fatalf("NewFromConn: %v", err)
 			}
 			mock.ExpectQuery(tt.query).
-				WithArgs(testUserID, "").
-				WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID}).AddRow("m1", testNoteID))
+				WithArgs("", "active", "trialing", "past_due").
+				WillReturnRows(sqlmock.NewRows([]string{"id", colNoteID, "ownerId"}).
+					AddRow("m1", testNoteID, testUserID).
+					AddRow("m2", testNoteID, testUserID))
 
-			ids, err := tt.run(d)
+			got, err := tt.run(d)
 			if err != nil {
 				t.Fatalf("run: %v", err)
 			}
-			if diff := cmp.Diff([]string{"m1"}, ids); diff != "" {
-				t.Errorf("ids mismatch (-want +got):\n%s", diff)
+			want := [][2]string{{"m1", testUserID}, {"m2", testUserID}}
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("rows mismatch (-want +got):\n%s", diff)
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled mock expectations: %v", err)

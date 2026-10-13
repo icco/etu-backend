@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // AIEligibleSubscriptionStatuses lists subscription statuses that may use AI features.
@@ -20,18 +22,6 @@ func AIEligible(u *User) bool {
 		}
 	}
 	return false
-}
-
-// ListAIEligibleUsers returns users that pass AIEligible.
-func (db *DB) ListAIEligibleUsers(ctx context.Context) ([]User, error) {
-	var users []User
-	err := db.conn.WithContext(ctx).
-		Where(`"aiEnabled" = ? AND "disabled" = ? AND "subscriptionStatus" IN ?`, true, false, AIEligibleSubscriptionStatuses).
-		Find(&users).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to query AI eligible users: %w", err)
-	}
-	return users, nil
 }
 
 // ConsumeAIQuota atomically records one AI operation for userID on the UTC day
@@ -58,30 +48,42 @@ func (db *DB) ConsumeAIQuota(ctx context.Context, userID string, now time.Time, 
 	return len(counts) > 0, nil
 }
 
-// GetImagesWithoutExtractedTextForUser returns a user's images that have no extracted text yet.
-func (db *DB) GetImagesWithoutExtractedTextForUser(ctx context.Context, userID string) ([]NoteImage, error) {
-	var images []NoteImage
-	err := db.conn.WithContext(ctx).
-		Select(`"NoteImage".*`).
-		Joins(`JOIN "Note" ON "Note"."id" = "NoteImage"."noteId"`).
-		Where(`"Note"."userId" = ? AND "NoteImage"."extractedText" = ?`, userID, "").
-		Find(&images).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get images without extracted text: %w", err)
-	}
-	return images, nil
+// PendingAIImage is an image without extracted text plus the ID of the user who owns it.
+type PendingAIImage struct {
+	NoteImage `gorm:"embedded"`
+	OwnerID   string `gorm:"column:ownerId"`
 }
 
-// GetAudiosWithoutTranscriptionForUser returns a user's audio files that have no transcription yet.
-func (db *DB) GetAudiosWithoutTranscriptionForUser(ctx context.Context, userID string) ([]NoteAudio, error) {
-	var audios []NoteAudio
-	err := db.conn.WithContext(ctx).
-		Select(`"NoteAudio".*`).
-		Joins(`JOIN "Note" ON "Note"."id" = "NoteAudio"."noteId"`).
-		Where(`"Note"."userId" = ? AND "NoteAudio"."transcribedText" = ?`, userID, "").
-		Find(&audios).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get audios without transcription: %w", err)
+// PendingAIAudio is an audio file without a transcription plus the ID of the user who owns it.
+type PendingAIAudio struct {
+	NoteAudio `gorm:"embedded"`
+	OwnerID   string `gorm:"column:ownerId"`
+}
+
+// ListPendingAIImages returns images without extracted text owned by AI eligible users, ordered by owner.
+func (db *DB) ListPendingAIImages(ctx context.Context) ([]PendingAIImage, error) {
+	var rows []PendingAIImage
+	if err := db.pendingAIMedia(ctx, "NoteImage", colExtractedText).Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to list pending AI images: %w", err)
 	}
-	return audios, nil
+	return rows, nil
+}
+
+// ListPendingAIAudios returns audio files without transcription owned by AI eligible users, ordered by owner.
+func (db *DB) ListPendingAIAudios(ctx context.Context) ([]PendingAIAudio, error) {
+	var rows []PendingAIAudio
+	if err := db.pendingAIMedia(ctx, "NoteAudio", colTranscribedText).Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to list pending AI audios: %w", err)
+	}
+	return rows, nil
+}
+
+func (db *DB) pendingAIMedia(ctx context.Context, table, textCol string) *gorm.DB {
+	return db.conn.WithContext(ctx).
+		Table(fmt.Sprintf(`"%s"`, table)).
+		Select(fmt.Sprintf(`"%s".*, "Note"."userId" AS "ownerId"`, table)).
+		Joins(fmt.Sprintf(`JOIN "Note" ON "Note"."id" = "%s"."noteId"`, table)).
+		Joins(`JOIN "User" ON "User"."id" = "Note"."userId"`).
+		Where(fmt.Sprintf(`"%s"."%s" = ? AND "User"."aiEnabled" AND NOT "User"."disabled" AND "User"."subscriptionStatus" IN ?`, table, textCol), "", AIEligibleSubscriptionStatuses).
+		Order(`"Note"."userId"`)
 }
