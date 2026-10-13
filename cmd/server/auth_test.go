@@ -62,6 +62,38 @@ func TestStreamAuthInterceptor(t *testing.T) {
 	}
 }
 
+func TestPublicMethodsRecognizeM2M(t *testing.T) {
+	t.Setenv("GRPC_API_KEYS", "m2m-secret")
+	interceptor := authInterceptor(nil, auth.NewM2MConfig(context.Background()), zap.NewNop().Sugar())
+	for _, tc := range []struct {
+		name   string
+		token  string
+		wantM2 bool
+	}{
+		{name: "no token", wantM2: false},
+		{name: "valid m2m token", token: "m2m-secret", wantM2: true},
+		{name: "invalid token stays public", token: "etu_nope", wantM2: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tc.token != "" {
+				ctx = metadata.NewIncomingContext(ctx, metadata.Pairs("authorization", tc.token))
+			}
+			var got bool
+			_, err := interceptor(ctx, nil, &grpc.UnaryServerInfo{FullMethod: "/etu.AuthService/Authenticate"}, func(ctx context.Context, _ interface{}) (interface{}, error) {
+				got = auth.IsM2MAuth(ctx)
+				return nil, nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tc.wantM2 {
+				t.Fatalf("IsM2MAuth = %v, want %v", got, tc.wantM2)
+			}
+		})
+	}
+}
+
 func TestStreamAuthInterceptorPassesAuthContext(t *testing.T) {
 	unary := func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		return handler(auth.SetAuthContext(ctx, "alice", "apikey"), req)

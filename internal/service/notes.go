@@ -21,10 +21,12 @@ import (
 
 // Note size and pagination limits applied by the NotesService API.
 const (
-	MaxNotesLimit     = 100
-	DefaultNotesLimit = 50
-	MaxImageSize      = 10 * 1024 * 1024 // 10MB max image size
-	MaxAudioSize      = 25 * 1024 * 1024 // 25MB max audio size
+	MaxNotesLimit       = 100
+	DefaultNotesLimit   = 50
+	MaxImageSize        = 10 * 1024 * 1024 // 10MB max image size
+	MaxAudioSize        = 25 * 1024 * 1024 // 25MB max audio size
+	MaxImagesPerRequest = 10
+	MaxAudiosPerRequest = 2
 )
 
 // NotesService implements the NotesService gRPC service.
@@ -102,10 +104,23 @@ func clampInt32(n int) int32 {
 	return int32(n)
 }
 
+func checkAttachmentCounts(images, audios int) error {
+	if images > MaxImagesPerRequest {
+		return status.Errorf(codes.InvalidArgument, "too many images: %d (max %d per request)", images, MaxImagesPerRequest)
+	}
+	if audios > MaxAudiosPerRequest {
+		return status.Errorf(codes.InvalidArgument, "too many audio files: %d (max %d per request)", audios, MaxAudiosPerRequest)
+	}
+	return nil
+}
+
 // CreateNote creates a new note
 func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest) (*pb.CreateNoteResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+	if err := checkAttachmentCounts(len(req.Images), len(req.Audios)); err != nil {
+		return nil, err
 	}
 	if req.Content == "" && len(req.Images) == 0 && len(req.Audios) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "at least one of content, images, or audio files is required")
@@ -306,6 +321,9 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 	}
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
+	}
+	if err := checkAttachmentCounts(len(req.AddImages), len(req.AddAudios)); err != nil {
+		return nil, err
 	}
 
 	// Verify authorization
