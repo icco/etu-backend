@@ -39,6 +39,9 @@ var (
 
 const statusKey = "status"
 
+// maxMsgSize leaves room for one max-size audio upload (25MB) plus request overhead.
+const maxMsgSize = 32 << 20
+
 func main() {
 	log := logger.New("etu-backend-server")
 	if err := run(log); err != nil {
@@ -154,6 +157,8 @@ func run(log *zap.SugaredLogger) error {
 
 	server := grpc.NewServer(
 		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
+		grpc.MaxRecvMsgSize(maxMsgSize),
+		grpc.MaxSendMsgSize(maxMsgSize),
 	)
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
