@@ -364,3 +364,28 @@ func TestGetProfileImageURL_NoImgixNoStorage(t *testing.T) {
 		t.Errorf("expected FailedPrecondition, got %v", st.Code())
 	}
 }
+
+func TestUserToProtoNotionKey(t *testing.T) {
+	key := "secret_notion"
+	empty := ""
+	tests := []struct {
+		name          string
+		notionKey     *string
+		wantHasNotion bool
+	}{
+		{name: "no key", notionKey: nil},
+		{name: "empty key", notionKey: &empty},
+		{name: "key set", notionKey: &key, wantHasNotion: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := userToProto(&db.User{ID: testUserID1, NotionKey: tt.notionKey})
+			if got.NotionKey != nil {
+				t.Errorf("NotionKey = %q, want nil", *got.NotionKey)
+			}
+			if got.HasNotionKey != tt.wantHasNotion {
+				t.Errorf("HasNotionKey = %v, want %v", got.HasNotionKey, tt.wantHasNotion)
+			}
+		})
+	}
+}

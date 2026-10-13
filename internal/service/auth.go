@@ -309,9 +309,7 @@ func userToProto(u *db.User) *pb.User {
 	if u.BillingCountry != nil {
 		pbUser.BillingCountry = u.BillingCountry
 	}
-	if u.NotionKey != nil {
-		pbUser.NotionKey = u.NotionKey
-	}
+	pbUser.HasNotionKey = u.NotionKey != nil && *u.NotionKey != ""
 	if u.NotionDatabaseName != nil {
 		pbUser.NotionDatabaseName = u.NotionDatabaseName
 	}
