@@ -1,0 +1,37 @@
+name: Migrations
+on:
+  - push
+jobs:
+  atlas:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ATLAS_MODELS_URL: postgres://postgres:postgres@localhost:5432/models?sslmode=disable&search_path=public
+      ATLAS_DEV_URL: postgres://postgres:postgres@localhost:5432/dev?sslmode=disable&search_path=public
+      ATLAS_RUN: docker run --rm --network host -v ${{ github.workspace }}:/src -w /src -e ATLAS_MODELS_URL -e ATLAS_DEV_URL arigaio/atlas:latest-community@sha256:88cadf07b3896a995f455263bd9d54dddd9704e3e3b04b34194ba710d5672c49
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Create scratch databases
+        run: |
+          psql "postgres://postgres:postgres@localhost:5432/postgres" -c 'CREATE DATABASE models' -c 'CREATE DATABASE dev'
+      - name: Apply GORM models to scratch database
+        run: DATABASE_URL="$ATLAS_MODELS_URL" go run ./cmd/schemagen
+      - name: Validate migrations
+        run: $ATLAS_RUN migrate validate --env local
+      - name: Check migrations are in sync with models
+        run: |
+          $ATLAS_RUN migrate diff --env local ci_check
+          test -z "$(git status --porcelain migrations)"
+      - name: Lint migrations
+        run: $ATLAS_RUN migrate lint --env local --latest 1
