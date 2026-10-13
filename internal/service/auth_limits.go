@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
 
+	"go.icco.me/etu-backend/internal/auth"
 	"go.icco.me/etu-backend/internal/db"
 	"golang.org/x/time/rate"
 	"google.golang.org/grpc/metadata"
@@ -17,6 +19,7 @@ import (
 const (
 	attemptsPerEmailBurst = 5
 	attemptsPerIPBurst    = 20
+	clientIPMetadataKey   = "x-etu-client-ip"
 )
 
 // attemptLimits throttles Register and Authenticate per client IP and per
@@ -38,26 +41,43 @@ func bucket(key string) int {
 func (l *attemptLimits) allow(ip, email string, now time.Time) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	ipIdx, emailIdx := bucket(ip), bucket(db.NormalizeEmail(email))
-	if l.ips[ipIdx] == nil {
-		l.ips[ipIdx] = rate.NewLimiter(rate.Every(3*time.Second), attemptsPerIPBurst)
-	}
+	emailIdx := bucket(db.NormalizeEmail(email))
 	if l.emails[emailIdx] == nil {
 		l.emails[emailIdx] = rate.NewLimiter(rate.Every(12*time.Second), attemptsPerEmailBurst)
 	}
-	ipRes := l.ips[ipIdx].ReserveN(now, 1)
 	emailRes := l.emails[emailIdx].ReserveN(now, 1)
-	if ipRes.DelayFrom(now) > 0 || emailRes.DelayFrom(now) > 0 {
-		ipRes.CancelAt(now)
+	if emailRes.DelayFrom(now) > 0 {
+		emailRes.CancelAt(now)
+		return false
+	}
+	if ip == "" {
+		return true
+	}
+	ipIdx := bucket(ip)
+	if l.ips[ipIdx] == nil {
+		l.ips[ipIdx] = rate.NewLimiter(rate.Every(3*time.Second), attemptsPerIPBurst)
+	}
+	if !l.ips[ipIdx].AllowN(now, 1) {
 		emailRes.CancelAt(now)
 		return false
 	}
 	return true
 }
 
-// clientIP prefers the last X-Forwarded-For hop, which the fronting load
-// balancer appends and clients cannot forge, over the transport peer.
+// clientIP returns the end-user IP for per-IP limits, or "" to skip them. M2M
+// callers such as etu-web proxy many users, so only their x-etu-client-ip is
+// trusted. Otherwise the last X-Forwarded-For hop wins: Caddy discards
+// client-supplied values and sets it to the connecting address.
 func clientIP(ctx context.Context) string {
+	if auth.IsM2MAuth(ctx) {
+		md, _ := metadata.FromIncomingContext(ctx)
+		if values := md.Get(clientIPMetadataKey); len(values) > 0 {
+			if addr, err := netip.ParseAddr(strings.TrimSpace(values[0])); err == nil {
+				return addr.String()
+			}
+		}
+		return ""
+	}
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if values := md.Get("x-forwarded-for"); len(values) > 0 {
 			hops := strings.Split(values[len(values)-1], ",")
