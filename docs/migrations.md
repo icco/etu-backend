@@ -27,7 +27,7 @@ Databases created by `AutoMigrate` already contain the tables in `migrations/202
      --dev-url "postgres://postgres:postgres@localhost:5432/dev?sslmode=disable&search_path=public"
    ```
 
-   Add `&search_path=public` to `DATABASE_URL` so only the application schema is compared. Fix any reported drift with a reviewed manual change before continuing.
+   Append `search_path=public` to `DATABASE_URL` so only the application schema is compared. Use `?search_path=public` if the URL has no query string, otherwise `&search_path=public` (for example `postgres://u:p@host:5432/etu?sslmode=require&search_path=public`). Fix any reported drift with a reviewed manual change before continuing.
 
 2. Record the baseline:
 
