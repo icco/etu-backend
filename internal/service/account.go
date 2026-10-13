@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.icco.me/etu-backend/internal/auth"
@@ -16,6 +17,9 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// paidStatuses are subscription states that may still bill, including legacy plan names.
+var paidStatuses = map[string]bool{"active": true, "trialing": true, "past_due": true, "paid": true, "pro": true, "premium": true}
 
 const (
 	exportPageSize  = 200
@@ -87,6 +91,9 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 	l := logging.FromContext(ctx)
 
 	customerID, subscriptionID := deref(user.StripeCustomerID), deref(user.StripeSubscriptionID)
+	if customerID == "" && subscriptionID == "" && paidStatuses[strings.ToLower(user.SubscriptionStatus)] {
+		return nil, status.Error(codes.FailedPrecondition, "subscription has no Stripe record to cancel; contact support to delete this account")
+	}
 	if (customerID != "" || subscriptionID != "") && s.billing == nil {
 		return nil, status.Error(codes.FailedPrecondition, "billing not configured; cannot cancel subscription")
 	}

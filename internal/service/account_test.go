@@ -53,7 +53,7 @@ func (f *fakeCanceler) CancelSubscriptions(_ context.Context, customerID, subscr
 
 var accountUserColumns = []string{
 	"id", colEmail, colPasswordHash, colFailedLoginAttempts,
-	"stripeCustomerId", "stripeSubscriptionId", "profileImageGCSObject", colCreatedAt, colUpdatedAt, colDisabled,
+	"stripeCustomerId", "stripeSubscriptionId", "profileImageGCSObject", colCreatedAt, colUpdatedAt, colDisabled, colSubscriptionStatus,
 }
 
 const (
@@ -84,6 +84,8 @@ func TestDeleteAccount(t *testing.T) {
 		freezeFail   bool
 		disabled     bool
 		wantMsg      string
+		subStatus    string
+		noStripeIDs  bool
 		wantCode     codes.Code
 		wantBilling  []string
 		wantStorage  []string
@@ -181,6 +183,26 @@ func TestDeleteAccount(t *testing.T) {
 			wantCode:     codes.Internal,
 		},
 		{
+			name:        "paid status without stripe ids needs support",
+			ctx:         m2mCtx,
+			req:         &pb.DeleteAccountRequest{UserId: acctUser},
+			userExists:  true,
+			subStatus:   "trialing",
+			noStripeIDs: true,
+			wantCode:    codes.FailedPrecondition,
+			wantMsg:     "contact support",
+		},
+		{
+			name:        "legacy pro status without stripe ids needs support",
+			ctx:         m2mCtx,
+			req:         &pb.DeleteAccountRequest{UserId: acctUser},
+			userExists:  true,
+			subStatus:   "pro",
+			noStripeIDs: true,
+			wantCode:    codes.FailedPrecondition,
+			wantMsg:     "contact support",
+		},
+		{
 			name: "already deleted user is success for retries",
 			ctx:  m2mCtx,
 			req:  &pb.DeleteAccountRequest{UserId: acctUser},
@@ -207,14 +229,18 @@ func TestDeleteAccount(t *testing.T) {
 			if tt.wantCode != codes.PermissionDenied || tt.expectFailed {
 				rows := sqlmock.NewRows(accountUserColumns)
 				if tt.userExists {
-					rows.AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now(), tt.disabled)
+					var c, s any = cus, sub
+					if tt.noStripeIDs {
+						c, s = nil, nil
+					}
+					rows.AddRow(acctUser, testEmail, string(hash), 0, c, s, avatar, time.Now(), time.Now(), tt.disabled, tt.subStatus)
 				}
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).WillReturnRows(rows)
 			}
 			if tt.expectFailed {
 				mock.ExpectBegin()
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).
-					WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now(), false))
+					WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now(), false, ""))
 				mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 			}
@@ -317,7 +343,7 @@ func TestExportDataPaginatesAllNotes(t *testing.T) {
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).
-		WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, "h", 0, nil, nil, nil, base, base, false))
+		WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, "h", 0, nil, nil, nil, base, base, false, ""))
 	mock.ExpectQuery(`FROM "Tag"`).WithArgs(acctUser).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "count", colCreatedAt}).AddRow("t1", "work", 1, base))
 
