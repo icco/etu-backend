@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"go.icco.me/etu-backend/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ExportCursor is the keyset position of the last note returned by ExportNotes.
@@ -17,8 +19,9 @@ type ExportCursor struct {
 
 // DeleteUserData permanently deletes a user and every row they own in a single transaction.
 // It locks the user row first, so in-flight note writes either commit before it (and are
-// deleted here) or fail afterwards. It returns the media object names present at deletion.
-func (db *DB) DeleteUserData(ctx context.Context, userID string) ([]string, error) {
+// deleted here) or fail afterwards. It records media not in alreadyDeleted, plus the user's profile prefix, as
+// AccountDeletionCleanup rows in the same transaction so a failed media sweep can be retried.
+func (db *DB) DeleteUserData(ctx context.Context, userID string, alreadyDeleted []string) error {
 	const notesOf = `(SELECT id FROM "Note" WHERE "userId" = ?)`
 	statements := []string{
 		`DELETE FROM "NoteTag" WHERE "noteId" IN ` + notesOf,
@@ -31,14 +34,16 @@ func (db *DB) DeleteUserData(ctx context.Context, userID string) ([]string, erro
 		`DELETE FROM "SyncState" WHERE "userId" = ?`,
 		`DELETE FROM "User" WHERE id = ?`,
 	}
-	var objects []string
-	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var locked []string
 		if err := tx.Raw(`SELECT id FROM "User" WHERE id = ? FOR UPDATE`, userID).Scan(&locked).Error; err != nil {
 			return fmt.Errorf("lock user: %w", err)
 		}
-		var err error
-		if objects, err = userMediaObjects(tx, userID); err != nil {
+		objects, err := userMediaObjects(tx, userID)
+		if err != nil {
+			return err
+		}
+		if err := recordCleanup(tx, userID, objects, alreadyDeleted); err != nil {
 			return err
 		}
 		for _, stmt := range statements {
@@ -48,10 +53,6 @@ func (db *DB) DeleteUserData(ctx context.Context, userID string) ([]string, erro
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return objects, nil
 }
 
 // UserMediaObjects returns the GCS object names of every attachment on the user's notes.
@@ -162,6 +163,42 @@ func lockActiveNoteOwner(tx *gorm.DB, noteID string) error {
 	}
 	if len(ids) == 0 {
 		return ErrUserDisabled
+	}
+	return nil
+}
+
+func recordCleanup(tx *gorm.DB, userID string, objects, alreadyDeleted []string) error {
+	done := make(map[string]bool, len(alreadyDeleted))
+	for _, name := range alreadyDeleted {
+		done[name] = true
+	}
+	now := time.Now()
+	var rows []models.AccountDeletionCleanup
+	for _, name := range append(objects, "profiles/"+userID+"/") {
+		if !done[name] {
+			rows = append(rows, models.AccountDeletionCleanup{UserID: userID, ObjectName: name, CreatedAt: now})
+		}
+	}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(rows, 500).Error; err != nil {
+		return fmt.Errorf("record deletion cleanup: %w", err)
+	}
+	return nil
+}
+
+// ListDeletionCleanup returns the GCS objects and prefixes still to remove for a deleted user.
+func (db *DB) ListDeletionCleanup(ctx context.Context, userID string) ([]string, error) {
+	var names []string
+	if err := db.conn.WithContext(ctx).Raw(`SELECT "objectName" FROM "AccountDeletionCleanup" WHERE "userId" = ? ORDER BY "objectName"`, userID).Scan(&names).Error; err != nil {
+		return nil, fmt.Errorf("list deletion cleanup: %w", err)
+	}
+	return names, nil
+}
+
+// RemoveDeletionCleanup marks one cleanup object as done.
+func (db *DB) RemoveDeletionCleanup(ctx context.Context, userID, objectName string) error {
+	err := db.conn.WithContext(ctx).Where(`"userId" = ? AND "objectName" = ?`, userID, objectName).Delete(&models.AccountDeletionCleanup{}).Error
+	if err != nil {
+		return fmt.Errorf("remove deletion cleanup: %w", err)
 	}
 	return nil
 }

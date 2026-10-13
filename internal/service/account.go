@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -71,6 +72,9 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
 	}
 	if user == nil {
+		if err := s.finishCleanup(ctx, req.UserId); err != nil {
+			return nil, status.Errorf(codes.Unavailable, "account deleted but media cleanup is incomplete; retry: %v", err)
+		}
 		return &pb.DeleteAccountResponse{Success: true}, nil
 	}
 
@@ -139,13 +143,12 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 		}
 	}
 
-	remaining, err := s.db.DeleteUserData(ctx, user.ID)
-	if err != nil {
+	if err := s.db.DeleteUserData(ctx, user.ID, objects); err != nil {
 		return nil, incompleteDeletion(codes.Internal, "delete account data", err)
 	}
-	if err := s.sweepStragglers(ctx, user.ID, objects, remaining); err != nil {
-		l.Errorw("account deleted but media cleanup failed", "user_id", user.ID, "objects", remaining, "error", err)
-		return nil, status.Errorf(codes.Internal, "account deleted but media cleanup failed; support must remove remaining files: %v", err)
+	if err := s.finishCleanup(ctx, user.ID); err != nil {
+		l.Errorw("account deleted but media cleanup failed", "user_id", user.ID, "error", err)
+		return nil, status.Errorf(codes.Unavailable, "account deleted but media cleanup is incomplete; an M2M retry finishes it: %v", err)
 	}
 	l.Infow("account deleted", "user_id", user.ID, "media_objects", len(objects))
 	return &pb.DeleteAccountResponse{Success: true}, nil
@@ -276,23 +279,28 @@ func deref(p *string) string {
 	return *p
 }
 
-// sweepStragglers deletes media committed between the first media listing and the
-// locked delete transaction, plus any profile image uploaded meanwhile.
-func (s *AccountService) sweepStragglers(ctx context.Context, userID string, deleted, remaining []string) error {
-	if s.storage == nil {
-		return nil
+// finishCleanup removes the GCS objects and prefixes recorded by DeleteUserData,
+// dropping each record once its deletion succeeds.
+func (s *AccountService) finishCleanup(ctx context.Context, userID string) error {
+	names, err := s.db.ListDeletionCleanup(ctx, userID)
+	if err != nil {
+		return err
 	}
-	done := make(map[string]bool, len(deleted))
-	for _, name := range deleted {
-		done[name] = true
+	if len(names) > 0 && s.storage == nil {
+		return errors.New("storage not configured")
 	}
-	for _, name := range remaining {
-		if done[name] {
-			continue
+	for _, name := range names {
+		if strings.HasSuffix(name, "/") {
+			err = s.storage.DeletePrefix(ctx, name)
+		} else {
+			err = s.storage.DeleteImage(ctx, name)
 		}
-		if err := s.storage.DeleteImage(ctx, name); err != nil {
+		if err != nil {
+			return err
+		}
+		if err := s.db.RemoveDeletionCleanup(ctx, userID, name); err != nil {
 			return err
 		}
 	}
-	return s.storage.DeletePrefix(ctx, fmt.Sprintf("profiles/%s/", userID))
+	return nil
 }

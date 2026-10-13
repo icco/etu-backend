@@ -84,6 +84,8 @@ func TestDeleteAccount(t *testing.T) {
 		freezeFail   bool
 		disabled     bool
 		wantMsg      string
+		cleanup      []string
+		cleanupDone  int
 		subStatus    string
 		noStripeIDs  bool
 		wantCode     codes.Code
@@ -235,6 +237,23 @@ func TestDeleteAccount(t *testing.T) {
 			wantMsg:     "contact support",
 		},
 		{
+			name:        "m2m retry finishes recorded media cleanup",
+			ctx:         m2mCtx,
+			req:         &pb.DeleteAccountRequest{UserId: acctUser},
+			cleanup:     []string{"notes/n2/late", "profiles/alice/"},
+			cleanupDone: 2,
+			wantStorage: []string{"delete notes/n2/late", "prefix profiles/alice/"},
+		},
+		{
+			name:        "failed cleanup on retry keeps records and errors",
+			ctx:         m2mCtx,
+			req:         &pb.DeleteAccountRequest{UserId: acctUser},
+			cleanup:     []string{"notes/n2/late"},
+			storageFail: true,
+			wantCode:    codes.Unavailable,
+			wantStorage: []string{"delete notes/n2/late"},
+		},
+		{
 			name: "already deleted user is success for retries",
 			ctx:  m2mCtx,
 			req:  &pb.DeleteAccountRequest{UserId: acctUser},
@@ -268,6 +287,9 @@ func TestDeleteAccount(t *testing.T) {
 					rows.AddRow(acctUser, testEmail, string(hash), 0, c, s, avatar, time.Now(), time.Now(), tt.disabled, tt.subStatus)
 				}
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).WillReturnRows(rows)
+				if !tt.userExists {
+					expectCleanup(mock, tt.cleanup, tt.cleanupDone)
+				}
 			}
 			if tt.expectFailed {
 				mock.ExpectBegin()
@@ -288,7 +310,7 @@ func TestDeleteAccount(t *testing.T) {
 					mock.ExpectCommit()
 				}
 			}
-			if len(tt.wantStorage) > 0 {
+			if tt.expectFreeze && len(tt.wantStorage) > 0 {
 				mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(acctUser, acctUser).
 					WillReturnRows(sqlmock.NewRows([]string{"gcsObjectName"}).AddRow("notes/n1/i1"))
 			}
@@ -297,10 +319,12 @@ func TestDeleteAccount(t *testing.T) {
 				mock.ExpectQuery(`FOR UPDATE`).WithArgs(acctUser).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(acctUser))
 				mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(acctUser, acctUser).
 					WillReturnRows(sqlmock.NewRows([]string{"gcsObjectName"}).AddRow("notes/n1/i1").AddRow("notes/n2/late"))
+				mock.ExpectExec(`INSERT INTO "AccountDeletionCleanup"`).WillReturnResult(sqlmock.NewResult(0, 2))
 				for range 9 {
 					mock.ExpectExec(`DELETE FROM`).WithArgs(acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
 				}
 				mock.ExpectCommit()
+				expectCleanup(mock, []string{"notes/n2/late", "profiles/alice/"}, 2)
 			}
 
 			resp, err := svc.DeleteAccount(tt.ctx, tt.req)
@@ -467,5 +491,18 @@ func TestNoteWritesForDisabledUser(t *testing.T) {
 				t.Fatalf("code = %v, want FailedPrecondition (err %v)", status.Code(err), err)
 			}
 		})
+	}
+}
+
+func expectCleanup(mock sqlmock.Sqlmock, names []string, done int) {
+	rows := sqlmock.NewRows([]string{"objectName"})
+	for _, n := range names {
+		rows.AddRow(n)
+	}
+	mock.ExpectQuery(`FROM "AccountDeletionCleanup"`).WithArgs(acctUser).WillReturnRows(rows)
+	for _, n := range names[:done] {
+		mock.ExpectBegin()
+		mock.ExpectExec(`DELETE FROM "AccountDeletionCleanup"`).WithArgs(acctUser, n).WillReturnResult(sqlmock.NewResult(0, 1))
+		mock.ExpectCommit()
 	}
 }

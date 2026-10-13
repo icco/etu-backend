@@ -129,6 +129,7 @@ func (db *DB) AutoMigrate() error {
 		&models.SyncState{},
 		&models.NoteImage{},
 		&models.NoteAudio{},
+		&models.AccountDeletionCleanup{},
 	); err != nil {
 		return err
 	}

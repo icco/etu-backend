@@ -221,3 +221,16 @@ func GenerateCUID() string {
 
 	return string(result)
 }
+
+// AccountDeletionCleanup is a GCS object or prefix (ending in "/") still to be
+// removed after a user's rows were deleted, kept so a retry can finish cleanup.
+type AccountDeletionCleanup struct {
+	UserID     string    `gorm:"column:userId;primaryKey"`
+	ObjectName string    `gorm:"column:objectName;primaryKey"`
+	CreatedAt  time.Time `gorm:"column:createdAt"`
+}
+
+// TableName specifies the table name for AccountDeletionCleanup
+func (AccountDeletionCleanup) TableName() string {
+	return "AccountDeletionCleanup"
+}

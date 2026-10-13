@@ -54,7 +54,10 @@ func TestDeleteUserData(t *testing.T) {
 			mock.ExpectQuery(regexp.QuoteMeta(`SELECT id FROM "User" WHERE id = $1 FOR UPDATE`)).WithArgs(testUserID).
 				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(testUserID))
 			mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(testUserID, testUserID).
-				WillReturnRows(sqlmock.NewRows([]string{colGCSObjectName}).AddRow("notes/n9/late"))
+				WillReturnRows(sqlmock.NewRows([]string{colGCSObjectName}).AddRow("notes/n1/done").AddRow("notes/n9/late"))
+			mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "AccountDeletionCleanup" ("userId","objectName","createdAt") VALUES ($1,$2,$3),($4,$5,$6) ON CONFLICT DO NOTHING`)).
+				WithArgs(testUserID, "notes/n9/late", sqlmock.AnyArg(), testUserID, "profiles/"+testUserID+"/", sqlmock.AnyArg()).
+				WillReturnResult(sqlmock.NewResult(0, 2))
 			for i, stmt := range deleteUserDataStatements {
 				e := mock.ExpectExec(regexp.QuoteMeta(stmt)).WithArgs(testUserID)
 				if i == tt.failAt {
@@ -68,14 +71,9 @@ func TestDeleteUserData(t *testing.T) {
 				mock.ExpectCommit()
 			}
 
-			objects, err := database.DeleteUserData(context.Background(), testUserID)
+			err := database.DeleteUserData(context.Background(), testUserID, []string{"notes/n1/done"})
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("DeleteUserData err = %v, wantErr %v", err, tt.wantErr)
-			}
-			if !tt.wantErr {
-				if diff := cmp.Diff([]string{"notes/n9/late"}, objects); diff != "" {
-					t.Errorf("objects mismatch (-want +got):\n%s", diff)
-				}
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %v", err)
@@ -251,5 +249,29 @@ func TestWritesRejectDisabledUser(t *testing.T) {
 				t.Errorf("unfulfilled expectations: %v", err)
 			}
 		})
+	}
+}
+
+func TestDeletionCleanupRecords(t *testing.T) {
+	database, mock := newMockDB(t)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT "objectName" FROM "AccountDeletionCleanup" WHERE "userId" = $1 ORDER BY "objectName"`)).
+		WithArgs(testUserID).WillReturnRows(sqlmock.NewRows([]string{"objectName"}).AddRow("notes/n9/late").AddRow("profiles/user-1/"))
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "AccountDeletionCleanup" WHERE "userId" = $1 AND "objectName" = $2`)).
+		WithArgs(testUserID, "notes/n9/late").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	got, err := database.ListDeletionCleanup(context.Background(), testUserID)
+	if err != nil {
+		t.Fatalf("ListDeletionCleanup: %v", err)
+	}
+	if diff := cmp.Diff([]string{"notes/n9/late", "profiles/user-1/"}, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+	if err := database.RemoveDeletionCleanup(context.Background(), testUserID, "notes/n9/late"); err != nil {
+		t.Fatalf("RemoveDeletionCleanup: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled expectations: %v", err)
 	}
 }
