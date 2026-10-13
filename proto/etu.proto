@@ -608,7 +608,10 @@ message ExportDataResponse {
 
 // AccountService manages whole-account operations.
 service AccountService {
-  // DeleteAccount cancels billing, deletes stored media, and removes all account data.
+  // DeleteAccount disables the account and revokes its API keys, cancels billing,
+  // deletes stored media, and removes all account data. If a step after the
+  // disable fails, the user is signed out and an M2M (support) call with the same
+  // user_id completes the deletion.
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
   // ExportData streams all of the caller's data.
   rpc ExportData(ExportDataRequest) returns (stream ExportDataResponse);

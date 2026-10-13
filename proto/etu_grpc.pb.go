@@ -1321,7 +1321,10 @@ const (
 //
 // AccountService manages whole-account operations.
 type AccountServiceClient interface {
-	// DeleteAccount cancels billing, deletes stored media, and removes all account data.
+	// DeleteAccount disables the account and revokes its API keys, cancels billing,
+	// deletes stored media, and removes all account data. If a step after the
+	// disable fails, the user is signed out and an M2M (support) call with the same
+	// user_id completes the deletion.
 	DeleteAccount(ctx context.Context, in *DeleteAccountRequest, opts ...grpc.CallOption) (*DeleteAccountResponse, error)
 	// ExportData streams all of the caller's data.
 	ExportData(ctx context.Context, in *ExportDataRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportDataResponse], error)
@@ -1370,7 +1373,10 @@ type AccountService_ExportDataClient = grpc.ServerStreamingClient[ExportDataResp
 //
 // AccountService manages whole-account operations.
 type AccountServiceServer interface {
-	// DeleteAccount cancels billing, deletes stored media, and removes all account data.
+	// DeleteAccount disables the account and revokes its API keys, cancels billing,
+	// deletes stored media, and removes all account data. If a step after the
+	// disable fails, the user is signed out and an M2M (support) call with the same
+	// user_id completes the deletion.
 	DeleteAccount(context.Context, *DeleteAccountRequest) (*DeleteAccountResponse, error)
 	// ExportData streams all of the caller's data.
 	ExportData(*ExportDataRequest, grpc.ServerStreamingServer[ExportDataResponse]) error
