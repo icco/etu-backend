@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.icco.me/etu-backend/internal/crypto"
 	"go.icco.me/etu-backend/internal/models"
 	"go.icco.me/gutil/logging"
@@ -139,7 +140,7 @@ func (db *DB) AutoMigrate() error {
 			return fmt.Errorf("drop User.image: %w", err)
 		}
 	}
-	return nil
+	return db.ensureEmailIndex(context.Background())
 }
 
 // ListNotes retrieves notes for a user with optional filtering
@@ -660,6 +661,7 @@ func (db *DB) ListTags(ctx context.Context, userID string) ([]Tag, error) {
 
 // CreateUser creates a new user with email and password
 func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User, error) {
+	email = NormalizeEmail(email)
 	now := time.Now()
 	user := User{
 		ID:                 models.GenerateCUID(),
@@ -670,6 +672,10 @@ func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User
 	}
 
 	if err := db.conn.WithContext(ctx).Create(&user).Error; err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrEmailTaken
+		}
 		return nil, fmt.Errorf("failed to insert user: %w", err)
 	}
 
@@ -679,7 +685,7 @@ func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User
 // GetUserByEmail retrieves a user by email address
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
-	result := db.conn.WithContext(ctx).Where("email = ?", email).First(&user)
+	result := db.conn.WithContext(ctx).Where("lower(email) = ?", NormalizeEmail(email)).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

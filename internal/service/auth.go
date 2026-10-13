@@ -52,6 +52,9 @@ func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 	// Create the user
 	user, err := s.db.CreateUser(ctx, req.Email, string(passwordHash))
 	if err != nil {
+		if errors.Is(err, db.ErrEmailTaken) {
+			return nil, status.Error(codes.AlreadyExists, "user with this email already exists")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
 	}
 
