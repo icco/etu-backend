@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
+	"go.icco.me/etu-backend/internal/db"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -65,17 +67,10 @@ func (p Paywall) Authorize(method string, s AccountState, now time.Time) error {
 }
 
 func (p Paywall) hasFullAccess(s AccountState, now time.Time) bool {
-	switch s.Status {
-	// etu-web stores Stripe "trialing" as "trial"; "pro" and "premium" are legacy manual grants.
-	case "active", "trialing", "trial", "pro", "premium":
-		return true
-	case "past_due":
+	if s.Status == db.SubscriptionStatusPastDue {
 		return s.PastDueSince != nil && now.Before(s.PastDueSince.Add(p.Grace))
-	case "canceled", "inactive", "unpaid", "free", "none", "":
-		return false
-	default:
-		return false
 	}
+	return slices.Contains(db.AIEligibleSubscriptionStatuses, s.Status)
 }
 
 // GetAccountState loads the billing and lockout state for userID.
