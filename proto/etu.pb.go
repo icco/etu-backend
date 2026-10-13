@@ -3153,8 +3153,9 @@ type GetProfileImageURLRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// key is the storage object key returned in User.image.
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	// user_id selects whose avatar to resolve. Required for M2M callers;
-	// API key callers may only resolve their own.
+	// user_id selects whose avatar to resolve. M2M callers that omit it must
+	// pass a "profiles/{userId}/..." key, whose owner segment is used. API key
+	// callers may only resolve their own.
 	UserId        string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

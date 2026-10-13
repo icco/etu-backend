@@ -562,8 +562,9 @@ service UserSettingsService {
 message GetProfileImageURLRequest {
   // key is the storage object key returned in User.image.
   string key = 1;
-  // user_id selects whose avatar to resolve. Required for M2M callers;
-  // API key callers may only resolve their own.
+  // user_id selects whose avatar to resolve. M2M callers that omit it must
+  // pass a "profiles/{userId}/..." key, whose owner segment is used. API key
+  // callers may only resolve their own.
   string user_id = 2;
 }
 
