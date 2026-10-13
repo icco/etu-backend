@@ -163,6 +163,7 @@ func run(log *zap.SugaredLogger) error {
 			authInterceptor(authenticator, m2mConfig, log),
 			paywallInterceptor(authenticator, paywall),
 		),
+		grpc.ChainStreamInterceptor(paywallStreamInterceptor(authenticator, paywall)),
 	)
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)

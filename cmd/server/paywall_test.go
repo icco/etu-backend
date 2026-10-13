@@ -56,3 +56,43 @@ func TestPaywallInterceptor(t *testing.T) {
 		})
 	}
 }
+
+type fakeServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s fakeServerStream) Context() context.Context { return s.ctx }
+
+func TestPaywallStreamInterceptor(t *testing.T) {
+	tests := []struct {
+		name     string
+		method   string
+		ctx      context.Context
+		accounts *fakeAccounts
+		want     codes.Code
+	}{
+		{"m2m bypass", "/etu.AccountService/ExportData", auth.SetAuthContext(context.Background(), "m2m", "m2m"), &fakeAccounts{}, codes.OK},
+		{"canceled export allowed", "/etu.AccountService/ExportData", auth.SetAuthContext(context.Background(), "u1", "apikey"), &fakeAccounts{state: auth.AccountState{Status: "canceled"}}, codes.OK},
+		{"canceled other stream denied", "/etu.NotesService/StreamNotes", auth.SetAuthContext(context.Background(), "u1", "apikey"), &fakeAccounts{state: auth.AccountState{Status: "canceled"}}, codes.PermissionDenied},
+		{"disabled export denied", "/etu.AccountService/ExportData", auth.SetAuthContext(context.Background(), "u1", "apikey"), &fakeAccounts{state: auth.AccountState{Status: "active", Disabled: true}}, codes.PermissionDenied},
+		{"unauthenticated stream denied", "/etu.AccountService/ExportData", context.Background(), &fakeAccounts{}, codes.Unauthenticated},
+		{"lookup error", "/etu.AccountService/ExportData", auth.SetAuthContext(context.Background(), "u1", "apikey"), &fakeAccounts{err: errors.New("boom")}, codes.Internal},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			interceptor := paywallStreamInterceptor(tt.accounts, auth.Paywall{Grace: time.Hour})
+			err := interceptor(nil, fakeServerStream{ctx: tt.ctx}, &grpc.StreamServerInfo{FullMethod: tt.method, IsServerStream: true}, func(interface{}, grpc.ServerStream) error {
+				called = true
+				return nil
+			})
+			if diff := cmp.Diff(tt.want, status.Code(err)); diff != "" {
+				t.Errorf("code mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.want == codes.OK, called); diff != "" {
+				t.Errorf("handler called mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
