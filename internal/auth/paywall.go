@@ -66,10 +66,13 @@ func (p Paywall) Authorize(method string, s AccountState, now time.Time) error {
 
 func (p Paywall) hasFullAccess(s AccountState, now time.Time) bool {
 	switch s.Status {
-	case "active", "trialing":
+	// etu-web stores Stripe "trialing" as "trial"; "pro" and "premium" are legacy manual grants.
+	case "active", "trialing", "trial", "pro", "premium":
 		return true
 	case "past_due":
 		return s.PastDueSince != nil && now.Before(s.PastDueSince.Add(p.Grace))
+	case "canceled", "inactive", "unpaid", "free", "none", "":
+		return false
 	default:
 		return false
 	}

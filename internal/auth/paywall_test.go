@@ -25,6 +25,12 @@ func TestPaywallAuthorize(t *testing.T) {
 	}{
 		{"active full access", notes, AccountState{Status: "active"}, codes.OK},
 		{"trialing full access", notes, AccountState{Status: "trialing"}, codes.OK},
+		{"etu-web trial full access", notes, AccountState{Status: "trial"}, codes.OK},
+		{"legacy pro full access", notes, AccountState{Status: "pro"}, codes.OK},
+		{"legacy premium full access", notes, AccountState{Status: "premium"}, codes.OK},
+		{"inactive denied", notes, AccountState{Status: "inactive"}, codes.PermissionDenied},
+		{"case mismatch denied", notes, AccountState{Status: "Active"}, codes.PermissionDenied},
+		{"disabled pro", notes, AccountState{Status: "pro", Disabled: true}, codes.PermissionDenied},
 		{"past_due within grace", notes, AccountState{Status: "past_due", PastDueSince: &recent}, codes.OK},
 		{"past_due after grace", notes, AccountState{Status: "past_due", PastDueSince: &old}, codes.PermissionDenied},
 		{"past_due without timestamp", notes, AccountState{Status: "past_due"}, codes.PermissionDenied},
