@@ -32,6 +32,7 @@ func (db *DB) DeleteUserData(ctx context.Context, userID string, alreadyDeleted 
 		`DELETE FROM "Tag" WHERE "userId" = ?`,
 		`DELETE FROM "ApiKey" WHERE "userId" = ?`,
 		`DELETE FROM "SyncState" WHERE "userId" = ?`,
+		`DELETE FROM "AIUsage" WHERE "userId" = ?`,
 		`DELETE FROM "User" WHERE id = ?`,
 	}
 	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

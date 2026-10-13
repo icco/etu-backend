@@ -293,9 +293,7 @@ func TestDeleteAccount(t *testing.T) {
 			}
 			if tt.expectFailed {
 				mock.ExpectBegin()
-				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).
-					WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now(), false, ""))
-				mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec(`UPDATE "User" SET "failedLoginAttempts"`).WithArgs(sqlmock.AnyArg(), acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 			}
 			if tt.expectFreeze {
@@ -320,7 +318,7 @@ func TestDeleteAccount(t *testing.T) {
 				mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(acctUser, acctUser).
 					WillReturnRows(sqlmock.NewRows([]string{"gcsObjectName"}).AddRow("notes/n1/i1").AddRow("notes/n2/late"))
 				mock.ExpectExec(`INSERT INTO "AccountDeletionCleanup"`).WillReturnResult(sqlmock.NewResult(0, 2))
-				for range 9 {
+				for range 10 {
 					mock.ExpectExec(`DELETE FROM`).WithArgs(acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
 				}
 				mock.ExpectCommit()

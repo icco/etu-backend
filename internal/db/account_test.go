@@ -35,6 +35,7 @@ var deleteUserDataStatements = []string{
 	`DELETE FROM "Tag" WHERE "userId" = $1`,
 	`DELETE FROM "ApiKey" WHERE "userId" = $1`,
 	`DELETE FROM "SyncState" WHERE "userId" = $1`,
+	`DELETE FROM "AIUsage" WHERE "userId" = $1`,
 	`DELETE FROM "User" WHERE id = $1`,
 }
 
