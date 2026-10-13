@@ -96,10 +96,7 @@ func run(log *zap.SugaredLogger) error {
 		}
 	}()
 
-	if err := database.AutoMigrate(); err != nil {
-		return fmt.Errorf("failed to run database migrations: %w", err)
-	}
-	log.Infow("database initialized and migrations completed")
+	log.Infow("database initialized")
 
 	authenticator, err := auth.New()
 	if err != nil {
