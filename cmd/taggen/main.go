@@ -47,6 +47,11 @@ func run(log *zap.SugaredLogger) error {
 		return fmt.Errorf("GCS_BUCKET environment variable not set")
 	}
 
+	limit, err := dailyAILimit()
+	if err != nil {
+		return err
+	}
+
 	aiClient, err := ai.NewClient(geminiProject, os.Getenv("GEMINI_LOCATION"))
 	if err != nil {
 		return fmt.Errorf("failed to initialize AI client: %w", err)
@@ -70,7 +75,8 @@ func run(log *zap.SugaredLogger) error {
 	log.Infow("starting AI processing job (tag generation, OCR, audio transcription)",
 		"dry_run", *dryRun,
 		"continuous", *interval > 0,
-		"interval", intervalStr)
+		"interval", intervalStr,
+		"daily_ai_limit", limit)
 
 	database, err := db.New()
 	if err != nil {
@@ -102,7 +108,7 @@ func run(log *zap.SugaredLogger) error {
 		ticker := time.NewTicker(*interval)
 		defer ticker.Stop()
 
-		processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter)
+		processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter, limit)
 
 		for {
 			select {
@@ -110,18 +116,18 @@ func run(log *zap.SugaredLogger) error {
 				log.Infow("shutting down AI processing job")
 				return nil
 			case <-ticker.C:
-				processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter)
+				processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter, limit)
 			}
 		}
 	}
-	processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter)
+	processOnce(processCtx, database, aiClient, storageClient, *dryRun, rateLimiter, limit)
 	return nil
 }
 
-func processOnce(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) {
+func processOnce(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter, limit int) {
 	l := logging.FromContext(ctx)
 
-	result := processAllTasks(ctx, database, aiClient, storageClient, dryRun, rateLimiter)
+	result := processAllTasks(ctx, database, aiClient, storageClient, dryRun, rateLimiter, limit)
 
 	l.Infow("AI processing completed",
 		"duration", result.Duration.String(),
@@ -145,11 +151,20 @@ type ProcessResult struct {
 }
 
 // processAllTasks runs all AI processing tasks in parallel: tag generation, OCR, and audio transcription.
-func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter) *ProcessResult {
+func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, rateLimiter *rate.Limiter, limit int) *ProcessResult {
 	l := logging.FromContext(ctx)
 
 	start := time.Now()
 	result := &ProcessResult{}
+
+	users, err := database.ListAIEligibleUsers(ctx)
+	if err != nil {
+		l.Errorw("failed to list AI eligible users", zap.Error(err))
+		result.Errors++
+		result.Duration = time.Since(start)
+		return result
+	}
+	l.Infow("found AI eligible users", "count", len(users))
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -157,7 +172,7 @@ func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		tagResult, err := generateTagsForAllUsers(ctx, database, aiClient, dryRun, rateLimiter)
+		tagResult, err := generateTagsForAllUsers(ctx, database, users, aiClient, dryRun, rateLimiter, limit)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -174,7 +189,7 @@ func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		imagesProcessed, imageErrors := processImagesWithoutText(ctx, database, aiClient, storageClient, dryRun, rateLimiter)
+		imagesProcessed, imageErrors := processImagesWithoutText(ctx, database, users, aiClient, storageClient, dryRun, rateLimiter, limit)
 		mu.Lock()
 		defer mu.Unlock()
 		result.ImagesProcessed = imagesProcessed
@@ -184,7 +199,7 @@ func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		audiosProcessed, audioErrors := processAudiosWithoutTranscription(ctx, database, aiClient, storageClient, dryRun, rateLimiter)
+		audiosProcessed, audioErrors := processAudiosWithoutTranscription(ctx, database, users, aiClient, storageClient, dryRun, rateLimiter, limit)
 		mu.Lock()
 		defer mu.Unlock()
 		result.AudiosProcessed = audiosProcessed
@@ -197,11 +212,24 @@ func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, 
 	return result
 }
 
-// processImagesWithoutText processes all images that don't have extracted text yet
-func processImagesWithoutText(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter) (int, int) {
-	l := logging.FromContext(ctx)
+// processImagesWithoutText runs OCR on images without extracted text for each AI eligible user.
+func processImagesWithoutText(ctx context.Context, database *db.DB, users []db.User, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter, limit int) (int, int) {
+	processed, errors := 0, 0
+	for _, user := range users {
+		if ctx.Err() != nil {
+			break
+		}
+		p, e := processImagesForUser(ctx, database, user.ID, aiClient, storageClient, dryRun, limiter, limit)
+		processed += p
+		errors += e
+	}
+	return processed, errors
+}
 
-	images, err := database.GetImagesWithoutExtractedText(ctx)
+func processImagesForUser(ctx context.Context, database *db.DB, userID string, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter, limit int) (int, int) {
+	l := logging.FromContext(ctx).With("user_id", userID)
+
+	images, err := database.GetImagesWithoutExtractedTextForUser(ctx, userID)
 	if err != nil {
 		l.Errorw("failed to get images without extracted text", zap.Error(err))
 		return 0, 1
@@ -220,6 +248,10 @@ func processImagesWithoutText(ctx context.Context, database *db.DB, aiClient *ai
 		}
 
 		l.Infow("processing image for OCR", "image_id", image.ID, "note_id", image.NoteID)
+
+		if !allowAI(ctx, database, userID, limit) {
+			return processed, errors
+		}
 
 		if limiter != nil {
 			if err := limiter.Wait(ctx); err != nil {
@@ -258,11 +290,24 @@ func processImagesWithoutText(ctx context.Context, database *db.DB, aiClient *ai
 	return processed, errors
 }
 
-// processAudiosWithoutTranscription processes all audio files that don't have transcribed text yet
-func processAudiosWithoutTranscription(ctx context.Context, database *db.DB, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter) (int, int) {
-	l := logging.FromContext(ctx)
+// processAudiosWithoutTranscription transcribes audio without text for each AI eligible user.
+func processAudiosWithoutTranscription(ctx context.Context, database *db.DB, users []db.User, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter, limit int) (int, int) {
+	processed, errors := 0, 0
+	for _, user := range users {
+		if ctx.Err() != nil {
+			break
+		}
+		p, e := processAudiosForUser(ctx, database, user.ID, aiClient, storageClient, dryRun, limiter, limit)
+		processed += p
+		errors += e
+	}
+	return processed, errors
+}
 
-	audios, err := database.GetAudiosWithoutTranscription(ctx)
+func processAudiosForUser(ctx context.Context, database *db.DB, userID string, aiClient *ai.Client, storageClient *storage.Client, dryRun bool, limiter *rate.Limiter, limit int) (int, int) {
+	l := logging.FromContext(ctx).With("user_id", userID)
+
+	audios, err := database.GetAudiosWithoutTranscriptionForUser(ctx, userID)
 	if err != nil {
 		l.Errorw("failed to get audios without transcription", zap.Error(err))
 		return 0, 1
@@ -281,6 +326,10 @@ func processAudiosWithoutTranscription(ctx context.Context, database *db.DB, aiC
 		}
 
 		l.Infow("processing audio for transcription", "audio_id", audio.ID, "note_id", audio.NoteID)
+
+		if !allowAI(ctx, database, userID, limit) {
+			return processed, errors
+		}
 
 		if limiter != nil {
 			if err := limiter.Wait(ctx); err != nil {
@@ -320,19 +369,12 @@ func processAudiosWithoutTranscription(ctx context.Context, database *db.DB, aiC
 	return processed, errors
 }
 
-// generateTagsForAllUsers generates tags for all users in the database
-func generateTagsForAllUsers(ctx context.Context, database *db.DB, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter) (*TagGenResult, error) {
+// generateTagsForAllUsers generates tags for each AI eligible user.
+func generateTagsForAllUsers(ctx context.Context, database *db.DB, users []db.User, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter, limit int) (*TagGenResult, error) {
 	l := logging.FromContext(ctx)
 
 	start := time.Now()
 	result := &TagGenResult{}
-
-	users, err := database.ListAllUsers(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	l.Infow("found users to process", "count", len(users))
 
 	for _, user := range users {
 		select {
@@ -342,7 +384,7 @@ func generateTagsForAllUsers(ctx context.Context, database *db.DB, aiClient *ai.
 		default:
 		}
 
-		userResult, err := generateTagsForUser(ctx, database, user.ID, aiClient, dryRun, limiter)
+		userResult, err := generateTagsForUser(ctx, database, user.ID, aiClient, dryRun, limiter, limit)
 		if err != nil {
 			l.Errorw("failed to generate tags for user", "user_id", user.ID, zap.Error(err))
 			result.Errors++
@@ -368,7 +410,7 @@ type TagGenResult struct {
 	Duration       time.Duration
 }
 
-func generateTagsForUser(ctx context.Context, database *db.DB, userID string, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter) (*TagGenResult, error) {
+func generateTagsForUser(ctx context.Context, database *db.DB, userID string, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter, limit int) (*TagGenResult, error) {
 	l := logging.FromContext(ctx).With("user_id", userID)
 
 	result := &TagGenResult{}
@@ -430,6 +472,10 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID string, ai
 
 		if maxNewTags <= 0 {
 			continue
+		}
+
+		if !allowAI(ctx, database, userID, limit) {
+			return result, nil
 		}
 
 		if limiter != nil {
