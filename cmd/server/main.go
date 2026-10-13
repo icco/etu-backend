@@ -153,11 +153,17 @@ func run(log *zap.SugaredLogger) error {
 
 	m2mConfig := auth.NewM2MConfig(rootCtx)
 
+	paywall, err := auth.NewPaywallFromEnv()
+	if err != nil {
+		return fmt.Errorf("failed to configure paywall: %w", err)
+	}
+	log.Infow("paywall configured", "grace_period", paywall.Grace.String())
+
 	unaryAuth := authInterceptor(authenticator, m2mConfig, log)
 	recoverUnary, recoverStream := recoveryInterceptors(log)
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(recoverUnary, unaryAuth),
-		grpc.ChainStreamInterceptor(recoverStream, streamAuthInterceptor(unaryAuth)),
+		grpc.ChainUnaryInterceptor(recoverUnary, unaryAuth, paywallInterceptor(authenticator, paywall)),
+		grpc.ChainStreamInterceptor(recoverStream, streamAuthInterceptor(unaryAuth), paywallStreamInterceptor(authenticator, paywall)),
 		grpc.MaxRecvMsgSize(maxRecvMsgSize),
 	)
 
@@ -294,17 +300,17 @@ func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler
 	return mux
 }
 
+var publicMethods = map[string]bool{
+	"/etu.AuthService/Register":        true,
+	"/etu.AuthService/Authenticate":    true,
+	"/etu.AuthService/Login":           true,
+	"/etu.ApiKeysService/VerifyApiKey": true,
+}
+
 // authInterceptor creates a gRPC interceptor that validates API keys and M2M tokens.
 // It also injects the application logger into the request context so downstream
 // handlers can call logging.FromContext(ctx) and emit correlated logs.
 func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfig, log *zap.SugaredLogger) grpc.UnaryServerInterceptor {
-	publicMethods := map[string]bool{
-		"/etu.AuthService/Register":        true,
-		"/etu.AuthService/Authenticate":    true,
-		"/etu.AuthService/Login":           true,
-		"/etu.ApiKeysService/VerifyApiKey": true,
-	}
-
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Always seed the per-request logger so downstream code can use logging.FromContext.
 		ctx = logging.NewContext(ctx, log)

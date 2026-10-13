@@ -472,3 +472,29 @@ func TestUpdateUserSettings_AIEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestProfileImageKeyOwner(t *testing.T) {
+	tests := []struct {
+		key    string
+		want   string
+		wantOK bool
+	}{
+		{"profiles/u1/a.png", "u1", true},
+		{"profiles/u1/", "u1", true},
+		{"profiles//a.png", "", false},
+		{"profiles/u1", "", false},
+		{"notes/u1/a.png", "", false},
+		{"", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			got, ok := ProfileImageKeyOwner(tt.key)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("owner (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantOK, ok); diff != "" {
+				t.Errorf("ok (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

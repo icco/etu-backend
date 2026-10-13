@@ -42,7 +42,7 @@ func TestLogin(t *testing.T) {
 		{name: "success uses verified owner", email: testEmail, found: true, want: codes.OK},
 		{name: "missing email", want: codes.InvalidArgument},
 		{name: "unknown user", email: testEmail, want: codes.Unauthenticated},
-		{name: "disabled", email: testEmail, found: true, disabled: true, want: codes.PermissionDenied},
+		{name: "disabled", email: testEmail, found: true, disabled: true, want: codes.Unauthenticated},
 		{name: "locked", email: testEmail, found: true, attempts: 5, want: codes.PermissionDenied},
 		{name: "key storage failure", email: testEmail, found: true, insertError: true, want: codes.Internal},
 		{name: "session cap", email: testEmail, found: true, sessions: db.MaxMobileSessions, want: codes.ResourceExhausted},

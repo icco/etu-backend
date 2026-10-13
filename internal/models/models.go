@@ -115,7 +115,8 @@ type User struct {
 	FailedLoginAttempts int        `gorm:"column:failedLoginAttempts;default:0"`
 	LastFailedLogin     *time.Time `gorm:"column:lastFailedLogin"`
 
-	AIEnabled bool `gorm:"column:aiEnabled;not null;default:false"`
+	AIEnabled    bool       `gorm:"column:aiEnabled;not null;default:false"`
+	PastDueSince *time.Time `gorm:"column:pastDueSince"`
 }
 
 // TableName specifies the table name for User

@@ -33,6 +33,7 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 - `DATABASE_URL` - PostgreSQL connection string (required)
 - `PORT` - Server port (default: 50051)
 - `GRPC_API_KEYS` - Comma-separated list of M2M tokens for server-to-server auth (supports rotation)
+- `PAYWALL_GRACE_PERIOD` - Go duration a `past_due` subscription keeps full access (default: `168h`). API-key users without an `active`, `trialing`, or in-grace `past_due` subscription can only call account and key management RPCs; disabled users are denied everything
 - `GEMINI_PROJECT` - GCP project for Vertex AI (for AI processing: tag generation, OCR, audio transcription). Auth is Application Default Credentials; there is no API key
 - `GEMINI_LOCATION` - Vertex AI region (default: `us-central1`)
 - `AI_DAILY_LIMIT` - Max AI operations per user per UTC day in `taggen` (default: `200`). AI only runs for users with `ai_enabled` and a subscription status of `active`, `trial`, `trialing`, `pro`, `premium`, or `past_due`

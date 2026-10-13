@@ -211,10 +211,19 @@ func profileImageOwner(ctx context.Context, req *pb.GetProfileImageURLRequest) (
 	if req.UserId != "" {
 		return req.UserId, nil
 	}
-	rest, ok := strings.CutPrefix(req.Key, "profiles/")
-	owner, _, found := strings.Cut(rest, "/")
-	if !ok || !found || owner == "" {
+	owner, ok := ProfileImageKeyOwner(req.Key)
+	if !ok {
 		return "", status.Error(codes.InvalidArgument, "user_id or a profile image key is required")
 	}
 	return owner, nil
+}
+
+// ProfileImageKeyOwner returns the user ID embedded in a profiles/{userId}/ storage key.
+func ProfileImageKeyOwner(key string) (string, bool) {
+	rest, ok := strings.CutPrefix(key, "profiles/")
+	owner, _, found := strings.Cut(rest, "/")
+	if !ok || !found || owner == "" {
+		return "", false
+	}
+	return owner, true
 }
