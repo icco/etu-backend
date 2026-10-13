@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"go.icco.me/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/service"
+	pb "go.icco.me/etu-backend/proto"
 	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -15,16 +17,15 @@ import (
 const globalStatsMethod = "/etu.StatsService/GetStats"
 
 var m2mPaywallBypassMethods = map[string]bool{
-	"/etu.AuthService/Register":                   true,
-	"/etu.AuthService/Authenticate":               true,
-	"/etu.AuthService/Login":                      true,
-	"/etu.AuthService/GetUser":                    true,
-	"/etu.AuthService/GetUserByStripeCustomerId":  true,
-	"/etu.AuthService/UpdateUserSubscription":     true,
-	"/etu.AuthService/UpdateUserStripeCustomer":   true,
-	"/etu.AccountService/DeleteAccount":           true,
-	"/etu.AccountService/ExportData":              true,
-	"/etu.UserSettingsService/GetProfileImageURL": true,
+	"/etu.AuthService/Register":                  true,
+	"/etu.AuthService/Authenticate":              true,
+	"/etu.AuthService/Login":                     true,
+	"/etu.AuthService/GetUser":                   true,
+	"/etu.AuthService/GetUserByStripeCustomerId": true,
+	"/etu.AuthService/UpdateUserSubscription":    true,
+	"/etu.AuthService/UpdateUserStripeCustomer":  true,
+	"/etu.AccountService/DeleteAccount":          true,
+	"/etu.AccountService/ExportData":             true,
 }
 
 type accountStateGetter interface {
@@ -98,9 +99,7 @@ func enforcePaywall(ctx context.Context, method string, req interface{}, account
 		if m2mPaywallBypassMethods[method] {
 			return nil
 		}
-		if g, ok := req.(userIDGetter); ok {
-			userID = g.GetUserId()
-		}
+		userID = m2mRequestUserID(req)
 		if userID == "" {
 			if method == globalStatsMethod && req != nil {
 				return nil
@@ -125,4 +124,15 @@ func enforcePaywall(ctx context.Context, method string, req interface{}, account
 		return err
 	}
 	return nil
+}
+
+func m2mRequestUserID(req interface{}) string {
+	if g, ok := req.(userIDGetter); ok && g.GetUserId() != "" {
+		return g.GetUserId()
+	}
+	if r, ok := req.(*pb.GetProfileImageURLRequest); ok {
+		owner, _ := service.ProfileImageKeyOwner(r.GetKey())
+		return owner
+	}
+	return ""
 }
