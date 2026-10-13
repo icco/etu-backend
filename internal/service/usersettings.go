@@ -10,6 +10,7 @@ import (
 	pb "go.icco.me/etu-backend/proto"
 	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -65,6 +66,12 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		return nil, err
 	}
 
+	if req.Password != nil && *req.Password != "" {
+		if err := s.changePassword(ctx, req.UserId, req.GetCurrentPassword(), *req.Password); err != nil {
+			return nil, err
+		}
+	}
+
 	l := logging.FromContext(ctx)
 
 	var profileImageGCSObject *string
@@ -109,7 +116,7 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		profileImageGCSObject = &empty
 	}
 
-	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, req.Password, req.NotionDatabaseName, profileImageGCSObject)
+	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, nil, req.NotionDatabaseName, profileImageGCSObject)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
 	}
@@ -146,4 +153,39 @@ func (s *UserSettingsService) GetProfileImageURL(ctx context.Context, req *pb.Ge
 	}
 
 	return &pb.GetProfileImageURLResponse{Url: url}, nil
+}
+
+// changePassword revokes every API key and mobile session, including the
+// caller's, so a leaked credential cannot survive a password change.
+func (s *UserSettingsService) changePassword(ctx context.Context, userID, current, next string) error {
+	if current == "" {
+		return status.Error(codes.InvalidArgument, "current_password is required to change password")
+	}
+	user, err := s.db.GetUser(ctx, userID)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to get user: %v", err)
+	}
+	if user == nil {
+		return status.Error(codes.NotFound, "user not found")
+	}
+	if user.Disabled {
+		return status.Error(codes.PermissionDenied, "account is disabled")
+	}
+	if db.LockoutRemaining(user.FailedLoginAttempts, user.LastFailedLogin, time.Now()) > 0 {
+		return status.Error(codes.PermissionDenied, "account is locked")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)); err != nil {
+		if recordErr := s.db.RecordFailedLogin(ctx, userID); recordErr != nil {
+			return status.Errorf(codes.Internal, "failed to record failed attempt: %v", recordErr)
+		}
+		return status.Error(codes.PermissionDenied, "current password is incorrect")
+	}
+	found, err := s.db.ChangePassword(ctx, userID, next)
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to change password: %v", err)
+	}
+	if !found {
+		return status.Error(codes.NotFound, "user not found")
+	}
+	return nil
 }
