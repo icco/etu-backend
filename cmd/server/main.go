@@ -152,8 +152,10 @@ func run(log *zap.SugaredLogger) error {
 
 	m2mConfig := auth.NewM2MConfig(rootCtx)
 
+	recoverUnary, recoverStream := recoveryInterceptors(log)
 	server := grpc.NewServer(
-		grpc.UnaryInterceptor(authInterceptor(authenticator, m2mConfig, log)),
+		grpc.ChainUnaryInterceptor(recoverUnary, authInterceptor(authenticator, m2mConfig, log)),
+		grpc.ChainStreamInterceptor(recoverStream),
 		grpc.MaxRecvMsgSize(maxRecvMsgSize),
 	)
 

@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/storage v1.69.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/google/go-cmp v0.7.0
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.4
 	github.com/jomei/notionapi v1.13.3
 	github.com/lib/pq v1.12.3
 	github.com/prometheus/client_golang v1.24.1
