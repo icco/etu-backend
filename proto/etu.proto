@@ -154,6 +154,9 @@ message User {
   // billing_country is the ISO-3166-1 alpha-2 country code of the
   // user's billing address.
   optional string billing_country = 24;
+  // ai_enabled reports whether the user opted in to AI processing such as
+  // tag generation, OCR, and audio transcription. Defaults to false.
+  bool ai_enabled = 25;
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -465,6 +468,8 @@ message UpdateUserSettingsRequest {
   optional string notion_database_name = 7;
   optional ImageUpload profile_image_upload = 8;
   optional bool clear_profile_image = 9;
+  // ai_enabled opts the user in or out of AI processing when set.
+  optional bool ai_enabled = 10;
 }
 
 // UpdateUserSettingsResponse returns the updated user settings view.
