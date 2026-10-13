@@ -421,6 +421,7 @@ func TestCreateNote_SQL(t *testing.T) {
 
 	// Transaction: BEGIN, INSERT Note, COMMIT
 	mock.ExpectBegin()
+	mock.ExpectQuery(`FOR SHARE`).WithArgs(userID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 	mock.ExpectExec(`INSERT INTO "Note"`).
 		WithArgs(
 			sqlmock.AnyArg(), "hello", sqlmock.AnyArg(), sqlmock.AnyArg(), userID,
@@ -474,6 +475,7 @@ func TestUpdateNote_NotFound(t *testing.T) {
 
 	content := "updated"
 	mock.ExpectBegin()
+	mock.ExpectQuery(`FOR SHARE`).WithArgs(testUserID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(testUserID))
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs("note-missing", testUserID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}))
@@ -514,6 +516,7 @@ func TestAddImageToNote_SQL(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery(`FOR SHARE OF "User"`).WithArgs(noteID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(testUserID))
 	mock.ExpectExec(`INSERT INTO "NoteImage"`).
 		WithArgs(sqlmock.AnyArg(), noteID, img.URL, img.GCSObjectName, sqlmock.AnyArg(), img.MimeType, sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -690,6 +693,7 @@ func TestAddAudioToNote_SQL(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
+	mock.ExpectQuery(`FOR SHARE OF "User"`).WithArgs(noteID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(testUserID))
 	mock.ExpectExec(`INSERT INTO "NoteAudio"`).
 		WithArgs(sqlmock.AnyArg(), noteID, audio.URL, audio.GCSObjectName, sqlmock.AnyArg(), audio.MimeType, sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -1155,6 +1159,7 @@ func TestAddTagsToNote_SQL(t *testing.T) {
 
 	// Transaction: BEGIN, SELECT note, SELECT tag (not found), INSERT tag, SELECT NoteTag (not found), INSERT NoteTag, COMMIT
 	mock.ExpectBegin()
+	mock.ExpectQuery(`FOR SHARE`).WithArgs(userID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(userID))
 	mock.ExpectQuery(`SELECT (.+) FROM "Note"`).
 		WithArgs(noteID, userID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", colContent, colCreatedAt, colUpdatedAt, colUserID, colExternalID, colNotionUUID, colLastSyncedToNotion}).

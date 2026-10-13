@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -116,4 +117,32 @@ func (db *DB) FreezeUserForDeletion(ctx context.Context, userID string) error {
 		}
 		return nil
 	})
+}
+
+// ErrUserDisabled is returned by note writes for a missing or disabled user.
+var ErrUserDisabled = errors.New("user is disabled")
+
+// lockActiveUser share-locks the user row so writes commit before, or fail after, account deletion.
+func lockActiveUser(tx *gorm.DB, userID string) error {
+	var ids []string
+	if err := tx.Raw(`SELECT id FROM "User" WHERE id = ? AND disabled IS NOT TRUE FOR SHARE`, userID).Scan(&ids).Error; err != nil {
+		return fmt.Errorf("lock user: %w", err)
+	}
+	if len(ids) == 0 {
+		return ErrUserDisabled
+	}
+	return nil
+}
+
+// lockActiveNoteOwner share-locks the owner of noteID; see lockActiveUser.
+func lockActiveNoteOwner(tx *gorm.DB, noteID string) error {
+	var ids []string
+	err := tx.Raw(`SELECT "User".id FROM "User" JOIN "Note" ON "Note"."userId" = "User".id WHERE "Note".id = ? AND "User".disabled IS NOT TRUE FOR SHARE OF "User"`, noteID).Scan(&ids).Error
+	if err != nil {
+		return fmt.Errorf("lock note owner: %w", err)
+	}
+	if len(ids) == 0 {
+		return ErrUserDisabled
+	}
+	return nil
 }

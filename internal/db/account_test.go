@@ -196,3 +196,51 @@ func TestFreezeUserForDeletion(t *testing.T) {
 		})
 	}
 }
+
+const (
+	lockByUserSQL = `SELECT id FROM "User" WHERE id = $1 AND disabled IS NOT TRUE FOR SHARE`
+	lockByNoteSQL = `SELECT "User".id FROM "User" JOIN "Note" ON "Note"."userId" = "User".id WHERE "Note".id = $1 AND "User".disabled IS NOT TRUE FOR SHARE OF "User"`
+)
+
+func TestWritesRejectDisabledUser(t *testing.T) {
+	content := "x"
+	tests := []struct {
+		name  string
+		query string
+		arg   string
+		write func(*DB) error
+	}{
+		{name: "create note", query: lockByUserSQL, arg: testUserID, write: func(d *DB) error {
+			_, err := d.CreateNote(context.Background(), testUserID, "x", nil)
+			return err
+		}},
+		{name: "update note", query: lockByUserSQL, arg: testUserID, write: func(d *DB) error {
+			_, err := d.UpdateNote(context.Background(), testUserID, testNoteID, &content, nil, false)
+			return err
+		}},
+		{name: "add tags", query: lockByUserSQL, arg: testUserID, write: func(d *DB) error {
+			return d.AddTagsToNote(context.Background(), testUserID, testNoteID, []string{tagWork})
+		}},
+		{name: "add image", query: lockByNoteSQL, arg: testNoteID, write: func(d *DB) error {
+			return d.AddImageToNote(context.Background(), testNoteID, &NoteImage{ID: testImageID})
+		}},
+		{name: "add audio", query: lockByNoteSQL, arg: testNoteID, write: func(d *DB) error {
+			return d.AddAudioToNote(context.Background(), testNoteID, &NoteAudio{ID: "aud-1"})
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			database, mock := newMockDB(t)
+			mock.ExpectBegin()
+			mock.ExpectQuery(regexp.QuoteMeta(tt.query)).WithArgs(tt.arg).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+			mock.ExpectRollback()
+
+			if err := tt.write(database); !errors.Is(err, ErrUserDisabled) {
+				t.Fatalf("err = %v, want ErrUserDisabled", err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled expectations: %v", err)
+			}
+		})
+	}
+}

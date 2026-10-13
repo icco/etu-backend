@@ -130,15 +130,15 @@ func TestDeleteAccount(t *testing.T) {
 			wantCode:     codes.PermissionDenied,
 		},
 		{
-			name:        "stripe failure aborts before deleting",
-			ctx:         apiKeyCtx,
-			req:         &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
-			userExists:  true,
-			billingErr:  errors.New("stripe down"),
+			name:         "stripe failure aborts before deleting",
+			ctx:          apiKeyCtx,
+			req:          &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
+			userExists:   true,
+			billingErr:   errors.New("stripe down"),
 			expectFreeze: true,
-			wantMsg:     "contact support",
-			wantCode:    codes.Unavailable,
-			wantBilling: []string{"cus_1/sub_1"},
+			wantMsg:      "contact support",
+			wantCode:     codes.Unavailable,
+			wantBilling:  []string{"cus_1/sub_1"},
 		},
 		{
 			name:       "subscribed user without billing configured aborts",
@@ -149,16 +149,16 @@ func TestDeleteAccount(t *testing.T) {
 			wantCode:   codes.FailedPrecondition,
 		},
 		{
-			name:        "gcs failure aborts before db delete",
-			ctx:         apiKeyCtx,
-			req:         &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
-			userExists:  true,
-			storageFail: true,
+			name:         "gcs failure aborts before db delete",
+			ctx:          apiKeyCtx,
+			req:          &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
+			userExists:   true,
+			storageFail:  true,
 			expectFreeze: true,
-			wantMsg:     "contact support",
-			wantCode:    codes.Unavailable,
-			wantBilling: []string{"cus_1/sub_1"},
-			wantStorage: []string{"delete notes/n1/i1"},
+			wantMsg:      "contact support",
+			wantCode:     codes.Unavailable,
+			wantBilling:  []string{"cus_1/sub_1"},
+			wantStorage:  []string{"delete notes/n1/i1"},
 		},
 		{
 			name:         "m2m retry completes a frozen account",
@@ -369,4 +369,42 @@ func TestExportDataPaginatesAllNotes(t *testing.T) {
 
 func noteID(i int) string {
 	return "n" + time.Duration(i).String()
+}
+
+func TestNoteWritesForDisabledUser(t *testing.T) {
+	content := "x"
+	tests := []struct {
+		name string
+		call func(*NotesService, context.Context) error
+	}{
+		{name: "create", call: func(s *NotesService, ctx context.Context) error {
+			_, err := s.CreateNote(ctx, &pb.CreateNoteRequest{UserId: acctUser, Content: content})
+			return err
+		}},
+		{name: "update", call: func(s *NotesService, ctx context.Context) error {
+			_, err := s.UpdateNote(ctx, &pb.UpdateNoteRequest{UserId: acctUser, Id: "n1", Content: &content})
+			return err
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sqlDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = sqlDB.Close() }()
+			database, err := db.NewFromConn(sqlDB)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mock.ExpectBegin()
+			mock.ExpectQuery(`FOR SHARE`).WithArgs(acctUser).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+			mock.ExpectRollback()
+
+			err = tt.call(NewNotesService(database, nil, nil, ""), auth.SetAuthContext(context.Background(), "m2m", "m2m"))
+			if status.Code(err) != codes.FailedPrecondition {
+				t.Fatalf("code = %v, want FailedPrecondition (err %v)", status.Code(err), err)
+			}
+		})
+	}
 }
