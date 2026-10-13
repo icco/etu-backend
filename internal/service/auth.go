@@ -78,9 +78,10 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 		return &pb.AuthenticateResponse{Success: false}, nil
 	}
 
-	// Check if account is disabled
 	if user.Disabled {
-		return nil, status.Error(codes.PermissionDenied, "account is disabled")
+		// Pay the bcrypt cost so disabled accounts are not distinguishable from wrong passwords.
+		_ = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
+		return &pb.AuthenticateResponse{Success: false}, nil
 	}
 
 	// Check if account is locked due to too many failed attempts

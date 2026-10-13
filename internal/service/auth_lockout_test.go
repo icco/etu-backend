@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/go-cmp/cmp"
 	"go.icco.me/etu-backend/internal/db"
 	pb "go.icco.me/etu-backend/proto"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestAuthenticate_AccountLockout(t *testing.T) {
@@ -117,10 +119,7 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 		}
 	})
 
-	t.Run("disabled account returns error", func(t *testing.T) {
-		ctx := context.Background()
-
-		// Expect GetUserByEmail
+	t.Run("disabled account is indistinguishable from bad credentials", func(t *testing.T) {
 		mock.ExpectQuery(`SELECT \* FROM "User"`).
 			WithArgs(testEmail, 1).
 			WillReturnRows(sqlmock.NewRows([]string{
@@ -131,21 +130,15 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 				true, "Terms violation", 0,
 			))
 
-		_, err := service.Authenticate(ctx, &pb.AuthenticateRequest{
+		resp, err := service.Authenticate(context.Background(), &pb.AuthenticateRequest{
 			Email:    testEmail,
 			Password: testPassword,
 		})
-
-		if err == nil {
-			t.Fatal("Expected error for disabled account")
+		if err != nil {
+			t.Fatalf("Authenticate: %v", err)
 		}
-
-		st, ok := status.FromError(err)
-		if !ok {
-			t.Fatal("Expected gRPC status error")
-		}
-		if st.Code() != codes.PermissionDenied {
-			t.Errorf("Expected PermissionDenied code, got %v", st.Code())
+		if diff := cmp.Diff(&pb.AuthenticateResponse{Success: false}, resp, protocmp.Transform()); diff != "" {
+			t.Errorf("response mismatch (-want +got):\n%s", diff)
 		}
 	})
 
