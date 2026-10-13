@@ -16,22 +16,26 @@ import (
 // AuthService implements the AuthService gRPC service
 type AuthService struct {
 	pb.UnimplementedAuthServiceServer
-	db          *db.DB
-	loginLimits *loginLimits
+	db            *db.DB
+	loginLimits   *loginLimits
+	attemptLimits *attemptLimits
 }
 
 // NewAuthService creates a new AuthService
 func NewAuthService(database *db.DB) *AuthService {
-	return &AuthService{db: database, loginLimits: newLoginLimits()}
+	return &AuthService{db: database, loginLimits: newLoginLimits(), attemptLimits: newAttemptLimits()}
 }
 
 // Register creates a new user account
 func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	if req.Email == "" {
+	if db.NormalizeEmail(req.Email) == "" {
 		return nil, status.Error(codes.InvalidArgument, "email is required")
 	}
 	if req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "password is required")
+	}
+	if !s.attemptLimits.allow(clientIP(ctx), req.Email, time.Now()) {
+		return nil, status.Error(codes.ResourceExhausted, "too many attempts; retry later")
 	}
 
 	// Check if user already exists
@@ -65,6 +69,13 @@ func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 
 // Authenticate verifies user credentials
 func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequest) (*pb.AuthenticateResponse, error) {
+	if req.Email != "" && req.Password != "" && !s.attemptLimits.allow(clientIP(ctx), req.Email, time.Now()) {
+		return nil, status.Error(codes.ResourceExhausted, "too many attempts; retry later")
+	}
+	return s.authenticate(ctx, req)
+}
+
+func (s *AuthService) authenticate(ctx context.Context, req *pb.AuthenticateRequest) (*pb.AuthenticateResponse, error) {
 	if req.Email == "" {
 		return nil, status.Error(codes.InvalidArgument, "email is required")
 	}
@@ -117,7 +128,7 @@ func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*
 		return nil, status.Error(codes.ResourceExhausted, "too many login requests; retry later")
 	}
 	defer s.loginLimits.release()
-	result, err := s.Authenticate(ctx, req)
+	result, err := s.authenticate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
