@@ -11,6 +11,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	pb "go.icco.me/etu-backend/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeAccounts struct {
@@ -34,7 +37,7 @@ func TestPaywallInterceptor(t *testing.T) {
 		wantLookup bool
 	}{
 		{"public method", "/etu.AuthService/Login", context.Background(), &fakeAccounts{}, codes.OK, false},
-		{"m2m bypass", "/etu.NotesService/ListNotes", auth.SetAuthContext(context.Background(), "m2m", "m2m"), &fakeAccounts{}, codes.OK, false},
+		{"m2m billing bypass", "/etu.AuthService/GetUserByStripeCustomerId", auth.SetAuthContext(context.Background(), "m2m", "m2m"), &fakeAccounts{}, codes.OK, false},
 		{"active user", "/etu.NotesService/ListNotes", auth.SetAuthContext(context.Background(), "u1", "apikey"), &fakeAccounts{state: auth.AccountState{Status: "active"}}, codes.OK, true},
 		{"canceled user", "/etu.NotesService/ListNotes", auth.SetAuthContext(context.Background(), "u1", "apikey"), &fakeAccounts{state: auth.AccountState{Status: "canceled"}}, codes.PermissionDenied, true},
 		{"disabled user", "/etu.AuthService/GetUser", auth.SetAuthContext(context.Background(), "u1", "apikey"), &fakeAccounts{state: auth.AccountState{Status: "active", Disabled: true}}, codes.PermissionDenied, true},
@@ -92,6 +95,96 @@ func TestPaywallStreamInterceptor(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.want == codes.OK, called); diff != "" {
 				t.Errorf("handler called mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestPaywallInterceptorM2M(t *testing.T) {
+	m2m := auth.SetAuthContext(context.Background(), "m2m", "m2m")
+	active := auth.AccountState{Status: "active"}
+	canceled := auth.AccountState{Status: "canceled"}
+	disabled := auth.AccountState{Status: "active", Disabled: true}
+	tests := []struct {
+		name       string
+		method     string
+		req        interface{}
+		state      auth.AccountState
+		want       codes.Code
+		wantLookup bool
+	}{
+		{"notes active", "/etu.NotesService/CreateNote", &pb.CreateNoteRequest{UserId: "u1"}, active, codes.OK, true},
+		{"notes canceled", "/etu.NotesService/CreateNote", &pb.CreateNoteRequest{UserId: "u1"}, canceled, codes.PermissionDenied, true},
+		{"notes disabled", "/etu.NotesService/ListNotes", &pb.ListNotesRequest{UserId: "u1"}, disabled, codes.PermissionDenied, true},
+		{"notes missing user", "/etu.NotesService/ListNotes", &pb.ListNotesRequest{}, active, codes.InvalidArgument, false},
+		{"tags canceled", "/etu.TagsService/ListTags", &pb.ListTagsRequest{UserId: "u1"}, canceled, codes.PermissionDenied, true},
+		{"user stats canceled", "/etu.StatsService/GetStats", &pb.GetStatsRequest{UserId: "u1"}, canceled, codes.PermissionDenied, true},
+		{"global stats", "/etu.StatsService/GetStats", &pb.GetStatsRequest{}, disabled, codes.OK, false},
+		{"settings read canceled", "/etu.UserSettingsService/GetUserSettings", &pb.GetUserSettingsRequest{UserId: "u1"}, canceled, codes.OK, true},
+		{"settings read disabled", "/etu.UserSettingsService/GetUserSettings", &pb.GetUserSettingsRequest{UserId: "u1"}, disabled, codes.PermissionDenied, true},
+		{"settings write canceled", "/etu.UserSettingsService/UpdateUserSettings", &pb.UpdateUserSettingsRequest{UserId: "u1"}, canceled, codes.PermissionDenied, true},
+		{"create key canceled", "/etu.ApiKeysService/CreateApiKey", &pb.CreateApiKeyRequest{UserId: "u1"}, canceled, codes.PermissionDenied, true},
+		{"delete key disabled", "/etu.ApiKeysService/DeleteApiKey", &pb.DeleteApiKeyRequest{UserId: "u1"}, disabled, codes.PermissionDenied, true},
+		{"profile image bypass", "/etu.UserSettingsService/GetProfileImageURL", &pb.GetProfileImageURLRequest{Key: "k"}, disabled, codes.OK, false},
+		{"get user bypass", "/etu.AuthService/GetUser", &pb.GetUserRequest{UserId: "u1"}, disabled, codes.OK, false},
+		{"subscription bypass", "/etu.AuthService/UpdateUserSubscription", &pb.UpdateUserSubscriptionRequest{UserId: "u1"}, disabled, codes.OK, false},
+		{"stripe customer bypass", "/etu.AuthService/UpdateUserStripeCustomer", &pb.UpdateUserStripeCustomerRequest{UserId: "u1"}, disabled, codes.OK, false},
+		{"register bypass", "/etu.AuthService/Register", &pb.RegisterRequest{}, disabled, codes.OK, false},
+		{"delete account bypass", "/etu.AccountService/DeleteAccount", nil, disabled, codes.OK, false},
+		{"unknown method without user id", "/etu.MediaService/Upload", &pb.GetProfileImageURLRequest{}, active, codes.InvalidArgument, false},
+		{"unknown method nil request", "/etu.MediaService/Upload", nil, active, codes.InvalidArgument, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			accounts := &fakeAccounts{state: tt.state}
+			interceptor := paywallInterceptor(accounts, auth.Paywall{Grace: time.Hour})
+			_, err := interceptor(m2m, tt.req, &grpc.UnaryServerInfo{FullMethod: tt.method}, func(context.Context, interface{}) (interface{}, error) {
+				return nil, nil
+			})
+			if diff := cmp.Diff(tt.want, status.Code(err)); diff != "" {
+				t.Errorf("code mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(tt.wantLookup, accounts.calls > 0); diff != "" {
+				t.Errorf("lookup mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+type recvServerStream struct {
+	fakeServerStream
+	msg *pb.ListNotesRequest
+}
+
+func (s recvServerStream) RecvMsg(m interface{}) error {
+	proto.Merge(m.(*pb.ListNotesRequest), s.msg)
+	return nil
+}
+
+func TestPaywallStreamInterceptorM2M(t *testing.T) {
+	m2m := auth.SetAuthContext(context.Background(), "m2m", "m2m")
+	tests := []struct {
+		name   string
+		method string
+		msg    *pb.ListNotesRequest
+		state  auth.AccountState
+		want   codes.Code
+	}{
+		{"export bypass", "/etu.AccountService/ExportData", &pb.ListNotesRequest{}, auth.AccountState{Disabled: true}, codes.OK},
+		{"stream active", "/etu.NotesService/StreamNotes", &pb.ListNotesRequest{UserId: "u1"}, auth.AccountState{Status: "active"}, codes.OK},
+		{"stream canceled", "/etu.NotesService/StreamNotes", &pb.ListNotesRequest{UserId: "u1"}, auth.AccountState{Status: "canceled"}, codes.PermissionDenied},
+		{"stream disabled", "/etu.NotesService/StreamNotes", &pb.ListNotesRequest{UserId: "u1"}, auth.AccountState{Status: "active", Disabled: true}, codes.PermissionDenied},
+		{"stream missing user", "/etu.NotesService/StreamNotes", &pb.ListNotesRequest{}, auth.AccountState{Status: "active"}, codes.InvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			interceptor := paywallStreamInterceptor(&fakeAccounts{state: tt.state}, auth.Paywall{Grace: time.Hour})
+			stream := recvServerStream{fakeServerStream: fakeServerStream{ctx: m2m}, msg: tt.msg}
+			err := interceptor(nil, stream, &grpc.StreamServerInfo{FullMethod: tt.method, IsServerStream: true}, func(_ interface{}, ss grpc.ServerStream) error {
+				return ss.RecvMsg(&pb.ListNotesRequest{})
+			})
+			if diff := cmp.Diff(tt.want, status.Code(err)); diff != "" {
+				t.Errorf("code mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}
