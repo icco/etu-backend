@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -22,8 +23,8 @@ func TestAttemptLimits(t *testing.T) {
 		mail func(i int) string
 		want int
 	}{
-		{name: "per email", ips: func(i int) string { return "10.0.0." + string(rune('a'+i)) }, mail: func(int) string { return "alice@example.com" }, want: attemptsPerEmailBurst},
-		{name: "per ip", ips: func(int) string { return "10.0.0.1" }, mail: func(i int) string { return string(rune('a'+i)) + "@example.com" }, want: attemptsPerIPBurst},
+		{name: "per email", ips: func(i int) string { return fmt.Sprintf("10.0.0.%d", i) }, mail: func(int) string { return "alice@example.com" }, want: attemptsPerEmailBurst},
+		{name: "per ip", ips: func(int) string { return "10.0.0.1" }, mail: func(i int) string { return fmt.Sprintf("user%d@example.com", i) }, want: attemptsPerIPBurst},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			l := newAttemptLimits()
