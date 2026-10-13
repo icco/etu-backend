@@ -162,7 +162,6 @@ func (s recvServerStream) RecvMsg(m interface{}) error {
 }
 
 func TestPaywallStreamInterceptorM2M(t *testing.T) {
-	m2m := auth.SetAuthContext(context.Background(), "m2m", "m2m")
 	tests := []struct {
 		name   string
 		method string
@@ -179,7 +178,7 @@ func TestPaywallStreamInterceptorM2M(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			interceptor := paywallStreamInterceptor(&fakeAccounts{state: tt.state}, auth.Paywall{Grace: time.Hour})
-			stream := recvServerStream{fakeServerStream: fakeServerStream{ctx: m2m}, msg: tt.msg}
+			stream := recvServerStream{fakeServerStream: fakeServerStream{ctx: auth.SetAuthContext(context.Background(), "m2m", "m2m")}, msg: tt.msg}
 			err := interceptor(nil, stream, &grpc.StreamServerInfo{FullMethod: tt.method, IsServerStream: true}, func(_ interface{}, ss grpc.ServerStream) error {
 				return ss.RecvMsg(&pb.ListNotesRequest{})
 			})
