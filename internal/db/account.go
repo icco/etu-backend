@@ -100,3 +100,20 @@ func (db *DB) ExportNotes(ctx context.Context, userID string, cursor *ExportCurs
 	}
 	return notes, nil
 }
+
+// DeletionDisabledReason marks accounts frozen by an in-progress or failed account deletion.
+const DeletionDisabledReason = "account deletion in progress"
+
+// FreezeUserForDeletion disables the user and revokes all of their API keys in one
+// committed transaction so no new data can be written while deletion runs.
+func (db *DB) FreezeUserForDeletion(ctx context.Context, userID string) error {
+	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(`UPDATE "User" SET disabled = true, "disabledReason" = ? WHERE id = ?`, DeletionDisabledReason, userID).Error; err != nil {
+			return fmt.Errorf("disable user: %w", err)
+		}
+		if err := tx.Exec(`DELETE FROM "ApiKey" WHERE "userId" = ?`, userID).Error; err != nil {
+			return fmt.Errorf("revoke api keys: %w", err)
+		}
+		return nil
+	})
+}

@@ -161,3 +161,38 @@ func TestExportNotes(t *testing.T) {
 		})
 	}
 }
+
+func TestFreezeUserForDeletion(t *testing.T) {
+	tests := []struct {
+		name      string
+		revokeErr error
+		wantErr   bool
+	}{
+		{name: "disables user and revokes keys in one transaction"},
+		{name: "rolls back when key revocation fails", revokeErr: errors.New("boom"), wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			database, mock := newMockDB(t)
+			mock.ExpectBegin()
+			mock.ExpectExec(regexp.QuoteMeta(`UPDATE "User" SET disabled = true, "disabledReason" = $1 WHERE id = $2`)).
+				WithArgs(DeletionDisabledReason, testUserID).WillReturnResult(sqlmock.NewResult(0, 1))
+			e := mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "ApiKey" WHERE "userId" = $1`)).WithArgs(testUserID)
+			if tt.revokeErr != nil {
+				e.WillReturnError(tt.revokeErr)
+				mock.ExpectRollback()
+			} else {
+				e.WillReturnResult(sqlmock.NewResult(0, 3))
+				mock.ExpectCommit()
+			}
+
+			err := database.FreezeUserForDeletion(context.Background(), testUserID)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("FreezeUserForDeletion err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled expectations: %v", err)
+			}
+		})
+	}
+}
