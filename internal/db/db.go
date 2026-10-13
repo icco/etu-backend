@@ -685,7 +685,7 @@ func (db *DB) CreateUser(ctx context.Context, email, passwordHash string) (*User
 // GetUserByEmail retrieves a user by email address
 func (db *DB) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	var user User
-	result := db.conn.WithContext(ctx).Where("lower(email) = ?", NormalizeEmail(email)).First(&user)
+	result := db.conn.WithContext(ctx).Where("lower(trim(email)) = ?", NormalizeEmail(email)).First(&user)
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

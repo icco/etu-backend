@@ -35,7 +35,7 @@ func TestGetUserByEmail_CaseInsensitive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mock.ExpectQuery(`SELECT \* FROM "User" WHERE lower\(email\) = \$1`).
+	mock.ExpectQuery(`SELECT \* FROM "User" WHERE lower\(trim\(email\)\) = \$1`).
 		WithArgs("alice@example.com", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", colEmail, colCreatedAt}).AddRow("u1", "Alice@Example.com", time.Now()))
 	user, err := database.GetUserByEmail(context.Background(), " ALICE@example.com")
@@ -98,10 +98,10 @@ func TestEnsureEmailIndex(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			mock.ExpectQuery(`SELECT count\(\*\) FROM \(SELECT lower\(email\) FROM "User" GROUP BY lower\(email\) HAVING count\(\*\) > 1\)`).
+			mock.ExpectQuery(`SELECT count\(\*\) FROM \(SELECT lower\(trim\(email\)\) FROM "User" GROUP BY lower\(trim\(email\)\) HAVING count\(\*\) > 1\)`).
 				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.dupes))
 			if tc.dupes == 0 {
-				mock.ExpectExec(`CREATE UNIQUE INDEX IF NOT EXISTS "User_email_lower_key" ON "User" \(lower\(email\)\)`).
+				mock.ExpectExec(`CREATE UNIQUE INDEX IF NOT EXISTS "User_email_normalized_key" ON "User" \(lower\(trim\(email\)\)\)`).
 					WillReturnResult(sqlmock.NewResult(0, 0))
 			}
 			err = database.ensureEmailIndex(context.Background())

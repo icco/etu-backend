@@ -21,14 +21,14 @@ func NormalizeEmail(email string) string {
 
 func (db *DB) ensureEmailIndex(ctx context.Context) error {
 	var dupes int64
-	if err := db.conn.WithContext(ctx).Raw(`SELECT count(*) FROM (SELECT lower(email) FROM "User" GROUP BY lower(email) HAVING count(*) > 1) d`).Row().Scan(&dupes); err != nil {
+	if err := db.conn.WithContext(ctx).Raw(`SELECT count(*) FROM (SELECT lower(trim(email)) FROM "User" GROUP BY lower(trim(email)) HAVING count(*) > 1) d`).Row().Scan(&dupes); err != nil {
 		return fmt.Errorf("count duplicate emails: %w", err)
 	}
 	if dupes > 0 {
 		return fmt.Errorf("%w: %d email addresses are shared by multiple users when compared case-insensitively; merge or rename them before starting the server", ErrDuplicateEmails, dupes)
 	}
-	if err := db.conn.WithContext(ctx).Exec(`CREATE UNIQUE INDEX IF NOT EXISTS "User_email_lower_key" ON "User" (lower(email))`).Error; err != nil {
-		return fmt.Errorf("create lower(email) unique index: %w", err)
+	if err := db.conn.WithContext(ctx).Exec(`CREATE UNIQUE INDEX IF NOT EXISTS "User_email_normalized_key" ON "User" (lower(trim(email)))`).Error; err != nil {
+		return fmt.Errorf("create normalized email unique index: %w", err)
 	}
 	return nil
 }
