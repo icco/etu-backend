@@ -96,7 +96,7 @@ func TestDeleteAccount(t *testing.T) {
 			expectDelete: true,
 			expectFreeze: true,
 			wantBilling:  []string{"cus_1/sub_1"},
-			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/"},
+			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/", "delete notes/n2/late", "prefix profiles/alice/"},
 		},
 		{
 			name:         "m2m skips password",
@@ -106,7 +106,7 @@ func TestDeleteAccount(t *testing.T) {
 			expectDelete: true,
 			expectFreeze: true,
 			wantBilling:  []string{"cus_1/sub_1"},
-			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/"},
+			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/", "delete notes/n2/late", "prefix profiles/alice/"},
 		},
 		{
 			name:     "other user is denied",
@@ -169,7 +169,7 @@ func TestDeleteAccount(t *testing.T) {
 			expectFreeze: true,
 			expectDelete: true,
 			wantBilling:  []string{"cus_1/sub_1"},
-			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/"},
+			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/", "delete notes/n2/late", "prefix profiles/alice/"},
 		},
 		{
 			name:         "freeze failure aborts before stripe",
@@ -236,6 +236,9 @@ func TestDeleteAccount(t *testing.T) {
 			}
 			if tt.expectDelete {
 				mock.ExpectBegin()
+				mock.ExpectQuery(`FOR UPDATE`).WithArgs(acctUser).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(acctUser))
+				mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(acctUser, acctUser).
+					WillReturnRows(sqlmock.NewRows([]string{"gcsObjectName"}).AddRow("notes/n1/i1").AddRow("notes/n2/late"))
 				for range 9 {
 					mock.ExpectExec(`DELETE FROM`).WithArgs(acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
 				}

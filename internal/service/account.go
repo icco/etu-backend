@@ -131,8 +131,13 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 		}
 	}
 
-	if err := s.db.DeleteUserData(ctx, user.ID); err != nil {
+	remaining, err := s.db.DeleteUserData(ctx, user.ID)
+	if err != nil {
 		return nil, incompleteDeletion(codes.Internal, "delete account data", err)
+	}
+	if err := s.sweepStragglers(ctx, user.ID, objects, remaining); err != nil {
+		l.Errorw("account deleted but media cleanup failed", "user_id", user.ID, "objects", remaining, "error", err)
+		return nil, status.Errorf(codes.Internal, "account deleted but media cleanup failed; support must remove remaining files: %v", err)
 	}
 	l.Infow("account deleted", "user_id", user.ID, "media_objects", len(objects))
 	return &pb.DeleteAccountResponse{Success: true}, nil
@@ -261,4 +266,25 @@ func deref(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// sweepStragglers deletes media committed between the first media listing and the
+// locked delete transaction, plus any profile image uploaded meanwhile.
+func (s *AccountService) sweepStragglers(ctx context.Context, userID string, deleted, remaining []string) error {
+	if s.storage == nil {
+		return nil
+	}
+	done := make(map[string]bool, len(deleted))
+	for _, name := range deleted {
+		done[name] = true
+	}
+	for _, name := range remaining {
+		if done[name] {
+			continue
+		}
+		if err := s.storage.DeleteImage(ctx, name); err != nil {
+			return err
+		}
+	}
+	return s.storage.DeletePrefix(ctx, fmt.Sprintf("profiles/%s/", userID))
 }

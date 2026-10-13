@@ -16,7 +16,9 @@ type ExportCursor struct {
 }
 
 // DeleteUserData permanently deletes a user and every row they own in a single transaction.
-func (db *DB) DeleteUserData(ctx context.Context, userID string) error {
+// It locks the user row first, so in-flight note writes either commit before it (and are
+// deleted here) or fail afterwards. It returns the media object names present at deletion.
+func (db *DB) DeleteUserData(ctx context.Context, userID string) ([]string, error) {
 	const notesOf = `(SELECT id FROM "Note" WHERE "userId" = ?)`
 	statements := []string{
 		`DELETE FROM "NoteTag" WHERE "noteId" IN ` + notesOf,
@@ -29,7 +31,16 @@ func (db *DB) DeleteUserData(ctx context.Context, userID string) error {
 		`DELETE FROM "SyncState" WHERE "userId" = ?`,
 		`DELETE FROM "User" WHERE id = ?`,
 	}
-	return db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var objects []string
+	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var locked []string
+		if err := tx.Raw(`SELECT id FROM "User" WHERE id = ? FOR UPDATE`, userID).Scan(&locked).Error; err != nil {
+			return fmt.Errorf("lock user: %w", err)
+		}
+		var err error
+		if objects, err = userMediaObjects(tx, userID); err != nil {
+			return err
+		}
 		for _, stmt := range statements {
 			if err := tx.Exec(stmt, userID).Error; err != nil {
 				return fmt.Errorf("delete user data: %w", err)
@@ -37,12 +48,20 @@ func (db *DB) DeleteUserData(ctx context.Context, userID string) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return objects, nil
 }
 
 // UserMediaObjects returns the GCS object names of every attachment on the user's notes.
 func (db *DB) UserMediaObjects(ctx context.Context, userID string) ([]string, error) {
+	return userMediaObjects(db.conn.WithContext(ctx), userID)
+}
+
+func userMediaObjects(tx *gorm.DB, userID string) ([]string, error) {
 	var names []string
-	err := db.conn.WithContext(ctx).Raw(
+	err := tx.Raw(
 		`SELECT "NoteImage"."gcsObjectName" FROM "NoteImage" JOIN "Note" ON "Note".id = "NoteImage"."noteId" WHERE "Note"."userId" = ?`+
 			` UNION SELECT "NoteAudio"."gcsObjectName" FROM "NoteAudio" JOIN "Note" ON "Note".id = "NoteAudio"."noteId" WHERE "Note"."userId" = ?`,
 		userID, userID,

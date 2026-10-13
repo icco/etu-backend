@@ -51,6 +51,10 @@ func TestDeleteUserData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			database, mock := newMockDB(t)
 			mock.ExpectBegin()
+			mock.ExpectQuery(regexp.QuoteMeta(`SELECT id FROM "User" WHERE id = $1 FOR UPDATE`)).WithArgs(testUserID).
+				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(testUserID))
+			mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(testUserID, testUserID).
+				WillReturnRows(sqlmock.NewRows([]string{colGCSObjectName}).AddRow("notes/n9/late"))
 			for i, stmt := range deleteUserDataStatements {
 				e := mock.ExpectExec(regexp.QuoteMeta(stmt)).WithArgs(testUserID)
 				if i == tt.failAt {
@@ -64,9 +68,14 @@ func TestDeleteUserData(t *testing.T) {
 				mock.ExpectCommit()
 			}
 
-			err := database.DeleteUserData(context.Background(), testUserID)
+			objects, err := database.DeleteUserData(context.Background(), testUserID)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("DeleteUserData err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				if diff := cmp.Diff([]string{"notes/n9/late"}, objects); diff != "" {
+					t.Errorf("objects mismatch (-want +got):\n%s", diff)
+				}
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %v", err)
