@@ -172,7 +172,7 @@ func processAllTasks(ctx context.Context, database *db.DB, aiClient *ai.Client, 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		tagResult, err := generateTagsForAllUsers(ctx, database, users, aiClient, dryRun, rateLimiter, limit)
+		tagResult, err := generateTagsForAllUsers(ctx, database, aiClient, dryRun, rateLimiter, limit)
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
@@ -369,12 +369,17 @@ func processAudiosForUser(ctx context.Context, database *db.DB, userID string, a
 	return processed, errors
 }
 
-// generateTagsForAllUsers generates tags for each AI eligible user.
-func generateTagsForAllUsers(ctx context.Context, database *db.DB, users []db.User, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter, limit int) (*TagGenResult, error) {
+// generateTagsForAllUsers adds hashtag tags for every user and AI tags for AI eligible users.
+func generateTagsForAllUsers(ctx context.Context, database *db.DB, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter, limit int) (*TagGenResult, error) {
 	l := logging.FromContext(ctx)
 
 	start := time.Now()
 	result := &TagGenResult{}
+
+	users, err := database.ListAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, user := range users {
 		select {
@@ -384,7 +389,7 @@ func generateTagsForAllUsers(ctx context.Context, database *db.DB, users []db.Us
 		default:
 		}
 
-		userResult, err := generateTagsForUser(ctx, database, user.ID, aiClient, dryRun, limiter, limit)
+		userResult, err := generateTagsForUser(ctx, database, user.ID, aiClient, dryRun, limiter, limit, db.AIEligible(&user))
 		if err != nil {
 			l.Errorw("failed to generate tags for user", "user_id", user.ID, zap.Error(err))
 			result.Errors++
@@ -410,7 +415,7 @@ type TagGenResult struct {
 	Duration       time.Duration
 }
 
-func generateTagsForUser(ctx context.Context, database *db.DB, userID string, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter, limit int) (*TagGenResult, error) {
+func generateTagsForUser(ctx context.Context, database *db.DB, userID string, aiClient *ai.Client, dryRun bool, limiter *rate.Limiter, limit int, aiAllowed bool) (*TagGenResult, error) {
 	l := logging.FromContext(ctx).With("user_id", userID)
 
 	result := &TagGenResult{}
@@ -471,6 +476,10 @@ func generateTagsForUser(ctx context.Context, database *db.DB, userID string, ai
 		}
 
 		if maxNewTags <= 0 {
+			continue
+		}
+
+		if !aiAllowed {
 			continue
 		}
 
