@@ -139,6 +139,14 @@ func (db *DB) AutoMigrate() error {
 			return fmt.Errorf("drop User.image: %w", err)
 		}
 	}
+	return db.BackfillPastDueSince(context.Background())
+}
+
+// BackfillPastDueSince starts the grace period now for past_due users that predate the pastDueSince column.
+func (db *DB) BackfillPastDueSince(ctx context.Context) error {
+	if err := db.conn.WithContext(ctx).Exec(`UPDATE "User" SET "pastDueSince" = now() WHERE "subscriptionStatus" = ? AND "pastDueSince" IS NULL`, SubscriptionStatusPastDue).Error; err != nil {
+		return fmt.Errorf("backfill pastDueSince: %w", err)
+	}
 	return nil
 }
 

@@ -1648,3 +1648,24 @@ func TestUpdateUserSubscription_PastDueSince_SQL(t *testing.T) {
 		})
 	}
 }
+
+func TestBackfillPastDueSince_SQL(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = sqlDB.Close() }()
+	db, err := NewFromConn(sqlDB)
+	if err != nil {
+		t.Fatalf("NewFromConn: %v", err)
+	}
+	mock.ExpectExec(`UPDATE "User" SET "pastDueSince" = now\(\) WHERE "subscriptionStatus" = \$1 AND "pastDueSince" IS NULL`).
+		WithArgs("past_due").
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	if err := db.BackfillPastDueSince(context.Background()); err != nil {
+		t.Fatalf("BackfillPastDueSince: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
