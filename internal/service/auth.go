@@ -266,6 +266,7 @@ func userToProto(u *db.User) *pb.User {
 		UpdatedAt:          timestamppb.New(u.UpdatedAt),
 		Disabled:           u.Disabled,
 		CancelAtPeriodEnd:  u.CancelAtPeriodEnd,
+		AiEnabled:          u.AIEnabled,
 	}
 
 	if u.Name != nil {

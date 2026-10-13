@@ -364,3 +364,62 @@ func TestGetProfileImageURL_NoImgixNoStorage(t *testing.T) {
 		t.Errorf("expected FailedPrecondition, got %v", st.Code())
 	}
 }
+
+func TestUpdateUserSettings_AIEnabled(t *testing.T) {
+	aiColumns := append(append([]string{}, userColumns...), "aiEnabled")
+	tests := []struct {
+		name    string
+		enabled bool
+	}{
+		{name: "opt in", enabled: true},
+		{name: "opt out", enabled: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, mock, cleanup := newTestUserSettingsService(t, "")
+			defer cleanup()
+
+			ctx := auth.SetAuthContext(context.Background(), testUserNameRow, "m2m")
+			now := time.Now()
+			row := func(ai bool) *sqlmock.Rows {
+				return sqlmock.NewRows(aiColumns).AddRow(
+					testUserNameRow, "a@b.com", "Alice", "hash",
+					"active", nil, now, nil, nil, nil, nil, now,
+					false, nil, 0, nil, ai,
+				)
+			}
+
+			mock.ExpectBegin()
+			mock.ExpectExec(`UPDATE "User" SET "aiEnabled"=\$1,"updatedAt"=\$2 WHERE "id" = \$3`).
+				WithArgs(tt.enabled, sqlmock.AnyArg(), testUserNameRow).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectCommit()
+			mock.ExpectQuery(`SELECT \* FROM "User"`).
+				WithArgs(testUserNameRow, 1).
+				WillReturnRows(row(tt.enabled))
+			mock.ExpectBegin()
+			mock.ExpectExec(`UPDATE "User"`).
+				WithArgs(sqlmock.AnyArg(), testUserNameRow).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectCommit()
+			mock.ExpectQuery(`SELECT \* FROM "User"`).
+				WithArgs(testUserNameRow, testUserNameRow, 1).
+				WillReturnRows(row(tt.enabled))
+
+			enabled := tt.enabled
+			resp, err := svc.UpdateUserSettings(ctx, &pb.UpdateUserSettingsRequest{
+				UserId:    testUserNameRow,
+				AiEnabled: &enabled,
+			})
+			if err != nil {
+				t.Fatalf("UpdateUserSettings: %v", err)
+			}
+			if resp.User.GetAiEnabled() != tt.enabled {
+				t.Errorf("AiEnabled = %v, want %v", resp.User.GetAiEnabled(), tt.enabled)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled expectations: %v", err)
+			}
+		})
+	}
+}

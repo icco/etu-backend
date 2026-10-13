@@ -109,6 +109,12 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		profileImageGCSObject = &empty
 	}
 
+	if req.AiEnabled != nil {
+		if err := s.db.SetUserAIEnabled(ctx, req.UserId, *req.AiEnabled); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to update ai setting: %v", err)
+		}
+	}
+
 	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, req.Password, req.NotionDatabaseName, profileImageGCSObject)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
