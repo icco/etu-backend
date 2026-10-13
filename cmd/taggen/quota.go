@@ -34,7 +34,7 @@ func allowAI(ctx context.Context, database *db.DB, userID string, limit int) boo
 		return false
 	}
 	if !ok {
-		logging.FromContext(ctx).Infow("daily AI limit reached", "user_id", userID, "limit", limit)
+		logging.FromContext(ctx).Infow("AI not admitted: daily limit reached or user no longer eligible", "user_id", userID, "limit", limit)
 	}
 	return ok
 }
