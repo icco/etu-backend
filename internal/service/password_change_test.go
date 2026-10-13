@@ -25,12 +25,14 @@ func TestUpdateUserSettings_PasswordChange(t *testing.T) {
 		current  *string
 		disabled bool
 		attempts int
+		image    bool
 		want     codes.Code
 	}{
 		{name: "missing current password", want: codes.InvalidArgument},
 		{name: "wrong current password records failure", current: ptr("wrong"), want: codes.PermissionDenied},
 		{name: "locked account", current: ptr(testPassword), attempts: 5, want: codes.PermissionDenied},
 		{name: "disabled account", current: ptr(testPassword), disabled: true, want: codes.PermissionDenied},
+		{name: "image failure aborts before any password write", current: ptr(testPassword), image: true, want: codes.FailedPrecondition},
 		{name: "success revokes keys", current: ptr(testPassword), want: codes.OK},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -43,7 +45,7 @@ func TestUpdateUserSettings_PasswordChange(t *testing.T) {
 					tc.disabled, nil, tc.attempts, now,
 				)
 			}
-			if tc.current != nil {
+			if tc.current != nil && !tc.image {
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs("u1", 1).WillReturnRows(row())
 			}
 			switch tc.name {
@@ -55,15 +57,17 @@ func TestUpdateUserSettings_PasswordChange(t *testing.T) {
 				mock.ExpectBegin()
 				mock.ExpectExec(`UPDATE "User" SET`).WithArgs(0, nil, sqlmock.AnyArg(), sqlmock.AnyArg(), "u1").WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectExec(`DELETE FROM "ApiKey" WHERE "userId" = \$1`).WithArgs("u1").WillReturnResult(sqlmock.NewResult(0, 2))
-				mock.ExpectCommit()
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs("u1", 1).WillReturnRows(row())
-				mock.ExpectBegin()
 				mock.ExpectExec(`UPDATE "User"`).WithArgs(sqlmock.AnyArg(), "u1").WillReturnResult(sqlmock.NewResult(0, 1))
-				mock.ExpectCommit()
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs("u1", "u1", 1).WillReturnRows(row())
+				mock.ExpectCommit()
 			}
 			ctx := auth.SetAuthContext(context.Background(), "u1", "apikey")
-			_, err := svc.UpdateUserSettings(ctx, &pb.UpdateUserSettingsRequest{UserId: "u1", Password: &newPassword, CurrentPassword: tc.current})
+			req := &pb.UpdateUserSettingsRequest{UserId: "u1", Password: &newPassword, CurrentPassword: tc.current}
+			if tc.image {
+				req.ProfileImageUpload = &pb.ImageUpload{Data: []byte("x"), MimeType: "image/png"}
+			}
+			_, err := svc.UpdateUserSettings(ctx, req)
 			if status.Code(err) != tc.want {
 				t.Fatalf("code = %v (%v), want %v", status.Code(err), err, tc.want)
 			}

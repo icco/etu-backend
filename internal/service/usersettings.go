@@ -66,15 +66,7 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		return nil, err
 	}
 
-	if req.Password != nil && *req.Password != "" {
-		if err := s.changePassword(ctx, req.UserId, req.GetCurrentPassword(), *req.Password); err != nil {
-			return nil, err
-		}
-	}
-
 	l := logging.FromContext(ctx)
-
-	var profileImageGCSObject *string
 
 	if req.ProfileImageUpload != nil {
 		if s.storage == nil {
@@ -85,12 +77,21 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 			l.Errorw("profile image validation failed", "user_id", req.UserId, zap.Error(err))
 			return nil, status.Errorf(codes.InvalidArgument, "invalid profile image: %v", err)
 		}
+	}
 
+	if req.Password != nil && *req.Password != "" {
+		if err := s.verifyCurrentPassword(ctx, req.UserId, req.GetCurrentPassword()); err != nil {
+			return nil, err
+		}
+	}
+
+	var profileImageGCSObject *string
+	var oldObjectName, newObjectName string
+	if req.ProfileImageUpload != nil {
 		// Capture any prior avatar object so we can delete it after a successful overwrite.
 		// Using a unique per-upload path avoids imgix's origin cache serving stale bytes
 		// from a fixed key, which it does even when the imgix request URL has a fresh
 		// cache-busting query param (imgix origin cache keys ignore query strings).
-		var oldObjectName string
 		if existing, getErr := s.db.GetUser(ctx, req.UserId); getErr == nil && existing != nil && existing.ProfileImageGCSObject != nil {
 			oldObjectName = *existing.ProfileImageGCSObject
 		}
@@ -104,21 +105,27 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		l.Infow("GCS upload succeeded", "user_id", req.UserId, "object_name", objectName, "bytes", len(req.ProfileImageUpload.Data))
 
 		profileImageGCSObject = &objectName
-
-		if oldObjectName != "" && oldObjectName != objectName {
-			if err := s.storage.DeleteImage(ctx, oldObjectName); err != nil {
-				l.Warnw("failed to delete previous avatar (orphaned object left in GCS)",
-					"user_id", req.UserId, "old_object_name", oldObjectName, zap.Error(err))
-			}
-		}
+		newObjectName = objectName
 	} else if req.ClearProfileImage != nil && *req.ClearProfileImage {
 		empty := ""
 		profileImageGCSObject = &empty
 	}
 
-	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, nil, req.NotionDatabaseName, profileImageGCSObject)
+	user, err := s.db.UpdateUserSettingsWithPassword(ctx, req.UserId, req.NotionKey, req.Name, req.Password, req.NotionDatabaseName, profileImageGCSObject)
 	if err != nil {
+		if newObjectName != "" {
+			if delErr := s.storage.DeleteImage(ctx, newObjectName); delErr != nil {
+				l.Errorw("failed to delete uploaded avatar after settings update failed", "user_id", req.UserId, "object_name", newObjectName, zap.Error(delErr))
+			}
+		}
 		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
+	}
+
+	if oldObjectName != "" && oldObjectName != newObjectName && newObjectName != "" {
+		if err := s.storage.DeleteImage(ctx, oldObjectName); err != nil {
+			l.Warnw("failed to delete previous avatar (orphaned object left in GCS)",
+				"user_id", req.UserId, "old_object_name", oldObjectName, zap.Error(err))
+		}
 	}
 
 	return &pb.UpdateUserSettingsResponse{
@@ -155,9 +162,9 @@ func (s *UserSettingsService) GetProfileImageURL(ctx context.Context, req *pb.Ge
 	return &pb.GetProfileImageURLResponse{Url: url}, nil
 }
 
-// changePassword revokes every API key and mobile session, including the
-// caller's, so a leaked credential cannot survive a password change.
-func (s *UserSettingsService) changePassword(ctx context.Context, userID, current, next string) error {
+// verifyCurrentPassword gates a password change, which revokes every API key
+// and mobile session, including the caller's.
+func (s *UserSettingsService) verifyCurrentPassword(ctx context.Context, userID, current string) error {
 	if current == "" {
 		return status.Error(codes.InvalidArgument, "current_password is required to change password")
 	}
@@ -179,13 +186,6 @@ func (s *UserSettingsService) changePassword(ctx context.Context, userID, curren
 			return status.Errorf(codes.Internal, "failed to record failed attempt: %v", recordErr)
 		}
 		return status.Error(codes.PermissionDenied, "current password is incorrect")
-	}
-	found, err := s.db.ChangePassword(ctx, userID, next)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to change password: %v", err)
-	}
-	if !found {
-		return status.Error(codes.NotFound, "user not found")
 	}
 	return nil
 }
