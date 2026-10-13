@@ -114,6 +114,8 @@ type User struct {
 	DisabledReason      *string    `gorm:"column:disabledReason"`
 	FailedLoginAttempts int        `gorm:"column:failedLoginAttempts;default:0"`
 	LastFailedLogin     *time.Time `gorm:"column:lastFailedLogin"`
+
+	PastDueSince *time.Time `gorm:"column:pastDueSince"`
 }
 
 // TableName specifies the table name for User

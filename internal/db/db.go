@@ -736,6 +736,9 @@ func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID st
 	return &user, nil
 }
 
+// SubscriptionStatusPastDue is the Stripe status that starts the past-due grace period.
+const SubscriptionStatusPastDue = "past_due"
+
 // SubscriptionUpdate carries optional Stripe subscription fields written by
 // UpdateUserSubscription. SubscriptionStatus is the only required field.
 // Pointer-typed fields are only persisted when non-nil; pass an empty string
@@ -755,6 +758,11 @@ func (db *DB) UpdateUserSubscription(ctx context.Context, userID string, in Subs
 	updates := map[string]interface{}{
 		colSubscriptionStatus: in.SubscriptionStatus,
 		colCancelAtPeriodEnd:  in.CancelAtPeriodEnd,
+	}
+	if in.SubscriptionStatus == SubscriptionStatusPastDue {
+		updates[colPastDueSince] = gorm.Expr(`COALESCE("pastDueSince", now())`)
+	} else {
+		updates[colPastDueSince] = gorm.Expr("NULL")
 	}
 	if in.StripeCustomerID != nil {
 		updates[colStripeCustomerID] = *in.StripeCustomerID

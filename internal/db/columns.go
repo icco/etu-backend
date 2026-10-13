@@ -33,6 +33,7 @@ const (
 	colNotionUUID           = "notionUuid"
 	colMimeType             = "mimeType"
 	colSubscriptionEnd      = "subscriptionEnd"
+	colPastDueSince         = "pastDueSince"
 	colNoteID               = "noteId"
 	colURL                  = "url"
 

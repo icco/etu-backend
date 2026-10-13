@@ -838,6 +838,7 @@ func TestCreateUser_SQL(t *testing.T) {
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
 			sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
 		).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -1607,5 +1608,43 @@ func TestUpdateAudioTranscribedText_NotFound(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestUpdateUserSubscription_PastDueSince_SQL(t *testing.T) {
+	tests := []struct {
+		name   string
+		status string
+		query  string
+	}{
+		{name: "past_due preserves first transition", status: "past_due", query: `UPDATE "User" SET .*"pastDueSince"=COALESCE\("pastDueSince", now\(\)\)`},
+		{name: "active clears", status: "active", query: `UPDATE "User" SET .*"pastDueSince"=NULL`},
+		{name: "canceled clears", status: "canceled", query: `UPDATE "User" SET .*"pastDueSince"=NULL`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sqlDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer func() { _ = sqlDB.Close() }()
+			db, err := NewFromConn(sqlDB)
+			if err != nil {
+				t.Fatalf("NewFromConn: %v", err)
+			}
+			now := time.Now().UTC()
+			mock.ExpectBegin()
+			mock.ExpectExec(tt.query).WillReturnResult(sqlmock.NewResult(0, 1))
+			mock.ExpectCommit()
+			mock.ExpectQuery(`SELECT (.+) FROM "User"`).
+				WillReturnRows(sqlmock.NewRows(userRowColumns).
+					AddRow("u1", "u@example.com", nil, "hash", tt.status, nil, now, nil, nil, nil, now))
+			if _, err := db.UpdateUserSubscription(context.Background(), "u1", SubscriptionUpdate{SubscriptionStatus: tt.status}); err != nil {
+				t.Fatalf("UpdateUserSubscription: %v", err)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled mock expectations: %v", err)
+			}
+		})
 	}
 }
