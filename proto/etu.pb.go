@@ -3375,7 +3375,8 @@ func (x *ExportDataRequest) GetUserId() string {
 }
 
 // ExportDataResponse is one item of a streamed data export. The stream sends
-// the user first, then every tag, then every note in creation order. Media
+// the user first, then profile_image_url if the user has an uploaded profile
+// image, then every tag, then every note in creation order. Media
 // URLs are signed GCS URLs that expire one hour after they are streamed.
 type ExportDataResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
