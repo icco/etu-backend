@@ -18,8 +18,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// paidStatuses are subscription states that may still bill, including legacy plan names.
-var paidStatuses = map[string]bool{"active": true, "trialing": true, "past_due": true, "paid": true, "pro": true, "premium": true}
+// paidStatuses are Stripe-backed states that may still bill. Legacy "pro"/"premium"
+// can be manual grants with no Stripe record, so they do not block deletion.
+var paidStatuses = map[string]bool{"active": true, "trial": true, "trialing": true, "past_due": true}
 
 const (
 	exportPageSize  = 200
