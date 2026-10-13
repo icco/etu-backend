@@ -121,7 +121,8 @@ message User {
   google.protobuf.Timestamp created_at = 7;
   // stripe_customer_id links the user to a Stripe customer record.
   optional string stripe_customer_id = 8;
-  // notion_key is an optional Notion API token for sync features.
+  // notion_key is write-only and is never populated in responses; see
+  // has_notion_key.
   optional string notion_key = 9;
   reserved 10; // was username, use name instead
   // updated_at is when the user record was last updated.
@@ -154,6 +155,9 @@ message User {
   // billing_country is the ISO-3166-1 alpha-2 country code of the
   // user's billing address.
   optional string billing_country = 24;
+  // has_notion_key reports whether a Notion API token is stored. The token
+  // itself is never returned.
+  bool has_notion_key = 25;
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -475,7 +479,8 @@ message UpdateUserSettingsResponse {
 
 // GetStatsRequest requests aggregate statistics.
 message GetStatsRequest {
-  // user_id scopes stats to a single user when provided.
+  // user_id scopes stats to a single user. Empty returns global stats for
+  // M2M callers and the authenticated user's stats otherwise.
   string user_id = 1;
 }
 
@@ -557,6 +562,9 @@ service UserSettingsService {
 message GetProfileImageURLRequest {
   // key is the storage object key returned in User.image.
   string key = 1;
+  // user_id selects whose avatar to resolve. Required for M2M callers;
+  // API key callers may only resolve their own.
+  string user_id = 2;
 }
 
 // GetProfileImageURLResponse returns a short-lived URL for the image.
