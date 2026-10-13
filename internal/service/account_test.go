@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,7 +53,7 @@ func (f *fakeCanceler) CancelSubscriptions(_ context.Context, customerID, subscr
 
 var accountUserColumns = []string{
 	"id", colEmail, colPasswordHash, colFailedLoginAttempts,
-	"stripeCustomerId", "stripeSubscriptionId", "profileImageGCSObject", colCreatedAt, colUpdatedAt,
+	"stripeCustomerId", "stripeSubscriptionId", "profileImageGCSObject", colCreatedAt, colUpdatedAt, colDisabled,
 }
 
 const (
@@ -79,6 +80,10 @@ func TestDeleteAccount(t *testing.T) {
 		storageFail  bool
 		expectDelete bool
 		expectFailed bool
+		expectFreeze bool
+		freezeFail   bool
+		disabled     bool
+		wantMsg      string
 		wantCode     codes.Code
 		wantBilling  []string
 		wantStorage  []string
@@ -89,6 +94,7 @@ func TestDeleteAccount(t *testing.T) {
 			req:          &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
 			userExists:   true,
 			expectDelete: true,
+			expectFreeze: true,
 			wantBilling:  []string{"cus_1/sub_1"},
 			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/"},
 		},
@@ -98,6 +104,7 @@ func TestDeleteAccount(t *testing.T) {
 			req:          &pb.DeleteAccountRequest{UserId: acctUser},
 			userExists:   true,
 			expectDelete: true,
+			expectFreeze: true,
 			wantBilling:  []string{"cus_1/sub_1"},
 			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/"},
 		},
@@ -128,6 +135,8 @@ func TestDeleteAccount(t *testing.T) {
 			req:         &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
 			userExists:  true,
 			billingErr:  errors.New("stripe down"),
+			expectFreeze: true,
+			wantMsg:     "contact support",
 			wantCode:    codes.Unavailable,
 			wantBilling: []string{"cus_1/sub_1"},
 		},
@@ -145,9 +154,31 @@ func TestDeleteAccount(t *testing.T) {
 			req:         &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
 			userExists:  true,
 			storageFail: true,
+			expectFreeze: true,
+			wantMsg:     "contact support",
 			wantCode:    codes.Unavailable,
 			wantBilling: []string{"cus_1/sub_1"},
 			wantStorage: []string{"delete notes/n1/i1"},
+		},
+		{
+			name:         "m2m retry completes a frozen account",
+			ctx:          m2mCtx,
+			req:          &pb.DeleteAccountRequest{UserId: acctUser},
+			userExists:   true,
+			disabled:     true,
+			expectFreeze: true,
+			expectDelete: true,
+			wantBilling:  []string{"cus_1/sub_1"},
+			wantStorage:  []string{"delete notes/n1/i1", "delete " + avatar, "prefix profiles/alice/"},
+		},
+		{
+			name:         "freeze failure aborts before stripe",
+			ctx:          apiKeyCtx,
+			req:          &pb.DeleteAccountRequest{UserId: acctUser, Password: testPassword},
+			userExists:   true,
+			expectFreeze: true,
+			freezeFail:   true,
+			wantCode:     codes.Internal,
 		},
 		{
 			name: "already deleted user is success for retries",
@@ -176,16 +207,28 @@ func TestDeleteAccount(t *testing.T) {
 			if tt.wantCode != codes.PermissionDenied || tt.expectFailed {
 				rows := sqlmock.NewRows(accountUserColumns)
 				if tt.userExists {
-					rows.AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now())
+					rows.AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now(), tt.disabled)
 				}
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).WillReturnRows(rows)
 			}
 			if tt.expectFailed {
 				mock.ExpectBegin()
 				mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).
-					WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now()))
+					WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, string(hash), 0, cus, sub, avatar, time.Now(), time.Now(), false))
 				mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
+			}
+			if tt.expectFreeze {
+				mock.ExpectBegin()
+				mock.ExpectExec(`UPDATE "User" SET disabled = true`).WithArgs(db.DeletionDisabledReason, acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
+				revoke := mock.ExpectExec(`DELETE FROM "ApiKey"`).WithArgs(acctUser)
+				if tt.freezeFail {
+					revoke.WillReturnError(errors.New("db down"))
+					mock.ExpectRollback()
+				} else {
+					revoke.WillReturnResult(sqlmock.NewResult(0, 2))
+					mock.ExpectCommit()
+				}
 			}
 			if len(tt.wantStorage) > 0 {
 				mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(acctUser, acctUser).
@@ -202,6 +245,9 @@ func TestDeleteAccount(t *testing.T) {
 			resp, err := svc.DeleteAccount(tt.ctx, tt.req)
 			if got := status.Code(err); got != tt.wantCode {
 				t.Fatalf("code = %v, want %v (err %v)", got, tt.wantCode, err)
+			}
+			if tt.wantMsg != "" && !strings.Contains(status.Convert(err).Message(), tt.wantMsg) {
+				t.Errorf("message = %q, want it to contain %q", status.Convert(err).Message(), tt.wantMsg)
 			}
 			if err == nil && !resp.Success {
 				t.Error("expected success")
@@ -268,7 +314,7 @@ func TestExportDataPaginatesAllNotes(t *testing.T) {
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).
-		WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, "h", 0, nil, nil, nil, base, base))
+		WillReturnRows(sqlmock.NewRows(accountUserColumns).AddRow(acctUser, testEmail, "h", 0, nil, nil, nil, base, base, false))
 	mock.ExpectQuery(`FROM "Tag"`).WithArgs(acctUser).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "count", colCreatedAt}).AddRow("t1", "work", 1, base))
 

@@ -50,8 +50,9 @@ func NewAccountService(database *db.DB, storageClient *storage.Client, billing S
 	return s
 }
 
-// DeleteAccount cancels billing, deletes stored media, then deletes all account rows.
-// Each step is idempotent so a failed call can be retried.
+// DeleteAccount freezes the account (disabled, API keys revoked), cancels billing,
+// deletes stored media, then deletes all account rows. Every step is idempotent;
+// after a partial failure the user can no longer authenticate, so an M2M retry finishes it.
 func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccountRequest) (*pb.DeleteAccountResponse, error) {
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
@@ -86,45 +87,61 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 	l := logging.FromContext(ctx)
 
 	customerID, subscriptionID := deref(user.StripeCustomerID), deref(user.StripeSubscriptionID)
-	if customerID != "" || subscriptionID != "" {
-		if s.billing == nil {
-			return nil, status.Error(codes.FailedPrecondition, "billing not configured; cannot cancel subscription")
+	if (customerID != "" || subscriptionID != "") && s.billing == nil {
+		return nil, status.Error(codes.FailedPrecondition, "billing not configured; cannot cancel subscription")
+	}
+	if s.storage == nil {
+		objects, err := s.db.UserMediaObjects(ctx, user.ID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to list media: %v", err)
 		}
+		if len(objects) > 0 || deref(user.ProfileImageGCSObject) != "" {
+			return nil, status.Error(codes.FailedPrecondition, "storage not configured; cannot delete media")
+		}
+	}
+
+	if err := s.db.FreezeUserForDeletion(ctx, user.ID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to start account deletion: %v", err)
+	}
+
+	if customerID != "" || subscriptionID != "" {
 		if err := s.billing.CancelSubscriptions(ctx, customerID, subscriptionID); err != nil {
-			l.Errorw("stripe cancellation failed; account not deleted", "user_id", user.ID, "error", err)
-			return nil, status.Errorf(codes.Unavailable, "failed to cancel subscription: %v", err)
+			l.Errorw("stripe cancellation failed; account frozen but not deleted", "user_id", user.ID, "error", err)
+			return nil, incompleteDeletion(codes.Unavailable, "cancel subscription", err)
 		}
 	}
 
 	objects, err := s.db.UserMediaObjects(ctx, user.ID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list media: %v", err)
+		return nil, incompleteDeletion(codes.Internal, "list media", err)
 	}
-	if s.storage == nil {
-		if len(objects) > 0 || deref(user.ProfileImageGCSObject) != "" {
-			return nil, status.Error(codes.FailedPrecondition, "storage not configured; cannot delete media")
-		}
-	} else {
+	if s.storage != nil {
 		for _, name := range objects {
 			if err := s.storage.DeleteImage(ctx, name); err != nil {
-				return nil, status.Errorf(codes.Unavailable, "failed to delete media: %v", err)
+				return nil, incompleteDeletion(codes.Unavailable, "delete media", err)
 			}
 		}
 		if p := deref(user.ProfileImageGCSObject); p != "" {
 			if err := s.storage.DeleteImage(ctx, p); err != nil {
-				return nil, status.Errorf(codes.Unavailable, "failed to delete profile image: %v", err)
+				return nil, incompleteDeletion(codes.Unavailable, "delete profile image", err)
 			}
 		}
 		if err := s.storage.DeletePrefix(ctx, fmt.Sprintf("profiles/%s/", user.ID)); err != nil {
-			return nil, status.Errorf(codes.Unavailable, "failed to delete profile images: %v", err)
+			return nil, incompleteDeletion(codes.Unavailable, "delete profile images", err)
 		}
 	}
 
 	if err := s.db.DeleteUserData(ctx, user.ID); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete account: %v", err)
+		return nil, incompleteDeletion(codes.Internal, "delete account data", err)
 	}
 	l.Infow("account deleted", "user_id", user.ID, "media_objects", len(objects))
 	return &pb.DeleteAccountResponse{Success: true}, nil
+}
+
+// incompleteDeletion reports a failure after the account was frozen. The user's
+// keys are already revoked, so only an M2M (support) retry can finish the deletion.
+func incompleteDeletion(code codes.Code, step string, err error) error {
+	return status.Errorf(code, "account deletion incomplete at %s: account is disabled and signed out; contact support to finish deleting it: %v", step, err)
 }
 
 // ExportData streams the user, their tags, then their notes in keyset-paginated pages.
