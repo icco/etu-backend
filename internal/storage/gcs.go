@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"google.golang.org/api/iterator"
 )
 
 // Client wraps the GCS client for image storage operations.
@@ -131,4 +132,34 @@ func (c *Client) GetImage(ctx context.Context, objectName string) (data []byte, 
 // Bucket returns the bucket name.
 func (c *Client) Bucket() string {
 	return c.bucket
+}
+
+// GetSignedURLWithExpiry generates a signed GET URL for an object that is valid for ttl.
+func (c *Client) GetSignedURLWithExpiry(_ context.Context, objectName string, ttl time.Duration) (string, error) {
+	url, err := c.client.Bucket(c.bucket).SignedURL(objectName, &storage.SignedURLOptions{
+		Scheme:  storage.SigningSchemeV4,
+		Method:  "GET",
+		Expires: time.Now().Add(ttl),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create signed URL: %w", err)
+	}
+	return url, nil
+}
+
+// DeletePrefix deletes every object whose name starts with prefix.
+func (c *Client) DeletePrefix(ctx context.Context, prefix string) error {
+	it := c.client.Bucket(c.bucket).Objects(ctx, &storage.Query{Prefix: prefix})
+	for {
+		attrs, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("failed to list objects under %q: %w", prefix, err)
+		}
+		if err := c.DeleteImage(ctx, attrs.Name); err != nil {
+			return err
+		}
+	}
 }

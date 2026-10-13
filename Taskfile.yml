@@ -79,3 +79,11 @@ tasks:
     cmds:
       - go get -u ./...
       - go mod tidy
+  migrate-diff:
+    desc: Generate a migration from GORM model changes (requires NAME, ATLAS_MODELS_URL and ATLAS_DEV_URL pointing at empty scratch databases)
+    cmds:
+      - DATABASE_URL="${ATLAS_MODELS_URL}" go run ./cmd/schemagen
+      - atlas migrate diff --env local {{.NAME}}
+    requires:
+      vars:
+        - NAME

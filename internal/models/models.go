@@ -115,6 +115,7 @@ type User struct {
 	FailedLoginAttempts int        `gorm:"column:failedLoginAttempts;default:0"`
 	LastFailedLogin     *time.Time `gorm:"column:lastFailedLogin"`
 
+	AIEnabled    bool       `gorm:"column:aiEnabled;not null;default:false"`
 	PastDueSince *time.Time `gorm:"column:pastDueSince"`
 }
 
@@ -222,4 +223,29 @@ func GenerateCUID() string {
 	}
 
 	return string(result)
+}
+
+// AccountDeletionCleanup is a GCS object or prefix (ending in "/") still to be
+// removed after a user's rows were deleted, kept so a retry can finish cleanup.
+type AccountDeletionCleanup struct {
+	UserID     string    `gorm:"column:userId;primaryKey"`
+	ObjectName string    `gorm:"column:objectName;primaryKey"`
+	CreatedAt  time.Time `gorm:"column:createdAt"`
+}
+
+// TableName specifies the table name for AccountDeletionCleanup
+func (AccountDeletionCleanup) TableName() string {
+	return "AccountDeletionCleanup"
+}
+
+// AIUsage counts AI operations performed for a user on a UTC day.
+type AIUsage struct {
+	UserID string    `gorm:"column:userId;primaryKey"`
+	Day    time.Time `gorm:"column:day;primaryKey;type:date"`
+	Count  int       `gorm:"column:count;not null;default:0"`
+}
+
+// TableName specifies the table name for AIUsage
+func (AIUsage) TableName() string {
+	return "AIUsage"
 }

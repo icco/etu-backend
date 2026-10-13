@@ -84,25 +84,9 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 				false, 2,
 			))
 
-		// Expect RecordFailedLogin
 		mock.ExpectBegin()
-		mock.ExpectQuery(`SELECT \* FROM "User"`).
-			WithArgs("user123", 1).
-			WillReturnRows(sqlmock.NewRows([]string{
-				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
-				colDisabled, colFailedLoginAttempts,
-			}).AddRow(
-				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
-				false, 2,
-			))
-		mock.ExpectExec(`UPDATE "User"`).
-			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(),
-				sqlmock.AnyArg(), sqlmock.AnyArg(), "user123").
+		mock.ExpectExec(`UPDATE "User" SET "failedLoginAttempts"="failedLoginAttempts" \+ 1`).
+			WithArgs(sqlmock.AnyArg(), "user123").
 			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectCommit()
 
@@ -150,10 +134,10 @@ func TestAuthenticate_AccountLockout(t *testing.T) {
 			WithArgs(testEmail, 1).
 			WillReturnRows(sqlmock.NewRows([]string{
 				"id", colEmail, colPasswordHash, colSubscriptionStatus, colCreatedAt, colUpdatedAt,
-				colDisabled, colFailedLoginAttempts,
+				colDisabled, colFailedLoginAttempts, "lastFailedLogin",
 			}).AddRow(
 				"user123", testEmail, string(passwordHash), "free", time.Now(), time.Now(),
-				false, 10,
+				false, 5, time.Now(),
 			))
 
 		_, err := service.Authenticate(ctx, &pb.AuthenticateRequest{

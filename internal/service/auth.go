@@ -16,22 +16,26 @@ import (
 // AuthService implements the AuthService gRPC service
 type AuthService struct {
 	pb.UnimplementedAuthServiceServer
-	db          *db.DB
-	loginLimits *loginLimits
+	db            *db.DB
+	loginLimits   *loginLimits
+	attemptLimits *attemptLimits
 }
 
 // NewAuthService creates a new AuthService
 func NewAuthService(database *db.DB) *AuthService {
-	return &AuthService{db: database, loginLimits: newLoginLimits()}
+	return &AuthService{db: database, loginLimits: newLoginLimits(), attemptLimits: newAttemptLimits()}
 }
 
 // Register creates a new user account
 func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	if req.Email == "" {
+	if db.NormalizeEmail(req.Email) == "" {
 		return nil, status.Error(codes.InvalidArgument, "email is required")
 	}
 	if req.Password == "" {
 		return nil, status.Error(codes.InvalidArgument, "password is required")
+	}
+	if !s.attemptLimits.allow(clientIP(ctx), req.Email, time.Now()) {
+		return nil, status.Error(codes.ResourceExhausted, "too many attempts; retry later")
 	}
 
 	// Check if user already exists
@@ -52,6 +56,9 @@ func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 	// Create the user
 	user, err := s.db.CreateUser(ctx, req.Email, string(passwordHash))
 	if err != nil {
+		if errors.Is(err, db.ErrEmailTaken) {
+			return nil, status.Error(codes.AlreadyExists, "user with this email already exists")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
 	}
 
@@ -62,6 +69,13 @@ func (s *AuthService) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 
 // Authenticate verifies user credentials
 func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequest) (*pb.AuthenticateResponse, error) {
+	if req.Email != "" && req.Password != "" && !s.attemptLimits.allow(clientIP(ctx), req.Email, time.Now()) {
+		return nil, status.Error(codes.ResourceExhausted, "too many attempts; retry later")
+	}
+	return s.authenticate(ctx, req)
+}
+
+func (s *AuthService) authenticate(ctx context.Context, req *pb.AuthenticateRequest) (*pb.AuthenticateResponse, error) {
 	if req.Email == "" {
 		return nil, status.Error(codes.InvalidArgument, "email is required")
 	}
@@ -84,8 +98,7 @@ func (s *AuthService) Authenticate(ctx context.Context, req *pb.AuthenticateRequ
 		return &pb.AuthenticateResponse{Success: false}, nil
 	}
 
-	// Check if account is locked due to too many failed attempts
-	if user.FailedLoginAttempts >= 10 {
+	if db.LockoutRemaining(user.FailedLoginAttempts, user.LastFailedLogin, time.Now()) > 0 {
 		return nil, status.Error(codes.PermissionDenied, "account is locked")
 	}
 
@@ -116,7 +129,7 @@ func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*
 		return nil, status.Error(codes.ResourceExhausted, "too many login requests; retry later")
 	}
 	defer s.loginLimits.release()
-	result, err := s.Authenticate(ctx, req)
+	result, err := s.authenticate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +185,9 @@ func (s *AuthService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 //
 //nolint:revive // proto-generated naming
 func (s *AuthService) GetUserByStripeCustomerId(ctx context.Context, req *pb.GetUserByStripeCustomerIdRequest) (*pb.GetUserByStripeCustomerIdResponse, error) {
+	if err := requireM2M(ctx); err != nil {
+		return nil, err
+	}
 	if req.StripeCustomerId == "" {
 		return nil, status.Error(codes.InvalidArgument, "stripe_customer_id is required")
 	}
@@ -193,6 +209,9 @@ func (s *AuthService) GetUserByStripeCustomerId(ctx context.Context, req *pb.Get
 
 // UpdateUserSubscription updates a user's subscription information
 func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.UpdateUserSubscriptionRequest) (*pb.UpdateUserSubscriptionResponse, error) {
+	if err := requireM2M(ctx); err != nil {
+		return nil, err
+	}
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -232,6 +251,9 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 // UpdateUserStripeCustomer syncs Stripe customer profile fields
 // (name, billing address) from webhook events to the user record.
 func (s *AuthService) UpdateUserStripeCustomer(ctx context.Context, req *pb.UpdateUserStripeCustomerRequest) (*pb.UpdateUserStripeCustomerResponse, error) {
+	if err := requireM2M(ctx); err != nil {
+		return nil, err
+	}
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -267,6 +289,7 @@ func userToProto(u *db.User) *pb.User {
 		UpdatedAt:          timestamppb.New(u.UpdatedAt),
 		Disabled:           u.Disabled,
 		CancelAtPeriodEnd:  u.CancelAtPeriodEnd,
+		AiEnabled:          u.AIEnabled,
 	}
 
 	if u.Name != nil {
@@ -310,9 +333,7 @@ func userToProto(u *db.User) *pb.User {
 	if u.BillingCountry != nil {
 		pbUser.BillingCountry = u.BillingCountry
 	}
-	if u.NotionKey != nil {
-		pbUser.NotionKey = u.NotionKey
-	}
+	pbUser.HasNotionKey = u.NotionKey != nil && *u.NotionKey != ""
 	if u.NotionDatabaseName != nil {
 		pbUser.NotionDatabaseName = u.NotionDatabaseName
 	}

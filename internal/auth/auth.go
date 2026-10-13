@@ -5,14 +5,18 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"strings"
+	"regexp"
 	"time"
 
 	_ "github.com/lib/pq" // register the postgres database/sql driver
 	"go.icco.me/gutil/logging"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+var apiKeyPattern = regexp.MustCompile(`^etu_[0-9a-f]{64}$`)
 
 // ContextKey is the type used for context keys in authentication.
 // Exported so all packages use the same type for context key comparison.
@@ -92,9 +96,8 @@ func (a *Authenticator) Close() error {
 // VerifyAPIKey verifies an API key and returns the associated user ID
 // API keys have the format: etu_<64 hex characters>
 func (a *Authenticator) VerifyAPIKey(ctx context.Context, apiKey string) (string, error) {
-	// Validate key format
-	if !strings.HasPrefix(apiKey, "etu_") {
-		return "", fmt.Errorf("invalid API key format")
+	if !apiKeyPattern.MatchString(apiKey) {
+		return "", status.Error(codes.Unauthenticated, "invalid API key format")
 	}
 
 	// Extract prefix for lookup (first 12 chars of the key)

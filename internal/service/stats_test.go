@@ -4,6 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/go-cmp/cmp"
+	"go.icco.me/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/db"
+	"google.golang.org/protobuf/testing/protocmp"
+
 	pb "go.icco.me/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -151,6 +157,64 @@ func TestGetStats(t *testing.T) {
 				if st.Code() != tt.wantErr {
 					t.Errorf("expected error code %v, got %v", tt.wantErr, st.Code())
 				}
+			}
+		})
+	}
+}
+
+func TestGetStatsScope(t *testing.T) {
+	tests := []struct {
+		name       string
+		ctx        context.Context
+		reqUserID  string
+		wantUserID string
+		global     bool
+		wantErr    codes.Code
+	}{
+		{name: "m2m empty user is global", ctx: auth.SetAuthContext(context.Background(), "m2m", "m2m"), global: true},
+		{name: "m2m specific user", ctx: auth.SetAuthContext(context.Background(), "m2m", "m2m"), reqUserID: testUserID2, wantUserID: testUserID2},
+		{name: "apikey empty user scoped to caller", ctx: auth.SetAuthContext(context.Background(), testUserID1, "apikey"), wantUserID: testUserID1},
+		{name: "apikey own user", ctx: auth.SetAuthContext(context.Background(), testUserID1, "apikey"), reqUserID: testUserID1, wantUserID: testUserID1},
+		{name: "apikey other user denied", ctx: auth.SetAuthContext(context.Background(), testUserID1, "apikey"), reqUserID: testUserID2, wantErr: codes.PermissionDenied},
+		{name: "unauthenticated denied", ctx: context.Background(), wantErr: codes.Unauthenticated},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sqlDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatalf("sqlmock.New: %v", err)
+			}
+			defer func() { _ = sqlDB.Close() }()
+			database, err := db.NewFromConn(sqlDB)
+			if err != nil {
+				t.Fatalf("NewFromConn: %v", err)
+			}
+
+			if tt.wantErr == codes.OK {
+				if tt.global {
+					mock.ExpectQuery(`SELECT count\(\*\) FROM "Note"$`).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+					mock.ExpectQuery(`SELECT count\(\*\) FROM "Tag"$`).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+					mock.ExpectQuery(`SELECT "content" FROM "Note" LIMIT`).WillReturnRows(sqlmock.NewRows([]string{"content"}))
+				} else {
+					mock.ExpectQuery(`SELECT count\(\*\) FROM "Note" WHERE "userId" = \$1`).WithArgs(tt.wantUserID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+					mock.ExpectQuery(`SELECT count\(\*\) FROM "Tag" WHERE "userId" = \$1`).WithArgs(tt.wantUserID).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+					mock.ExpectQuery(`SELECT "content" FROM "Note" WHERE "userId" = \$1`).WithArgs(tt.wantUserID, sqlmock.AnyArg()).WillReturnRows(sqlmock.NewRows([]string{"content"}))
+				}
+			}
+
+			resp, err := NewStatsService(database).GetStats(tt.ctx, &pb.GetStatsRequest{UserId: tt.reqUserID})
+			if got := status.Code(err); got != tt.wantErr {
+				t.Fatalf("GetStats code = %v, want %v (err %v)", got, tt.wantErr, err)
+			}
+			if tt.wantErr == codes.OK {
+				want := &pb.GetStatsResponse{TotalBlips: 3, UniqueTags: 2}
+				if diff := cmp.Diff(want, resp, protocmp.Transform()); diff != "" {
+					t.Errorf("GetStats mismatch (-want +got):\n%s", diff)
+				}
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled expectations: %v", err)
 			}
 		})
 	}

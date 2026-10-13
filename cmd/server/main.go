@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.icco.me/etu-backend/internal/ai"
 	"go.icco.me/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/billing"
 	"go.icco.me/etu-backend/internal/db"
 	"go.icco.me/etu-backend/internal/logger"
 	"go.icco.me/etu-backend/internal/service"
@@ -38,6 +39,9 @@ var (
 )
 
 const statusKey = "status"
+
+// maxRecvMsgSize fits a request carrying the maximum number of max-size attachments plus 1MB for note text and framing.
+const maxRecvMsgSize = service.MaxImagesPerRequest*service.MaxImageSize + service.MaxAudiosPerRequest*service.MaxAudioSize + 1<<20
 
 func main() {
 	log := logger.New("etu-backend-server")
@@ -93,10 +97,7 @@ func run(log *zap.SugaredLogger) error {
 		}
 	}()
 
-	if err := database.AutoMigrate(); err != nil {
-		return fmt.Errorf("failed to run database migrations: %w", err)
-	}
-	log.Infow("database initialized and migrations completed")
+	log.Infow("database initialized")
 
 	authenticator, err := auth.New()
 	if err != nil {
@@ -158,12 +159,12 @@ func run(log *zap.SugaredLogger) error {
 	}
 	log.Infow("paywall configured", "grace_period", paywall.Grace.String())
 
+	unaryAuth := authInterceptor(authenticator, m2mConfig, log)
+	recoverUnary, recoverStream := recoveryInterceptors(log)
 	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(
-			authInterceptor(authenticator, m2mConfig, log),
-			paywallInterceptor(authenticator, paywall),
-		),
-		grpc.ChainStreamInterceptor(paywallStreamInterceptor(authenticator, paywall)),
+		grpc.ChainUnaryInterceptor(recoverUnary, unaryAuth, paywallInterceptor(authenticator, paywall)),
+		grpc.ChainStreamInterceptor(recoverStream, streamAuthInterceptor(unaryAuth), paywallStreamInterceptor(authenticator, paywall)),
+		grpc.MaxRecvMsgSize(maxRecvMsgSize),
 	)
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
@@ -173,12 +174,21 @@ func run(log *zap.SugaredLogger) error {
 	userSettingsService := service.NewUserSettingsService(database, storageClient, imgixDomain)
 	statsService := service.NewStatsService(database)
 
+	var billingClient service.SubscriptionCanceler
+	if key := os.Getenv("STRIPE_SECRET_KEY"); key != "" {
+		billingClient = billing.NewStripe(key)
+	} else {
+		log.Warnw("STRIPE_SECRET_KEY not set; account deletion will refuse users with Stripe subscriptions")
+	}
+	accountService := service.NewAccountService(database, storageClient, billingClient)
+
 	pb.RegisterNotesServiceServer(server, notesService)
 	pb.RegisterTagsServiceServer(server, tagsService)
 	pb.RegisterAuthServiceServer(server, authService)
 	pb.RegisterApiKeysServiceServer(server, apiKeysService)
 	pb.RegisterUserSettingsServiceServer(server, userSettingsService)
 	pb.RegisterStatsServiceServer(server, statsService)
+	pb.RegisterAccountServiceServer(server, accountService)
 
 	reflection.Register(server)
 
@@ -307,6 +317,13 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 		l := logging.FromContext(ctx).With("method", info.FullMethod)
 
 		if publicMethods[info.FullMethod] {
+			if md, ok := metadata.FromIncomingContext(ctx); ok && m2mConfig.IsEnabled() {
+				if tokens := md.Get("authorization"); len(tokens) > 0 {
+					if valid, _ := m2mConfig.ValidateToken(tokens[0]); valid {
+						ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
+					}
+				}
+			}
 			l.Infow("public request")
 			return handler(ctx, req)
 		}
@@ -342,5 +359,22 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 		l.Infow("authenticated request", "user_id", userID, "auth_type", "apikey")
 
 		return handler(ctx, req)
+	}
+}
+
+type authedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (s authedServerStream) Context() context.Context { return s.ctx }
+
+// streamAuthInterceptor applies the unary auth interceptor to streaming RPCs so both share one auth path.
+func streamAuthInterceptor(unary grpc.UnaryServerInterceptor) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		_, err := unary(ss.Context(), nil, &grpc.UnaryServerInfo{Server: srv, FullMethod: info.FullMethod}, func(ctx context.Context, _ interface{}) (interface{}, error) {
+			return nil, handler(srv, authedServerStream{ServerStream: ss, ctx: ctx})
+		})
+		return err
 	}
 }

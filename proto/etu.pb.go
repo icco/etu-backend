@@ -555,7 +555,8 @@ type User struct {
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// stripe_customer_id links the user to a Stripe customer record.
 	StripeCustomerId *string `protobuf:"bytes,8,opt,name=stripe_customer_id,json=stripeCustomerId,proto3,oneof" json:"stripe_customer_id,omitempty"`
-	// notion_key is an optional Notion API token for sync features.
+	// notion_key is write-only and is never populated in responses; see
+	// has_notion_key.
 	NotionKey *string `protobuf:"bytes,9,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
 	// updated_at is when the user record was last updated.
 	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
@@ -587,8 +588,14 @@ type User struct {
 	// billing_country is the ISO-3166-1 alpha-2 country code of the
 	// user's billing address.
 	BillingCountry *string `protobuf:"bytes,24,opt,name=billing_country,json=billingCountry,proto3,oneof" json:"billing_country,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// has_notion_key reports whether a Notion API token is stored. The token
+	// itself is never returned.
+	HasNotionKey bool `protobuf:"varint,25,opt,name=has_notion_key,json=hasNotionKey,proto3" json:"has_notion_key,omitempty"`
+	// ai_enabled reports whether the user opted in to AI processing such as
+	// tag generation, OCR, and audio transcription. Defaults to false.
+	AiEnabled     bool `protobuf:"varint,26,opt,name=ai_enabled,json=aiEnabled,proto3" json:"ai_enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -780,6 +787,20 @@ func (x *User) GetBillingCountry() string {
 		return *x.BillingCountry
 	}
 	return ""
+}
+
+func (x *User) GetHasNotionKey() bool {
+	if x != nil {
+		return x.HasNotionKey
+	}
+	return false
+}
+
+func (x *User) GetAiEnabled() bool {
+	if x != nil {
+		return x.AiEnabled
+	}
+	return false
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -2898,8 +2919,12 @@ type UpdateUserSettingsRequest struct {
 	NotionDatabaseName *string                `protobuf:"bytes,7,opt,name=notion_database_name,json=notionDatabaseName,proto3,oneof" json:"notion_database_name,omitempty"`
 	ProfileImageUpload *ImageUpload           `protobuf:"bytes,8,opt,name=profile_image_upload,json=profileImageUpload,proto3,oneof" json:"profile_image_upload,omitempty"`
 	ClearProfileImage  *bool                  `protobuf:"varint,9,opt,name=clear_profile_image,json=clearProfileImage,proto3,oneof" json:"clear_profile_image,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Required when password is set; must match the stored password.
+	CurrentPassword *string `protobuf:"bytes,10,opt,name=current_password,json=currentPassword,proto3,oneof" json:"current_password,omitempty"`
+	// ai_enabled opts the user in or out of AI processing when set.
+	AiEnabled     *bool `protobuf:"varint,11,opt,name=ai_enabled,json=aiEnabled,proto3,oneof" json:"ai_enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateUserSettingsRequest) Reset() {
@@ -2981,6 +3006,20 @@ func (x *UpdateUserSettingsRequest) GetClearProfileImage() bool {
 	return false
 }
 
+func (x *UpdateUserSettingsRequest) GetCurrentPassword() string {
+	if x != nil && x.CurrentPassword != nil {
+		return *x.CurrentPassword
+	}
+	return ""
+}
+
+func (x *UpdateUserSettingsRequest) GetAiEnabled() bool {
+	if x != nil && x.AiEnabled != nil {
+		return *x.AiEnabled
+	}
+	return false
+}
+
 // UpdateUserSettingsResponse returns the updated user settings view.
 type UpdateUserSettingsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -3029,7 +3068,8 @@ func (x *UpdateUserSettingsResponse) GetUser() *User {
 // GetStatsRequest requests aggregate statistics.
 type GetStatsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// user_id scopes stats to a single user when provided.
+	// user_id scopes stats to a single user. Empty returns global stats for
+	// M2M callers and the authenticated user's stats otherwise.
 	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3140,7 +3180,11 @@ func (x *GetStatsResponse) GetWordsWritten() int64 {
 type GetProfileImageURLRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// key is the storage object key returned in User.image.
-	Key           string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// user_id selects whose avatar to resolve. M2M callers that omit it must
+	// pass a "profiles/{userId}/..." key, whose owner segment is used. API key
+	// callers may only resolve their own.
+	UserId        string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3178,6 +3222,13 @@ func (*GetProfileImageURLRequest) Descriptor() ([]byte, []int) {
 func (x *GetProfileImageURLRequest) GetKey() string {
 	if x != nil {
 		return x.Key
+	}
+	return ""
+}
+
+func (x *GetProfileImageURLRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
 	}
 	return ""
 }
@@ -3227,6 +3278,275 @@ func (x *GetProfileImageURLResponse) GetUrl() string {
 	return ""
 }
 
+// DeleteAccountRequest permanently deletes a user and all of their data.
+type DeleteAccountRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// user_id is the account to delete.
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// password is the account's current password; required unless called with M2M auth.
+	Password      string `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAccountRequest) Reset() {
+	*x = DeleteAccountRequest{}
+	mi := &file_proto_etu_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAccountRequest) ProtoMessage() {}
+
+func (x *DeleteAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAccountRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAccountRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *DeleteAccountRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *DeleteAccountRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+// DeleteAccountResponse reports the outcome of an account deletion.
+type DeleteAccountResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// success is true when the account no longer exists.
+	Success       bool `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAccountResponse) Reset() {
+	*x = DeleteAccountResponse{}
+	mi := &file_proto_etu_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAccountResponse) ProtoMessage() {}
+
+func (x *DeleteAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAccountResponse.ProtoReflect.Descriptor instead.
+func (*DeleteAccountResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *DeleteAccountResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+// ExportDataRequest requests a full export of a user's data.
+type ExportDataRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// user_id is the account to export.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportDataRequest) Reset() {
+	*x = ExportDataRequest{}
+	mi := &file_proto_etu_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportDataRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportDataRequest) ProtoMessage() {}
+
+func (x *ExportDataRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportDataRequest.ProtoReflect.Descriptor instead.
+func (*ExportDataRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *ExportDataRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+// ExportDataResponse is one item of a streamed data export. The stream sends
+// the user first, then profile_image_url if the user has an uploaded profile
+// image, then every tag, then every note in creation order. Media
+// URLs are signed GCS URLs that expire one hour after they are streamed.
+type ExportDataResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Item:
+	//
+	//	*ExportDataResponse_User
+	//	*ExportDataResponse_Tag
+	//	*ExportDataResponse_Note
+	//	*ExportDataResponse_ProfileImageUrl
+	Item          isExportDataResponse_Item `protobuf_oneof:"item"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportDataResponse) Reset() {
+	*x = ExportDataResponse{}
+	mi := &file_proto_etu_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportDataResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportDataResponse) ProtoMessage() {}
+
+func (x *ExportDataResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportDataResponse.ProtoReflect.Descriptor instead.
+func (*ExportDataResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *ExportDataResponse) GetItem() isExportDataResponse_Item {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *ExportDataResponse) GetUser() *User {
+	if x != nil {
+		if x, ok := x.Item.(*ExportDataResponse_User); ok {
+			return x.User
+		}
+	}
+	return nil
+}
+
+func (x *ExportDataResponse) GetTag() *Tag {
+	if x != nil {
+		if x, ok := x.Item.(*ExportDataResponse_Tag); ok {
+			return x.Tag
+		}
+	}
+	return nil
+}
+
+func (x *ExportDataResponse) GetNote() *Note {
+	if x != nil {
+		if x, ok := x.Item.(*ExportDataResponse_Note); ok {
+			return x.Note
+		}
+	}
+	return nil
+}
+
+func (x *ExportDataResponse) GetProfileImageUrl() string {
+	if x != nil {
+		if x, ok := x.Item.(*ExportDataResponse_ProfileImageUrl); ok {
+			return x.ProfileImageUrl
+		}
+	}
+	return ""
+}
+
+type isExportDataResponse_Item interface {
+	isExportDataResponse_Item()
+}
+
+type ExportDataResponse_User struct {
+	// user is the account profile and settings.
+	User *User `protobuf:"bytes,1,opt,name=user,proto3,oneof"`
+}
+
+type ExportDataResponse_Tag struct {
+	// tag is one of the user's tags.
+	Tag *Tag `protobuf:"bytes,2,opt,name=tag,proto3,oneof"`
+}
+
+type ExportDataResponse_Note struct {
+	// note is one note with its tags and media.
+	Note *Note `protobuf:"bytes,3,opt,name=note,proto3,oneof"`
+}
+
+type ExportDataResponse_ProfileImageUrl struct {
+	// profile_image_url is a signed URL for the uploaded profile image.
+	ProfileImageUrl string `protobuf:"bytes,4,opt,name=profile_image_url,json=profileImageUrl,proto3,oneof"`
+}
+
+func (*ExportDataResponse_User) isExportDataResponse_Item() {}
+
+func (*ExportDataResponse_Tag) isExportDataResponse_Item() {}
+
+func (*ExportDataResponse_Note) isExportDataResponse_Item() {}
+
+func (*ExportDataResponse_ProfileImageUrl) isExportDataResponse_Item() {}
+
 var File_proto_etu_proto protoreflect.FileDescriptor
 
 const file_proto_etu_proto_rawDesc = "" +
@@ -3267,8 +3587,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xf1\n" +
-	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb6\v\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -3296,7 +3615,10 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\fbilling_city\x18\x15 \x01(\tH\fR\vbillingCity\x88\x01\x01\x12(\n" +
 	"\rbilling_state\x18\x16 \x01(\tH\rR\fbillingState\x88\x01\x01\x123\n" +
 	"\x13billing_postal_code\x18\x17 \x01(\tH\x0eR\x11billingPostalCode\x88\x01\x01\x12,\n" +
-	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01B\a\n" +
+	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01\x12$\n" +
+	"\x0ehas_notion_key\x18\x19 \x01(\bR\fhasNotionKey\x12\x1d\n" +
+	"\n" +
+	"ai_enabled\x18\x1a \x01(\bR\taiEnabledB\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
@@ -3460,7 +3782,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x16GetUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\">\n" +
 	"\x17GetUserSettingsResponse\x12\x1d\n" +
-	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xc2\x03\n" +
+	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"\xba\x04\n" +
 	"\x19UpdateUserSettingsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\"\n" +
 	"\n" +
@@ -3469,13 +3791,19 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\bpassword\x18\x06 \x01(\tH\x02R\bpassword\x88\x01\x01\x125\n" +
 	"\x14notion_database_name\x18\a \x01(\tH\x03R\x12notionDatabaseName\x88\x01\x01\x12G\n" +
 	"\x14profile_image_upload\x18\b \x01(\v2\x10.etu.ImageUploadH\x04R\x12profileImageUpload\x88\x01\x01\x123\n" +
-	"\x13clear_profile_image\x18\t \x01(\bH\x05R\x11clearProfileImage\x88\x01\x01B\r\n" +
+	"\x13clear_profile_image\x18\t \x01(\bH\x05R\x11clearProfileImage\x88\x01\x01\x12.\n" +
+	"\x10current_password\x18\n" +
+	" \x01(\tH\x06R\x0fcurrentPassword\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"ai_enabled\x18\v \x01(\bH\aR\taiEnabled\x88\x01\x01B\r\n" +
 	"\v_notion_keyB\a\n" +
 	"\x05_nameB\v\n" +
 	"\t_passwordB\x17\n" +
 	"\x15_notion_database_nameB\x17\n" +
 	"\x15_profile_image_uploadB\x16\n" +
-	"\x14_clear_profile_imageJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06\"A\n" +
+	"\x14_clear_profile_imageB\x13\n" +
+	"\x11_current_passwordB\r\n" +
+	"\v_ai_enabledJ\x04\b\x03\x10\x04J\x04\b\x05\x10\x06\"A\n" +
 	"\x1aUpdateUserSettingsResponse\x12\x1d\n" +
 	"\x04user\x18\x02 \x01(\v2\t.etu.UserR\x04userJ\x04\b\x01\x10\x02\"*\n" +
 	"\x0fGetStatsRequest\x12\x17\n" +
@@ -3485,11 +3813,25 @@ const file_proto_etu_proto_rawDesc = "" +
 	"totalBlips\x12\x1f\n" +
 	"\vunique_tags\x18\x02 \x01(\x03R\n" +
 	"uniqueTags\x12#\n" +
-	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten\"-\n" +
+	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten\"F\n" +
 	"\x19GetProfileImageURLRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\".\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\".\n" +
 	"\x1aGetProfileImageURLResponse\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url*|\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"K\n" +
+	"\x14DeleteAccountRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"1\n" +
+	"\x15DeleteAccountResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\",\n" +
+	"\x11ExportDataRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\xaa\x01\n" +
+	"\x12ExportDataResponse\x12\x1f\n" +
+	"\x04user\x18\x01 \x01(\v2\t.etu.UserH\x00R\x04user\x12\x1c\n" +
+	"\x03tag\x18\x02 \x01(\v2\b.etu.TagH\x00R\x03tag\x12\x1f\n" +
+	"\x04note\x18\x03 \x01(\v2\t.etu.NoteH\x00R\x04note\x12,\n" +
+	"\x11profile_image_url\x18\x04 \x01(\tH\x00R\x0fprofileImageUrlB\x06\n" +
+	"\x04item*|\n" +
 	"\x0eDisabledReason\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fTERMS_VIOLATION\x10\x01\x12\x14\n" +
@@ -3527,7 +3869,11 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x12UpdateUserSettings\x12\x1e.etu.UpdateUserSettingsRequest\x1a\x1f.etu.UpdateUserSettingsResponse\x12U\n" +
 	"\x12GetProfileImageURL\x12\x1e.etu.GetProfileImageURLRequest\x1a\x1f.etu.GetProfileImageURLResponse2G\n" +
 	"\fStatsService\x127\n" +
-	"\bGetStats\x12\x14.etu.GetStatsRequest\x1a\x15.etu.GetStatsResponseB\x1eZ\x1cgo.icco.me/etu-backend/protob\x06proto3"
+	"\bGetStats\x12\x14.etu.GetStatsRequest\x1a\x15.etu.GetStatsResponse2\x99\x01\n" +
+	"\x0eAccountService\x12F\n" +
+	"\rDeleteAccount\x12\x19.etu.DeleteAccountRequest\x1a\x1a.etu.DeleteAccountResponse\x12?\n" +
+	"\n" +
+	"ExportData\x12\x16.etu.ExportDataRequest\x1a\x17.etu.ExportDataResponse0\x01B\x1eZ\x1cgo.icco.me/etu-backend/protob\x06proto3"
 
 var (
 	file_proto_etu_proto_rawDescOnce sync.Once
@@ -3542,7 +3888,7 @@ func file_proto_etu_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_etu_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
+var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 54)
 var file_proto_etu_proto_goTypes = []any{
 	(DisabledReason)(0),                       // 0: etu.DisabledReason
 	(*ImageUpload)(nil),                       // 1: etu.ImageUpload
@@ -3595,23 +3941,27 @@ var file_proto_etu_proto_goTypes = []any{
 	(*GetStatsResponse)(nil),                  // 48: etu.GetStatsResponse
 	(*GetProfileImageURLRequest)(nil),         // 49: etu.GetProfileImageURLRequest
 	(*GetProfileImageURLResponse)(nil),        // 50: etu.GetProfileImageURLResponse
-	(*timestamppb.Timestamp)(nil),             // 51: google.protobuf.Timestamp
+	(*DeleteAccountRequest)(nil),              // 51: etu.DeleteAccountRequest
+	(*DeleteAccountResponse)(nil),             // 52: etu.DeleteAccountResponse
+	(*ExportDataRequest)(nil),                 // 53: etu.ExportDataRequest
+	(*ExportDataResponse)(nil),                // 54: etu.ExportDataResponse
+	(*timestamppb.Timestamp)(nil),             // 55: google.protobuf.Timestamp
 }
 var file_proto_etu_proto_depIdxs = []int32{
-	51, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
-	51, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
-	51, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
-	51, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
+	55, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
+	55, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
+	55, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
+	55, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
 	3,  // 4: etu.Note.images:type_name -> etu.NoteImage
 	4,  // 5: etu.Note.audios:type_name -> etu.NoteAudio
-	51, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
-	51, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
-	51, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
-	51, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
+	55, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
+	55, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
+	55, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
+	55, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 10: etu.User.disabled_reason:type_name -> etu.DisabledReason
-	51, // 11: etu.User.current_period_start:type_name -> google.protobuf.Timestamp
-	51, // 12: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
-	51, // 13: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
+	55, // 11: etu.User.current_period_start:type_name -> google.protobuf.Timestamp
+	55, // 12: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
+	55, // 13: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
 	5,  // 14: etu.ListNotesResponse.notes:type_name -> etu.Note
 	1,  // 15: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
 	2,  // 16: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
@@ -3626,8 +3976,8 @@ var file_proto_etu_proto_depIdxs = []int32{
 	7,  // 25: etu.AuthenticateResponse.user:type_name -> etu.User
 	7,  // 26: etu.GetUserResponse.user:type_name -> etu.User
 	7,  // 27: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	51, // 28: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
-	51, // 29: etu.UpdateUserSubscriptionRequest.current_period_start:type_name -> google.protobuf.Timestamp
+	55, // 28: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
+	55, // 29: etu.UpdateUserSubscriptionRequest.current_period_start:type_name -> google.protobuf.Timestamp
 	7,  // 30: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
 	7,  // 31: etu.UpdateUserStripeCustomerResponse.user:type_name -> etu.User
 	8,  // 32: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
@@ -3635,55 +3985,62 @@ var file_proto_etu_proto_depIdxs = []int32{
 	7,  // 34: etu.GetUserSettingsResponse.user:type_name -> etu.User
 	1,  // 35: etu.UpdateUserSettingsRequest.profile_image_upload:type_name -> etu.ImageUpload
 	7,  // 36: etu.UpdateUserSettingsResponse.user:type_name -> etu.User
-	9,  // 37: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	11, // 38: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	13, // 39: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	15, // 40: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	17, // 41: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	19, // 42: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
-	21, // 43: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	23, // 44: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	25, // 45: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	25, // 46: etu.AuthService.Login:input_type -> etu.AuthenticateRequest
-	27, // 47: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	29, // 48: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	31, // 49: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	33, // 50: etu.AuthService.UpdateUserStripeCustomer:input_type -> etu.UpdateUserStripeCustomerRequest
-	35, // 51: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	37, // 52: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	39, // 53: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	41, // 54: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	43, // 55: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	45, // 56: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	49, // 57: etu.UserSettingsService.GetProfileImageURL:input_type -> etu.GetProfileImageURLRequest
-	47, // 58: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
-	10, // 59: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	12, // 60: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	14, // 61: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	16, // 62: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	18, // 63: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	20, // 64: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
-	22, // 65: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	24, // 66: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	26, // 67: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	36, // 68: etu.AuthService.Login:output_type -> etu.CreateApiKeyResponse
-	28, // 69: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	30, // 70: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	32, // 71: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	34, // 72: etu.AuthService.UpdateUserStripeCustomer:output_type -> etu.UpdateUserStripeCustomerResponse
-	36, // 73: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	38, // 74: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	40, // 75: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	42, // 76: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	44, // 77: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	46, // 78: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	50, // 79: etu.UserSettingsService.GetProfileImageURL:output_type -> etu.GetProfileImageURLResponse
-	48, // 80: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
-	59, // [59:81] is the sub-list for method output_type
-	37, // [37:59] is the sub-list for method input_type
-	37, // [37:37] is the sub-list for extension type_name
-	37, // [37:37] is the sub-list for extension extendee
-	0,  // [0:37] is the sub-list for field type_name
+	7,  // 37: etu.ExportDataResponse.user:type_name -> etu.User
+	6,  // 38: etu.ExportDataResponse.tag:type_name -> etu.Tag
+	5,  // 39: etu.ExportDataResponse.note:type_name -> etu.Note
+	9,  // 40: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	11, // 41: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	13, // 42: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	15, // 43: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	17, // 44: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	19, // 45: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
+	21, // 46: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	23, // 47: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	25, // 48: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	25, // 49: etu.AuthService.Login:input_type -> etu.AuthenticateRequest
+	27, // 50: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	29, // 51: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	31, // 52: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	33, // 53: etu.AuthService.UpdateUserStripeCustomer:input_type -> etu.UpdateUserStripeCustomerRequest
+	35, // 54: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	37, // 55: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	39, // 56: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	41, // 57: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	43, // 58: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	45, // 59: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	49, // 60: etu.UserSettingsService.GetProfileImageURL:input_type -> etu.GetProfileImageURLRequest
+	47, // 61: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
+	51, // 62: etu.AccountService.DeleteAccount:input_type -> etu.DeleteAccountRequest
+	53, // 63: etu.AccountService.ExportData:input_type -> etu.ExportDataRequest
+	10, // 64: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	12, // 65: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	14, // 66: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	16, // 67: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	18, // 68: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	20, // 69: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
+	22, // 70: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	24, // 71: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	26, // 72: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	36, // 73: etu.AuthService.Login:output_type -> etu.CreateApiKeyResponse
+	28, // 74: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	30, // 75: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	32, // 76: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	34, // 77: etu.AuthService.UpdateUserStripeCustomer:output_type -> etu.UpdateUserStripeCustomerResponse
+	36, // 78: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	38, // 79: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	40, // 80: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	42, // 81: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	44, // 82: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	46, // 83: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	50, // 84: etu.UserSettingsService.GetProfileImageURL:output_type -> etu.GetProfileImageURLResponse
+	48, // 85: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
+	52, // 86: etu.AccountService.DeleteAccount:output_type -> etu.DeleteAccountResponse
+	54, // 87: etu.AccountService.ExportData:output_type -> etu.ExportDataResponse
+	64, // [64:88] is the sub-list for method output_type
+	40, // [40:64] is the sub-list for method input_type
+	40, // [40:40] is the sub-list for extension type_name
+	40, // [40:40] is the sub-list for extension extendee
+	0,  // [0:40] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }
@@ -3700,15 +4057,21 @@ func file_proto_etu_proto_init() {
 	file_proto_etu_proto_msgTypes[32].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[41].OneofWrappers = []any{}
 	file_proto_etu_proto_msgTypes[44].OneofWrappers = []any{}
+	file_proto_etu_proto_msgTypes[53].OneofWrappers = []any{
+		(*ExportDataResponse_User)(nil),
+		(*ExportDataResponse_Tag)(nil),
+		(*ExportDataResponse_Note)(nil),
+		(*ExportDataResponse_ProfileImageUrl)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_etu_proto_rawDesc), len(file_proto_etu_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   50,
+			NumMessages:   54,
 			NumExtensions: 0,
-			NumServices:   6,
+			NumServices:   7,
 		},
 		GoTypes:           file_proto_etu_proto_goTypes,
 		DependencyIndexes: file_proto_etu_proto_depIdxs,
