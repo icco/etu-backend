@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -69,8 +70,6 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 
 	l := logging.FromContext(ctx)
 
-	var profileImageGCSObject *string
-
 	if req.ProfileImageUpload != nil {
 		if s.storage == nil {
 			return nil, status.Error(codes.FailedPrecondition, "storage client not configured")
@@ -80,12 +79,20 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 			l.Errorw("profile image validation failed", "user_id", req.UserId, zap.Error(err))
 			return nil, status.Errorf(codes.InvalidArgument, "invalid profile image: %v", err)
 		}
+	}
 
+	changingPassword := req.Password != nil && *req.Password != ""
+	if changingPassword && req.GetCurrentPassword() == "" {
+		return nil, status.Error(codes.InvalidArgument, "current_password is required to change password")
+	}
+
+	var profileImageGCSObject *string
+	var oldObjectName, newObjectName string
+	if req.ProfileImageUpload != nil {
 		// Capture any prior avatar object so we can delete it after a successful overwrite.
 		// Using a unique per-upload path avoids imgix's origin cache serving stale bytes
 		// from a fixed key, which it does even when the imgix request URL has a fresh
 		// cache-busting query param (imgix origin cache keys ignore query strings).
-		var oldObjectName string
 		if existing, getErr := s.db.GetUser(ctx, req.UserId); getErr == nil && existing != nil && existing.ProfileImageGCSObject != nil {
 			oldObjectName = *existing.ProfileImageGCSObject
 		}
@@ -99,21 +106,33 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 		l.Infow("GCS upload succeeded", "user_id", req.UserId, "object_name", objectName, "bytes", len(req.ProfileImageUpload.Data))
 
 		profileImageGCSObject = &objectName
-
-		if oldObjectName != "" && oldObjectName != objectName {
-			if err := s.storage.DeleteImage(ctx, oldObjectName); err != nil {
-				l.Warnw("failed to delete previous avatar (orphaned object left in GCS)",
-					"user_id", req.UserId, "old_object_name", oldObjectName, zap.Error(err))
-			}
-		}
+		newObjectName = objectName
 	} else if req.ClearProfileImage != nil && *req.ClearProfileImage {
 		empty := ""
 		profileImageGCSObject = &empty
 	}
 
-	user, err := s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, req.Password, req.NotionDatabaseName, profileImageGCSObject)
+	var user *db.User
+	var err error
+	if changingPassword {
+		user, err = s.db.ChangePasswordWithSettings(ctx, req.UserId, req.GetCurrentPassword(), *req.Password, req.NotionKey, req.Name, req.NotionDatabaseName, profileImageGCSObject)
+	} else {
+		user, err = s.db.UpdateUserSettings(ctx, req.UserId, req.NotionKey, req.Name, nil, req.NotionDatabaseName, profileImageGCSObject)
+	}
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to update user settings: %v", err)
+		if newObjectName != "" {
+			if delErr := s.storage.DeleteImage(ctx, newObjectName); delErr != nil {
+				l.Errorw("failed to delete uploaded avatar after settings update failed", "user_id", req.UserId, "object_name", newObjectName, zap.Error(delErr))
+			}
+		}
+		return nil, settingsError(err)
+	}
+
+	if oldObjectName != "" && oldObjectName != newObjectName && newObjectName != "" {
+		if err := s.storage.DeleteImage(ctx, oldObjectName); err != nil {
+			l.Warnw("failed to delete previous avatar (orphaned object left in GCS)",
+				"user_id", req.UserId, "old_object_name", oldObjectName, zap.Error(err))
+		}
 	}
 
 	return &pb.UpdateUserSettingsResponse{
@@ -162,6 +181,18 @@ func (s *UserSettingsService) GetProfileImageURL(ctx context.Context, req *pb.Ge
 	}
 
 	return &pb.GetProfileImageURLResponse{Url: url}, nil
+}
+
+// settingsError maps settings and password-change failures to gRPC statuses.
+func settingsError(err error) error {
+	switch {
+	case errors.Is(err, db.ErrUserNotFound):
+		return status.Error(codes.NotFound, "user not found")
+	case errors.Is(err, db.ErrAccountDisabled), errors.Is(err, db.ErrAccountLocked), errors.Is(err, db.ErrWrongPassword):
+		return status.Error(codes.PermissionDenied, err.Error())
+	default:
+		return status.Errorf(codes.Internal, "failed to update user settings: %v", err)
+	}
 }
 
 // profileImageOwner picks whose avatar to resolve. M2M callers without a

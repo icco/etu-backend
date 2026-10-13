@@ -300,6 +300,13 @@ func authInterceptor(authenticator *auth.Authenticator, m2mConfig *auth.M2MConfi
 		l := logging.FromContext(ctx).With("method", info.FullMethod)
 
 		if publicMethods[info.FullMethod] {
+			if md, ok := metadata.FromIncomingContext(ctx); ok && m2mConfig.IsEnabled() {
+				if tokens := md.Get("authorization"); len(tokens) > 0 {
+					if valid, _ := m2mConfig.ValidateToken(tokens[0]); valid {
+						ctx = auth.SetAuthContext(ctx, "m2m", "m2m")
+					}
+				}
+			}
 			l.Infow("public request")
 			return handler(ctx, req)
 		}

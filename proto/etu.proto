@@ -469,6 +469,8 @@ message UpdateUserSettingsRequest {
   optional string notion_database_name = 7;
   optional ImageUpload profile_image_upload = 8;
   optional bool clear_profile_image = 9;
+  // Required when password is set; must match the stored password.
+  optional string current_password = 10;
 }
 
 // UpdateUserSettingsResponse returns the updated user settings view.
