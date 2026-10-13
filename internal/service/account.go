@@ -82,7 +82,7 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 		if req.Password == "" {
 			return nil, status.Error(codes.InvalidArgument, "password is required")
 		}
-		if user.FailedLoginAttempts >= 10 {
+		if db.LockoutRemaining(user.FailedLoginAttempts, user.LastFailedLogin, time.Now()) > 0 {
 			return nil, status.Error(codes.PermissionDenied, "account is locked")
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
