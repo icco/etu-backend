@@ -48,8 +48,8 @@ func TestConsumeAIQuota(t *testing.T) {
 			name:  "under cap",
 			limit: 200,
 			setup: func(mock sqlmock.Sqlmock) {
-				mock.ExpectQuery(`INSERT INTO "AIUsage" (.+) ON CONFLICT (.+) DO UPDATE SET "count" = "AIUsage"."count" \+ 1 WHERE "AIUsage"."count" < \$3 RETURNING "count"`).
-					WithArgs(testUserID, day, 200).
+				mock.ExpectQuery(`INSERT INTO "AIUsage" \(.+\) SELECT "id", \$1, 1 FROM "User" WHERE "id" = \$2 AND "aiEnabled" AND NOT "disabled" AND "subscriptionStatus" IN \(\$3,\$4,\$5\) ON CONFLICT (.+) DO UPDATE SET "count" = "AIUsage"."count" \+ 1 WHERE "AIUsage"."count" < \$6 RETURNING "count"`).
+					WithArgs(day, testUserID, "active", "trialing", "past_due", 200).
 					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(5))
 			},
 			want: true,
@@ -59,7 +59,7 @@ func TestConsumeAIQuota(t *testing.T) {
 			limit: 200,
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectQuery(`INSERT INTO "AIUsage"`).
-					WithArgs(testUserID, day, 200).
+					WithArgs(day, testUserID, "active", "trialing", "past_due", 200).
 					WillReturnRows(sqlmock.NewRows([]string{"count"}))
 			},
 			want: false,

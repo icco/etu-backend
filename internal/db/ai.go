@@ -49,7 +49,8 @@ func (db *DB) SetUserAIEnabled(ctx context.Context, userID string, enabled bool)
 }
 
 // ConsumeAIQuota atomically records one AI operation for userID on the UTC day
-// of now. It returns false without recording when the user already reached limit.
+// of now. It returns false without recording when the user is not currently
+// AI eligible or already reached limit.
 func (db *DB) ConsumeAIQuota(ctx context.Context, userID string, now time.Time, limit int) (bool, error) {
 	if limit <= 0 {
 		return false, nil
@@ -59,10 +60,11 @@ func (db *DB) ConsumeAIQuota(ctx context.Context, userID string, now time.Time, 
 
 	var counts []int
 	err := db.conn.WithContext(ctx).Raw(
-		`INSERT INTO "AIUsage" ("userId", "day", "count") VALUES (?, ?, 1) `+
+		`INSERT INTO "AIUsage" ("userId", "day", "count") `+
+			`SELECT "id", ?, 1 FROM "User" WHERE "id" = ? AND "aiEnabled" AND NOT "disabled" AND "subscriptionStatus" IN ? `+
 			`ON CONFLICT ("userId", "day") DO UPDATE SET "count" = "AIUsage"."count" + 1 `+
 			`WHERE "AIUsage"."count" < ? RETURNING "count"`,
-		userID, day, limit,
+		day, userID, AIEligibleSubscriptionStatuses, limit,
 	).Scan(&counts).Error
 	if err != nil {
 		return false, fmt.Errorf("failed to consume AI quota: %w", err)
