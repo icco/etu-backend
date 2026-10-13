@@ -555,7 +555,8 @@ type User struct {
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// stripe_customer_id links the user to a Stripe customer record.
 	StripeCustomerId *string `protobuf:"bytes,8,opt,name=stripe_customer_id,json=stripeCustomerId,proto3,oneof" json:"stripe_customer_id,omitempty"`
-	// notion_key is an optional Notion API token for sync features.
+	// notion_key is write-only and is never populated in responses; see
+	// has_notion_key.
 	NotionKey *string `protobuf:"bytes,9,opt,name=notion_key,json=notionKey,proto3,oneof" json:"notion_key,omitempty"`
 	// updated_at is when the user record was last updated.
 	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
@@ -587,8 +588,11 @@ type User struct {
 	// billing_country is the ISO-3166-1 alpha-2 country code of the
 	// user's billing address.
 	BillingCountry *string `protobuf:"bytes,24,opt,name=billing_country,json=billingCountry,proto3,oneof" json:"billing_country,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// has_notion_key reports whether a Notion API token is stored. The token
+	// itself is never returned.
+	HasNotionKey  bool `protobuf:"varint,25,opt,name=has_notion_key,json=hasNotionKey,proto3" json:"has_notion_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -780,6 +784,13 @@ func (x *User) GetBillingCountry() string {
 		return *x.BillingCountry
 	}
 	return ""
+}
+
+func (x *User) GetHasNotionKey() bool {
+	if x != nil {
+		return x.HasNotionKey
+	}
+	return false
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -3029,7 +3040,8 @@ func (x *UpdateUserSettingsResponse) GetUser() *User {
 // GetStatsRequest requests aggregate statistics.
 type GetStatsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// user_id scopes stats to a single user when provided.
+	// user_id scopes stats to a single user. Empty returns global stats for
+	// M2M callers and the authenticated user's stats otherwise.
 	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3140,7 +3152,11 @@ func (x *GetStatsResponse) GetWordsWritten() int64 {
 type GetProfileImageURLRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// key is the storage object key returned in User.image.
-	Key           string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// user_id selects whose avatar to resolve. M2M callers that omit it must
+	// pass a "profiles/{userId}/..." key, whose owner segment is used. API key
+	// callers may only resolve their own.
+	UserId        string `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3178,6 +3194,13 @@ func (*GetProfileImageURLRequest) Descriptor() ([]byte, []int) {
 func (x *GetProfileImageURLRequest) GetKey() string {
 	if x != nil {
 		return x.Key
+	}
+	return ""
+}
+
+func (x *GetProfileImageURLRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
 	}
 	return ""
 }
@@ -3267,8 +3290,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xf1\n" +
-	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x97\v\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -3296,7 +3318,8 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\fbilling_city\x18\x15 \x01(\tH\fR\vbillingCity\x88\x01\x01\x12(\n" +
 	"\rbilling_state\x18\x16 \x01(\tH\rR\fbillingState\x88\x01\x01\x123\n" +
 	"\x13billing_postal_code\x18\x17 \x01(\tH\x0eR\x11billingPostalCode\x88\x01\x01\x12,\n" +
-	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01B\a\n" +
+	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01\x12$\n" +
+	"\x0ehas_notion_key\x18\x19 \x01(\bR\fhasNotionKeyB\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
@@ -3485,9 +3508,10 @@ const file_proto_etu_proto_rawDesc = "" +
 	"totalBlips\x12\x1f\n" +
 	"\vunique_tags\x18\x02 \x01(\x03R\n" +
 	"uniqueTags\x12#\n" +
-	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten\"-\n" +
+	"\rwords_written\x18\x03 \x01(\x03R\fwordsWritten\"F\n" +
 	"\x19GetProfileImageURLRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\".\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\".\n" +
 	"\x1aGetProfileImageURLResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url*|\n" +
 	"\x0eDisabledReason\x12\x0f\n" +

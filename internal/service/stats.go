@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"go.icco.me/etu-backend/internal/auth"
 	"go.icco.me/etu-backend/internal/db"
 	pb "go.icco.me/etu-backend/proto"
 	"google.golang.org/grpc/codes"
@@ -22,18 +23,24 @@ func NewStatsService(database *db.DB) *StatsService {
 	}
 }
 
-// GetStats retrieves statistics for a user or all users
+// GetStats retrieves statistics for a user, or for all users when an M2M
+// caller omits user_id. API key callers are always scoped to themselves.
 func (s *StatsService) GetStats(ctx context.Context, req *pb.GetStatsRequest) (*pb.GetStatsResponse, error) {
-	// If user_id is provided, verify authorization
-	if req.UserId != "" {
-		if err := verifyUserAuthorization(ctx, req.UserId); err != nil {
+	userID := req.UserId
+	if userID != "" {
+		if err := verifyUserAuthorization(ctx, userID); err != nil {
 			return nil, err
 		}
+	} else if !auth.IsM2MAuth(ctx) {
+		authenticatedUserID, err := auth.GetUserID(ctx)
+		if err != nil {
+			return nil, status.Error(codes.Unauthenticated, "authentication required")
+		}
+		userID = authenticatedUserID
 	}
-	// If user_id is empty, we get stats for all users
-	// This could be restricted based on authorization if needed
 
-	totalBlips, uniqueTags, wordsWritten, err := s.db.GetStats(ctx, req.UserId)
+	totalBlips, uniqueTags, wordsWritten, err := s.db.GetStats(ctx, userID)
+
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get stats: %v", err)
 	}

@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"go.icco.me/etu-backend/internal/auth"
 	"go.icco.me/etu-backend/internal/db"
 	"go.icco.me/etu-backend/internal/storage"
 	pb "go.icco.me/etu-backend/proto"
@@ -119,15 +121,29 @@ func (s *UserSettingsService) UpdateUserSettings(ctx context.Context, req *pb.Up
 	}, nil
 }
 
-// GetProfileImageURL resolves a stored avatar key to a short-lived URL. The
-// key is whatever was returned in User.image — typically "profiles/{userId}/avatar".
+// GetProfileImageURL resolves the caller's stored avatar to a short-lived URL.
+// The signed key always comes from the user record; a request key is only
+// accepted when it matches that record.
 func (s *UserSettingsService) GetProfileImageURL(ctx context.Context, req *pb.GetProfileImageURLRequest) (*pb.GetProfileImageURLResponse, error) {
-	if req.Key == "" {
-		return nil, status.Error(codes.InvalidArgument, "key is required")
+	userID, err := profileImageOwner(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.db.GetUser(ctx, userID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get user: %v", err)
+	}
+	if user == nil || user.ProfileImageGCSObject == nil || *user.ProfileImageGCSObject == "" {
+		return nil, status.Error(codes.NotFound, "profile image not found")
+	}
+	key := *user.ProfileImageGCSObject
+	if req.Key != "" && req.Key != key {
+		return nil, status.Error(codes.PermissionDenied, "key does not match profile image")
 	}
 
 	if s.imgixDomain != "" {
-		signed := mediaURL(s.imgixDomain, req.Key, time.Now())
+		signed := mediaURL(s.imgixDomain, key, time.Now())
 		if signed == "" {
 			return nil, status.Error(codes.FailedPrecondition, "media signing not configured")
 		}
@@ -140,10 +156,34 @@ func (s *UserSettingsService) GetProfileImageURL(ctx context.Context, req *pb.Ge
 		return nil, status.Error(codes.FailedPrecondition, "storage client not configured")
 	}
 
-	url, err := s.storage.GetSignedURL(ctx, req.Key)
+	url, err := s.storage.GetSignedURL(ctx, key)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to sign profile image URL: %v", err)
 	}
 
 	return &pb.GetProfileImageURLResponse{Url: url}, nil
+}
+
+// profileImageOwner picks whose avatar to resolve. M2M callers without a
+// user_id fall back to the owner segment of a "profiles/{userId}/..." key.
+func profileImageOwner(ctx context.Context, req *pb.GetProfileImageURLRequest) (string, error) {
+	if !auth.IsM2MAuth(ctx) {
+		userID, err := auth.GetUserID(ctx)
+		if err != nil {
+			return "", status.Error(codes.Unauthenticated, "authentication required")
+		}
+		if req.UserId != "" && req.UserId != userID {
+			return "", status.Error(codes.PermissionDenied, "cannot access another user's data")
+		}
+		return userID, nil
+	}
+	if req.UserId != "" {
+		return req.UserId, nil
+	}
+	rest, ok := strings.CutPrefix(req.Key, "profiles/")
+	owner, _, found := strings.Cut(rest, "/")
+	if !ok || !found || owner == "" {
+		return "", status.Error(codes.InvalidArgument, "user_id or a profile image key is required")
+	}
+	return owner, nil
 }
