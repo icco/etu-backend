@@ -69,10 +69,7 @@ func run(log *zap.SugaredLogger) error {
 		}
 	}()
 
-	if err := database.AutoMigrate(); err != nil {
-		return fmt.Errorf("failed to run migrations: %w", err)
-	}
-	log.Infow("database connected and migrations completed")
+	log.Infow("database connected")
 
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()

@@ -1,3 +1,5 @@
+FROM arigaio/atlas:latest-community@sha256:88cadf07b3896a995f455263bd9d54dddd9704e3e3b04b34194ba710d5672c49 AS atlas
+
 FROM golang:1.27-bookworm AS builder
 
 # Install task via go install to avoid supply-chain risk from curl|bash.
@@ -35,9 +37,12 @@ RUN groupadd -r app && useradd -r -u 1001 -g app app
 WORKDIR /app
 
 COPY --from=builder --chown=app:app /app/bin/ /app/bin/
+COPY --from=atlas --chown=app:app /atlas /app/bin/atlas
+COPY --chown=app:app migrations/ /app/migrations/
+COPY --chown=app:app scripts/server-entrypoint.sh /app/bin/server-entrypoint.sh
 
 USER app
 
 EXPOSE 8080 50051
 
-CMD ["/app/bin/server"]
+CMD ["/app/bin/server-entrypoint.sh"]

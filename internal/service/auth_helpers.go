@@ -27,3 +27,11 @@ func verifyUserAuthorization(ctx context.Context, requestedUserID string) error 
 
 	return nil
 }
+
+// requireM2M rejects any caller not authenticated with a service token.
+func requireM2M(ctx context.Context) error {
+	if !auth.IsM2MAuth(ctx) {
+		return status.Error(codes.PermissionDenied, "service token required")
+	}
+	return nil
+}

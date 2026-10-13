@@ -171,6 +171,9 @@ func (s *AuthService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 //
 //nolint:revive // proto-generated naming
 func (s *AuthService) GetUserByStripeCustomerId(ctx context.Context, req *pb.GetUserByStripeCustomerIdRequest) (*pb.GetUserByStripeCustomerIdResponse, error) {
+	if err := requireM2M(ctx); err != nil {
+		return nil, err
+	}
 	if req.StripeCustomerId == "" {
 		return nil, status.Error(codes.InvalidArgument, "stripe_customer_id is required")
 	}
@@ -192,6 +195,9 @@ func (s *AuthService) GetUserByStripeCustomerId(ctx context.Context, req *pb.Get
 
 // UpdateUserSubscription updates a user's subscription information
 func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.UpdateUserSubscriptionRequest) (*pb.UpdateUserSubscriptionResponse, error) {
+	if err := requireM2M(ctx); err != nil {
+		return nil, err
+	}
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
@@ -231,6 +237,9 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 // UpdateUserStripeCustomer syncs Stripe customer profile fields
 // (name, billing address) from webhook events to the user record.
 func (s *AuthService) UpdateUserStripeCustomer(ctx context.Context, req *pb.UpdateUserStripeCustomerRequest) (*pb.UpdateUserStripeCustomerResponse, error) {
+	if err := requireM2M(ctx); err != nil {
+		return nil, err
+	}
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}

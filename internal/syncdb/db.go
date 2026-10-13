@@ -84,18 +84,6 @@ func (db *DB) GetDB() *gorm.DB {
 	return db.conn
 }
 
-// AutoMigrate runs auto migrations for all tables
-func (db *DB) AutoMigrate() error {
-	return db.conn.AutoMigrate(
-		&models.User{},
-		&models.Note{},
-		&models.Tag{},
-		&models.NoteTag{},
-		&models.ApiKey{},
-		&models.SyncState{},
-	)
-}
-
 // GetNoteByNotionPageID finds a note by its Notion page ID (externalId)
 func (db *DB) GetNoteByNotionPageID(userID, pageID string) (*Note, error) {
 	var note Note
