@@ -129,7 +129,7 @@ func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*
 		return nil, status.Error(codes.ResourceExhausted, "too many login requests; retry later")
 	}
 	defer s.loginLimits.release()
-	result, err := s.authenticate(ctx, req)
+	result, err := s.Authenticate(ctx, req)
 	if err != nil {
 		return nil, err
 	}

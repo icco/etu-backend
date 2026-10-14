@@ -119,11 +119,21 @@ func enforcePaywall(ctx context.Context, method string, req interface{}, account
 		l.Errorw("failed to load account state", "method", method, "user_id", userID, zap.Error(err))
 		return status.Error(codes.Internal, "failed to load account state")
 	}
+	if method == "/etu.UserSettingsService/UpdateUserSettings" && !state.Disabled && accountPreferencesOnly(req) {
+		return nil
+	}
 	if err := paywall.Authorize(method, state, time.Now()); err != nil {
 		l.Infow("paywall denied request", "method", method, "user_id", userID, "subscription_status", state.Status, "disabled", state.Disabled)
 		return err
 	}
 	return nil
+}
+
+func accountPreferencesOnly(req interface{}) bool {
+	settings, ok := req.(*pb.UpdateUserSettingsRequest)
+	return ok && settings != nil && (settings.Password != nil || settings.AiEnabled != nil) &&
+		settings.NotionKey == nil && settings.Name == nil && settings.NotionDatabaseName == nil &&
+		settings.ProfileImageUpload == nil && settings.ClearProfileImage == nil
 }
 
 func m2mRequestUserID(req interface{}) string {

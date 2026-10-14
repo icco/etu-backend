@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,9 @@ import (
 	"go.icco.me/etu-backend/internal/db"
 	pb "go.icco.me/etu-backend/proto"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -23,6 +26,36 @@ func (m captureKeyHash) Match(value driver.Value) bool {
 	s, ok := value.(string)
 	*m.hash = s
 	return ok && strings.HasPrefix(s, "$2")
+}
+
+// TestLoginLimitsForwardedIPAcrossEmails checks source-IP throttling independently of account limits.
+func TestLoginLimitsForwardedIPAcrossEmails(t *testing.T) {
+	conn, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	database, err := db.NewFromConn(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := NewAuthService(database)
+	svc.loginLimits.global = rate.NewLimiter(rate.Inf, 30)
+	ctx := auth.SetAuthContext(context.Background(), "service", "m2m")
+	ctx = metadata.NewIncomingContext(ctx, metadata.Pairs("x-etu-client-ip", "192.0.2.1"))
+	for i := range 20 {
+		email := fmt.Sprintf("alice%d@example.com", i)
+		mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(email, 1).WillReturnRows(sqlmock.NewRows([]string{"id"}))
+		if _, err := svc.Login(ctx, &pb.AuthenticateRequest{Email: email, Password: testPassword}); status.Code(err) != codes.Unauthenticated {
+			t.Fatalf("attempt %d: %v", i, err)
+		}
+	}
+	if _, err := svc.Login(ctx, &pb.AuthenticateRequest{Email: "bob@example.com", Password: testPassword}); status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("exhausted source IP was not throttled: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestLogin(t *testing.T) {
