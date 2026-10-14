@@ -69,6 +69,7 @@ func TestLogin(t *testing.T) {
 		found, disabled bool
 		attempts        int
 		insertError     bool
+		deleteError     bool
 		sessions        int
 		want            codes.Code
 	}{
@@ -78,7 +79,8 @@ func TestLogin(t *testing.T) {
 		{name: "disabled", email: testEmail, found: true, disabled: true, want: codes.Unauthenticated},
 		{name: "locked", email: testEmail, found: true, attempts: 5, want: codes.PermissionDenied},
 		{name: "key storage failure", email: testEmail, found: true, insertError: true, want: codes.Internal},
-		{name: "session cap", email: testEmail, found: true, sessions: db.MaxMobileSessions, want: codes.ResourceExhausted},
+		{name: "session cap evicts least recently used", email: testEmail, found: true, sessions: db.MaxMobileSessions, want: codes.OK},
+		{name: "eviction failure", email: testEmail, found: true, sessions: db.MaxMobileSessions, deleteError: true, want: codes.Internal},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			conn, mock, err := sqlmock.New()
@@ -106,6 +108,14 @@ func TestLogin(t *testing.T) {
 				mock.ExpectQuery(`SELECT id FROM "User" WHERE id = \$1 FOR UPDATE`).WithArgs("verified-owner").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("verified-owner"))
 				mock.ExpectQuery(`SELECT count\(\*\) FROM "ApiKey"`).WithArgs("verified-owner", "etu-mobile").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tc.sessions))
 				if tc.sessions >= db.MaxMobileSessions {
+					del := mock.ExpectExec(`DELETE FROM "ApiKey" WHERE id IN \(SELECT id FROM "ApiKey" WHERE "userId" = \$1 AND name = \$2 ORDER BY "lastUsed" ASC NULLS FIRST, "createdAt" ASC LIMIT \$3\)`).WithArgs("verified-owner", "etu-mobile", tc.sessions-db.MaxMobileSessions+1)
+					if tc.deleteError {
+						del.WillReturnError(errors.New("database unavailable"))
+					} else {
+						del.WillReturnResult(sqlmock.NewResult(0, int64(tc.sessions-db.MaxMobileSessions+1)))
+					}
+				}
+				if tc.deleteError {
 					mock.ExpectRollback()
 				} else {
 					insert := mock.ExpectExec(`INSERT INTO "ApiKey"`).WithArgs(sqlmock.AnyArg(), "etu-mobile", sqlmock.AnyArg(), captureKeyHash{&storedHash}, "verified-owner", sqlmock.AnyArg(), sqlmock.AnyArg())

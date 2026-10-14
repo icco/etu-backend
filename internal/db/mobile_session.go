@@ -10,11 +10,15 @@ import (
 // MaxMobileSessions bounds persistent keys created by public Login per user.
 const MaxMobileSessions = 10
 
-// ErrMobileSessionLimit indicates that an old session must be revoked first.
+// ErrMobileSessionLimit indicates that eviction could not free a session slot.
 var ErrMobileSessionLimit = errors.New("mobile session limit reached")
 
-// CreateMobileSession serializes issuance per user across server instances. The
-// generator runs only after the cap check, and any failure rolls back the insert.
+const mobileSessionName = "etu-mobile"
+
+// CreateMobileSession serializes issuance per user across server instances. At
+// the cap it revokes the least-recently-used etu-mobile keys (never-used first,
+// then oldest) in the same transaction. The generator runs only once a slot is
+// free, and any failure rolls back both the eviction and the insert.
 func (db *DB) CreateMobileSession(ctx context.Context, userID string, generate func() (prefix, hash string, err error)) (*ApiKey, error) {
 	var key *ApiKey
 	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -23,17 +27,23 @@ func (db *DB) CreateMobileSession(ctx context.Context, userID string, generate f
 			return err
 		}
 		var count int64
-		if err := tx.Model(&ApiKey{}).Where(`"userId" = ? AND name = ?`, owner, "etu-mobile").Count(&count).Error; err != nil {
+		if err := tx.Model(&ApiKey{}).Where(`"userId" = ? AND name = ?`, owner, mobileSessionName).Count(&count).Error; err != nil {
 			return err
 		}
-		if count >= MaxMobileSessions {
-			return ErrMobileSessionLimit
+		if excess := count - MaxMobileSessions + 1; excess > 0 {
+			res := tx.Exec(`DELETE FROM "ApiKey" WHERE id IN (SELECT id FROM "ApiKey" WHERE "userId" = ? AND name = ? ORDER BY "lastUsed" ASC NULLS FIRST, "createdAt" ASC LIMIT ?)`, owner, mobileSessionName, excess)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected < excess {
+				return ErrMobileSessionLimit
+			}
 		}
 		prefix, hash, err := generate()
 		if err != nil {
 			return err
 		}
-		key, err = (&DB{conn: tx}).CreateApiKey(ctx, owner, "etu-mobile", prefix, hash)
+		key, err = (&DB{conn: tx}).CreateApiKey(ctx, owner, mobileSessionName, prefix, hash)
 		return err
 	})
 	if err != nil {
