@@ -37,7 +37,7 @@ RUN groupadd -r app && useradd -r -u 1001 -g app app
 WORKDIR /app
 
 COPY --from=builder --chown=app:app /app/bin/ /app/bin/
-COPY --from=atlas --chown=app:app /atlas /app/bin/atlas
+COPY --from=atlas --chown=app:app --chmod=0755 /atlas /app/bin/atlas
 COPY --chown=app:app migrations/ /app/migrations/
 COPY --chown=app:app scripts/server-entrypoint.sh /app/bin/server-entrypoint.sh
 
