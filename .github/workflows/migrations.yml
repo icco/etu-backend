@@ -17,9 +17,9 @@ jobs:
       ATLAS_DEV_URL: postgres://postgres:postgres@localhost:5432/dev?sslmode=disable&search_path=public
       ATLAS_RUN: docker run --rm --network host -v ${{ github.workspace }}:/src -w /src -e ATLAS_MODELS_URL -e ATLAS_DEV_URL arigaio/atlas:latest-community@sha256:88cadf07b3896a995f455263bd9d54dddd9704e3e3b04b34194ba710d5672c49
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: go.mod
       - name: Create scratch databases
@@ -35,3 +35,11 @@ jobs:
           test -z "$(git status --porcelain migrations)"
       - name: Lint migrations
         run: $ATLAS_RUN migrate lint --env local --latest 1
+      - name: Create Stripe integration database
+        run: psql "postgres://postgres:postgres@localhost:5432/postgres" -c 'CREATE DATABASE stripe_test'
+      - name: Apply migrations for Stripe integration tests
+        run: $ATLAS_RUN migrate apply --dir file://migrations --url "postgres://postgres:postgres@localhost:5432/stripe_test?sslmode=disable"
+      - name: Test Stripe event transactions
+        env:
+          STRIPE_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/stripe_test?sslmode=disable
+        run: go test -race -v ./internal/service -run 'TestStripeEvent|TestBillingRPCsRequireM2M' -count=1

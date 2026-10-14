@@ -11,6 +11,7 @@ import (
 	pb "go.icco.me/etu-backend/proto"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestBillingRPCsRequireM2M(t *testing.T) {
@@ -20,11 +21,11 @@ func TestBillingRPCsRequireM2M(t *testing.T) {
 			return err
 		},
 		"UpdateUserSubscription": func(s *AuthService, ctx context.Context) error {
-			_, err := s.UpdateUserSubscription(ctx, &pb.UpdateUserSubscriptionRequest{UserId: "alice", SubscriptionStatus: "active"})
+			_, err := s.UpdateUserSubscription(ctx, &pb.UpdateUserSubscriptionRequest{UserId: "alice", SubscriptionStatus: "active", StripeEventId: proto.String("evt_alice")})
 			return err
 		},
 		"UpdateUserStripeCustomer": func(s *AuthService, ctx context.Context) error {
-			_, err := s.UpdateUserStripeCustomer(ctx, &pb.UpdateUserStripeCustomerRequest{UserId: "alice"})
+			_, err := s.UpdateUserStripeCustomer(ctx, &pb.UpdateUserStripeCustomerRequest{UserId: "alice", StripeEventId: proto.String("evt_alice")})
 			return err
 		},
 	}

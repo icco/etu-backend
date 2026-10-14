@@ -369,6 +369,8 @@ message UpdateUserSubscriptionRequest {
   bool cancel_at_period_end = 7;
   // current_period_start sets the start of the current billing period.
   optional google.protobuf.Timestamp current_period_start = 8;
+  // Non-empty IDs are deduplicated globally across both Stripe update RPCs.
+  optional string stripe_event_id = 9;
 }
 
 // UpdateUserSubscriptionResponse returns the updated user record.
@@ -398,6 +400,8 @@ message UpdateUserStripeCustomerRequest {
   optional string billing_postal_code = 7;
   // billing_country is the ISO-3166-1 alpha-2 country code.
   optional string billing_country = 8;
+  // Non-empty IDs are deduplicated globally across both Stripe update RPCs.
+  optional string stripe_event_id = 9;
 }
 
 // UpdateUserStripeCustomerResponse returns the updated user record.

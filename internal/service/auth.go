@@ -220,6 +220,7 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	}
 
 	update := db.SubscriptionUpdate{
+		StripeEventID:        req.GetStripeEventId(),
 		SubscriptionStatus:   req.SubscriptionStatus,
 		StripeCustomerID:     req.StripeCustomerId,
 		StripeSubscriptionID: req.StripeSubscriptionId,
@@ -259,6 +260,7 @@ func (s *AuthService) UpdateUserStripeCustomer(ctx context.Context, req *pb.Upda
 	}
 
 	user, err := s.db.UpdateUserStripeCustomer(ctx, req.UserId, db.StripeCustomerUpdate{
+		StripeEventID:     req.GetStripeEventId(),
 		Name:              req.Name,
 		BillingLine1:      req.BillingLine1,
 		BillingLine2:      req.BillingLine2,

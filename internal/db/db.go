@@ -132,6 +132,7 @@ func (db *DB) AutoMigrate() error {
 		&models.NoteAudio{},
 		&models.AccountDeletionCleanup{},
 		&models.AIUsage{},
+		&models.StripeEvent{},
 	); err != nil {
 		return err
 	}
@@ -768,6 +769,7 @@ const SubscriptionStatusPastDue = "past_due"
 // Pointer-typed fields are only persisted when non-nil; pass an empty string
 // pointer to explicitly clear the column. CancelAtPeriodEnd is always written.
 type SubscriptionUpdate struct {
+	StripeEventID        string
 	SubscriptionStatus   string
 	StripeCustomerID     *string
 	SubscriptionEnd      *time.Time
@@ -779,6 +781,12 @@ type SubscriptionUpdate struct {
 
 // UpdateUserSubscription updates a user's subscription information.
 func (db *DB) UpdateUserSubscription(ctx context.Context, userID string, in SubscriptionUpdate) (*User, error) {
+	return db.withStripeEvent(ctx, userID, in.StripeEventID, func(tx *DB) (*User, error) {
+		return tx.updateUserSubscription(ctx, userID, in)
+	})
+}
+
+func (db *DB) updateUserSubscription(ctx context.Context, userID string, in SubscriptionUpdate) (*User, error) {
 	updates := map[string]interface{}{
 		colSubscriptionStatus: in.SubscriptionStatus,
 		colCancelAtPeriodEnd:  in.CancelAtPeriodEnd,
@@ -819,6 +827,7 @@ func (db *DB) UpdateUserSubscription(ctx context.Context, userID string, in Subs
 // written by UpdateUserStripeCustomer. Each non-nil pointer is persisted;
 // an empty string pointer explicitly clears the column.
 type StripeCustomerUpdate struct {
+	StripeEventID     string
 	Name              *string
 	BillingLine1      *string
 	BillingLine2      *string
@@ -831,6 +840,12 @@ type StripeCustomerUpdate struct {
 // UpdateUserStripeCustomer updates Stripe customer profile fields synced from
 // Stripe webhook events. Returns nil, nil if the user does not exist.
 func (db *DB) UpdateUserStripeCustomer(ctx context.Context, userID string, in StripeCustomerUpdate) (*User, error) {
+	return db.withStripeEvent(ctx, userID, in.StripeEventID, func(tx *DB) (*User, error) {
+		return tx.updateUserStripeCustomer(ctx, userID, in)
+	})
+}
+
+func (db *DB) updateUserStripeCustomer(ctx context.Context, userID string, in StripeCustomerUpdate) (*User, error) {
 	updates := map[string]interface{}{}
 	if in.Name != nil {
 		updates[colName] = *in.Name
