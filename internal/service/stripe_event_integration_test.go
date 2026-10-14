@@ -52,9 +52,9 @@ func stripeTestService(t *testing.T) (*AuthService, *sql.DB) {
 	return NewAuthService(database), conn
 }
 
-func stripeTestUser(t *testing.T, s *AuthService) string {
+func stripeTestUser(ctx context.Context, t *testing.T, s *AuthService) string {
 	t.Helper()
-	user, err := s.db.CreateUser(t.Context(), fmt.Sprintf("alice-%s@example.com", models.GenerateCUID()), "hash")
+	user, err := s.db.CreateUser(ctx, fmt.Sprintf("alice-%s@example.com", models.GenerateCUID()), "hash")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestStripeEventDuplicatePostgres(t *testing.T) {
 	for name, call := range stripeUpdateCalls() {
 		t.Run(name, func(t *testing.T) {
 			s, _ := stripeTestService(t)
-			id := stripeTestUser(t, s)
+			id := stripeTestUser(t.Context(), t, s)
 			event := "evt_" + id
 			ctx := stripeContext(t)
 			if _, err := call(s, ctx, id, &event, "first"); err != nil {
@@ -109,7 +109,7 @@ func TestStripeEventConcurrentPostgres(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			first, _ := stripeTestService(t)
 			second, _ := stripeTestService(t)
-			id := stripeTestUser(t, first)
+			id := stripeTestUser(t.Context(), t, first)
 			event := "evt_" + id
 			ctx := stripeContext(t)
 			const deliveries = 16
@@ -142,14 +142,14 @@ func TestStripeEventRollbackPostgres(t *testing.T) {
 	for name, call := range stripeUpdateCalls() {
 		t.Run(name, func(t *testing.T) {
 			s, conn := stripeTestService(t)
-			id := stripeTestUser(t, s)
+			id := stripeTestUser(t.Context(), t, s)
 			event := "evt_" + id
 			ctx := stripeContext(t)
 			if _, err := conn.ExecContext(ctx, `ALTER TABLE "User" ADD CONSTRAINT stripe_test_failure CHECK ("subscriptionStatus" != 'rejected' AND name IS DISTINCT FROM 'rejected')`); err != nil {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() {
-				if _, err := conn.Exec(`ALTER TABLE "User" DROP CONSTRAINT stripe_test_failure`); err != nil {
+				if _, err := conn.ExecContext(context.WithoutCancel(ctx), `ALTER TABLE "User" DROP CONSTRAINT stripe_test_failure`); err != nil {
 					t.Error(err)
 				}
 			})
@@ -176,13 +176,13 @@ func TestStripeEventCommitFailurePostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if _, err := conn.Exec(`ALTER TABLE "StripeEvent" DROP CONSTRAINT stripe_test_commit_failure; DROP TABLE stripe_test_commits`); err != nil {
+		if _, err := conn.ExecContext(context.WithoutCancel(ctx), `ALTER TABLE "StripeEvent" DROP CONSTRAINT stripe_test_commit_failure; DROP TABLE stripe_test_commits`); err != nil {
 			t.Error(err)
 		}
 	})
 	for name, call := range stripeUpdateCalls() {
 		t.Run(name, func(t *testing.T) {
-			id := stripeTestUser(t, s)
+			id := stripeTestUser(ctx, t, s)
 			event := "evt_" + id
 			before, err := s.db.GetUser(ctx, id)
 			if err != nil {
@@ -215,7 +215,7 @@ func TestStripeEventMissingUserPostgres(t *testing.T) {
 			if user, err := call(s, ctx, "missing", &event, "first"); err == nil || user != nil {
 				t.Fatalf("missing user returned success: %v, %v", user, err)
 			}
-			id := stripeTestUser(t, s)
+			id := stripeTestUser(ctx, t, s)
 			user, err := call(s, ctx, id, &event, "retry")
 			if err != nil || (user.GetName() != "retry" && user.GetSubscriptionStatus() != "retry") {
 				t.Fatalf("missing user consumed event: %v, %v", user, err)
