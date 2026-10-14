@@ -136,8 +136,8 @@ func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*
 	if !result.Success || result.User == nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid email or password")
 	}
-	// Ownership comes exclusively from verified credentials. Check the shared
-	// session cap under a database lock before paying for another key hash.
+	// Ownership comes exclusively from verified credentials. Issuance evicts the
+	// least-recently-used etu-mobile key under a database lock when at the cap.
 	var rawKey string
 	key, err := s.db.CreateMobileSession(ctx, result.User.Id, func() (string, string, error) {
 		var hash string
@@ -148,9 +148,6 @@ func (s *AuthService) Login(ctx context.Context, req *pb.AuthenticateRequest) (*
 		}
 		return rawKey[:12], hash, nil
 	})
-	if errors.Is(err, db.ErrMobileSessionLimit) {
-		return nil, status.Error(codes.ResourceExhausted, "mobile session limit reached; revoke an old etu-mobile key in Settings")
-	}
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to create mobile session")
 	}

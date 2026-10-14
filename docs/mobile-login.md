@@ -17,13 +17,7 @@ only its bcrypt hash is stored.
 - At most 4 concurrent Login operations per server instance, rejected rather
   than queued when busy. Successful and failed requests both consume quota.
 
-Each user can hold at most 10 `etu-mobile` keys created by Login. A transaction
-locks the user's row before counting existing keys and inserting, so concurrent
-requests and different server instances cannot race past the cap. The cap check
-runs before generating/hashing another key. No existing keys are evicted; revoke
-an old `etu-mobile` key in Settings before logging in again at the limit.
-Both throttling and the session cap return `ResourceExhausted`. Admission quotas
-reset on process restart, but the database-backed session cap survives restarts.
+Each user can hold at most 10 `etu-mobile` keys created by Login. A transaction locks the user's row before counting existing keys and inserting, so concurrent requests and different server instances cannot race past the cap. At the cap, Login revokes the least-recently-used `etu-mobile` keys in the same transaction (never-used keys first, then oldest `lastUsed`, ties broken by oldest creation) before generating and hashing the new key. Other API keys are never evicted. Throttling returns `ResourceExhausted`; admission quotas reset on process restart.
 
 Clients send the returned `raw_key` as the raw `authorization` metadata value
 (without `Bearer`). `VerifyApiKey` supplies the user ID and `GetUser` retrieves
