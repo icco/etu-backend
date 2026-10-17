@@ -137,6 +137,13 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 			return nil, incompleteDeletion(codes.Unavailable, "cancel subscription", err)
 		}
 	}
+	playSubs, err = s.db.ActivePlaySubscriptions(ctx, user.ID)
+	if err != nil {
+		return nil, incompleteDeletion(codes.Internal, "list google play subscriptions", err)
+	}
+	if len(playSubs) > 0 && s.play == nil {
+		return nil, incompleteDeletion(codes.FailedPrecondition, "cancel google play subscription", errors.New("google play billing not configured"))
+	}
 	if err := cancelPlaySubscriptions(ctx, s.play, playSubs); err != nil {
 		l.Errorw("play cancellation failed; account frozen but not deleted", "user_id", user.ID, "error", err)
 		return nil, incompleteDeletion(codes.Unavailable, "cancel google play subscription", err)
