@@ -128,3 +128,25 @@ func TestGetAccountState(t *testing.T) {
 		})
 	}
 }
+
+func TestPaywallExemptsVerifyPlayPurchase(t *testing.T) {
+	p := Paywall{Grace: 7 * 24 * time.Hour}
+	now := time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name  string
+		state AccountState
+		want  codes.Code
+	}{
+		{name: "unpaid user may verify", state: AccountState{Status: "canceled"}, want: codes.OK},
+		{name: "new user may verify", state: AccountState{}, want: codes.OK},
+		{name: "disabled user may not verify", state: AccountState{Status: "canceled", Disabled: true}, want: codes.PermissionDenied},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := status.Code(p.Authorize("/etu.BillingService/VerifyPlayPurchase", tt.state, now))
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Authorize() code mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

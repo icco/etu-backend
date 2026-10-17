@@ -11,6 +11,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/go-cmp/cmp"
 	"go.icco.me/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/billing"
 	"go.icco.me/etu-backend/internal/db"
 	pb "go.icco.me/etu-backend/proto"
 	"golang.org/x/crypto/bcrypt"
@@ -296,6 +297,10 @@ func TestDeleteAccount(t *testing.T) {
 				mock.ExpectExec(`UPDATE "User" SET "failedLoginAttempts"`).WithArgs(sqlmock.AnyArg(), acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
 				mock.ExpectCommit()
 			}
+			if tt.userExists && !tt.expectFailed && tt.wantCode != codes.InvalidArgument {
+				mock.ExpectQuery(activePlayQ).WithArgs(acctUser, stateExpired, statePendingCanceled).
+					WillReturnRows(sqlmock.NewRows([]string{"purchaseToken"}))
+			}
 			if tt.expectFreeze {
 				mock.ExpectBegin()
 				mock.ExpectExec(`UPDATE "User" SET disabled = true`).WithArgs(db.DeletionDisabledReason, acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
@@ -340,6 +345,91 @@ func TestDeleteAccount(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantStorage, store.calls); diff != "" {
 				t.Errorf("storage calls (-want +got):\n%s", diff)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled expectations: %v", err)
+			}
+		})
+	}
+}
+
+func TestDeleteAccountCancelsPlay(t *testing.T) {
+	m2mCtx := auth.SetAuthContext(context.Background(), "m2m", "m2m")
+	tests := []struct {
+		name        string
+		playState   string
+		noPlay      bool
+		cancelErr   error
+		wantCancels []string
+		wantCode    codes.Code
+		wantFreeze  bool
+		wantDelete  bool
+	}{
+		{name: "active play subscription is canceled", playState: stateActive, wantCancels: []string{playTok}, wantFreeze: true, wantDelete: true},
+		{name: "canceled play subscription is not canceled again", playState: stateCancel, wantFreeze: true, wantDelete: true},
+		{name: "purchase unknown to play is skipped", wantFreeze: true, wantDelete: true},
+		{name: "play cancel failure aborts", playState: stateActive, cancelErr: errors.New("play down"), wantCancels: []string{playTok}, wantFreeze: true, wantCode: codes.Unavailable},
+		{name: "play not configured aborts", playState: stateActive, noPlay: true, wantCode: codes.FailedPrecondition},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sqlDB, mock, err := sqlmock.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = sqlDB.Close() }()
+			database, err := db.NewFromConn(sqlDB)
+			if err != nil {
+				t.Fatal(err)
+			}
+			purchases := map[string]*billing.PlayPurchase{}
+			if tt.playState != "" {
+				purchases[playTok] = alicePurchase(tt.playState)
+			}
+			play := &fakePlay{purchases: purchases, cancelErr: tt.cancelErr}
+			canceler := &fakeCanceler{}
+			svc := NewAccountService(database, nil, canceler)
+			svc.storage = &fakeAccountStorage{}
+			if !tt.noPlay {
+				svc.SetPlay(play)
+			}
+
+			now := time.Now()
+			mock.ExpectQuery(`SELECT \* FROM "User"`).WithArgs(acctUser, 1).WillReturnRows(sqlmock.NewRows(accountUserColumns).
+				AddRow(acctUser, testEmail, "h", 0, nil, nil, nil, now, now, false, "trialing"))
+			mock.ExpectQuery(activePlayQ).WithArgs(acctUser, stateExpired, statePendingCanceled).
+				WillReturnRows(sqlmock.NewRows([]string{"purchaseToken", "userId", "productId", "basePlanId", "state", colCreatedAt, colUpdatedAt}).
+					AddRow(playTok, acctUser, playProduct, "yearly", stateActive, now, now))
+			if tt.wantFreeze {
+				mock.ExpectBegin()
+				mock.ExpectExec(`UPDATE "User" SET disabled = true`).WithArgs(db.DeletionDisabledReason, acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
+				mock.ExpectExec(`DELETE FROM "ApiKey"`).WithArgs(acctUser).WillReturnResult(sqlmock.NewResult(0, 2))
+				mock.ExpectCommit()
+			}
+			if tt.wantDelete {
+				mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(acctUser, acctUser).
+					WillReturnRows(sqlmock.NewRows([]string{"gcsObjectName"}))
+				mock.ExpectBegin()
+				mock.ExpectQuery(`FOR UPDATE`).WithArgs(acctUser).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(acctUser))
+				mock.ExpectQuery(`SELECT "NoteImage"."gcsObjectName"`).WithArgs(acctUser, acctUser).
+					WillReturnRows(sqlmock.NewRows([]string{"gcsObjectName"}))
+				mock.ExpectExec(`INSERT INTO "AccountDeletionCleanup"`).WillReturnResult(sqlmock.NewResult(0, 1))
+				for range 10 {
+					mock.ExpectExec(`DELETE FROM`).WithArgs(acctUser).WillReturnResult(sqlmock.NewResult(0, 1))
+				}
+				mock.ExpectCommit()
+				expectCleanup(mock, []string{"profiles/alice/"}, 1)
+			}
+
+			_, err = svc.DeleteAccount(m2mCtx, &pb.DeleteAccountRequest{UserId: acctUser})
+			if diff := cmp.Diff(tt.wantCode, status.Code(err)); diff != "" {
+				t.Errorf("code mismatch (-want +got):\n%s (err=%v)", diff, err)
+			}
+			if diff := cmp.Diff(tt.wantCancels, play.cancels); diff != "" {
+				t.Errorf("play cancels mismatch (-want +got):\n%s", diff)
+			}
+			if len(canceler.calls) != 0 {
+				t.Errorf("stripe calls = %v, want none", canceler.calls)
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled expectations: %v", err)

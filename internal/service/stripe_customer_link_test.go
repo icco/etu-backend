@@ -39,6 +39,7 @@ func TestUpdateUserSubscriptionExpectedStripeCustomer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("db.NewFromConn: %v", err)
 			}
+			expectNotLapsedPlay(mock)
 			mock.ExpectBegin()
 			mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, tt.rows))
 			mock.ExpectCommit()
@@ -75,6 +76,7 @@ func TestUpdateUserSubscriptionPlayOwned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("db.NewFromConn: %v", err)
 	}
+	expectNotLapsedPlay(mock)
 	mock.ExpectBegin()
 	mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
