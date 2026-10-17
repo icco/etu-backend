@@ -11,9 +11,25 @@ import (
 )
 
 const (
-	voidSelectQ = `SELECT "userId","superseded" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`
-	voidUpdateQ = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 WHERE id = \$4`
+	voidSelectQ      = `SELECT "userId","superseded" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`
+	voidRowQ         = `UPDATE "PlaySubscription" SET "autoRenewing"=\$1,"state"=\$2,"updatedAt"=\$3 WHERE "purchaseToken" = \$4`
+	otherActivePlayQ = `SELECT count\(\*\) FROM "PlaySubscription" WHERE .*"purchaseToken" <> \$2`
+	voidUpdateQ      = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 WHERE id = \$4`
 )
+
+func expectVoidLookup(m sqlmock.Sqlmock, superseded bool) {
+	m.ExpectBegin()
+	m.ExpectQuery(voidSelectQ).WithArgs(playTok, 1).WillReturnRows(sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(acctUser, superseded))
+}
+
+func expectVoidRow(m sqlmock.Sqlmock) {
+	m.ExpectExec(voidRowQ).WithArgs(false, stateExpired, sqlmock.AnyArg(), playTok).WillReturnResult(sqlmock.NewResult(0, 1))
+}
+
+func expectNoOtherActive(m sqlmock.Sqlmock, n int) {
+	m.ExpectQuery(otherActivePlayQ).WithArgs(acctUser, playTok, stateExpired, statePendingCanceled).
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(n))
+}
 
 func TestHandleNotificationSyncsSubscription(t *testing.T) {
 	database, mock := newBillingMock(t)
@@ -133,8 +149,9 @@ func TestHandleNotificationVoided(t *testing.T) {
 		{
 			name: "forces the owner to canceled",
 			setup: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery(voidSelectQ).WithArgs(playTok, 1).WillReturnRows(sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(acctUser, false))
-				m.ExpectBegin()
+				expectVoidLookup(m, false)
+				expectVoidRow(m)
+				expectNoOtherActive(m, 0)
 				m.ExpectExec(voidUpdateQ).
 					WithArgs(false, "canceled", sqlmock.AnyArg(), acctUser, provPlay, "active", "trial", "trialing", "pro", "premium", sqlmock.AnyArg()).
 					WillReturnResult(sqlmock.NewResult(0, 1))
@@ -144,17 +161,31 @@ func TestHandleNotificationVoided(t *testing.T) {
 			wantOK: true,
 		},
 		{
+			name: "other active play subscription keeps the user paid",
+			setup: func(m sqlmock.Sqlmock) {
+				expectVoidLookup(m, false)
+				expectVoidRow(m)
+				expectNoOtherActive(m, 1)
+				m.ExpectCommit()
+				expectBillingUser(m, "active", provPlay)
+			},
+			wantOK: true,
+		},
+		{
 			name: "unknown token is permanent",
 			setup: func(m sqlmock.Sqlmock) {
+				m.ExpectBegin()
 				m.ExpectQuery(voidSelectQ).WithArgs(playTok, 1).WillReturnRows(sqlmock.NewRows([]string{"userId", "superseded"}))
+				m.ExpectRollback()
 			},
 			wantErr: billing.ErrRTDNPermanent,
 		},
 		{
 			name: "stripe owning a paid subscription is acknowledged",
 			setup: func(m sqlmock.Sqlmock) {
-				m.ExpectQuery(voidSelectQ).WithArgs(playTok, 1).WillReturnRows(sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(acctUser, false))
-				m.ExpectBegin()
+				expectVoidLookup(m, false)
+				expectVoidRow(m)
+				expectNoOtherActive(m, 0)
 				m.ExpectExec(voidUpdateQ).WillReturnResult(sqlmock.NewResult(0, 0))
 				m.ExpectCommit()
 			},

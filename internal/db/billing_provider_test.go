@@ -356,47 +356,80 @@ func TestLapsedPlayOwner(t *testing.T) {
 	}
 }
 
+const (
+	voidSelectQ    = `SELECT "userId","superseded" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`
+	voidRowQ       = `UPDATE "PlaySubscription" SET "autoRenewing"=\$1,"state"=\$2,"updatedAt"=\$3 WHERE "purchaseToken" = \$4`
+	otherActiveQ   = `SELECT count\(\*\) FROM "PlaySubscription" WHERE .*"userId" = \$1 AND "purchaseToken" <> \$2 AND NOT "superseded" AND "state" NOT IN \(\$3,\$4\)`
+	voidUserQ      = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 `
+	playStateVoid  = "SUBSCRIPTION_STATE_EXPIRED"
+	playStatePCanc = "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED"
+)
+
+func voidRow(superseded bool) *sqlmock.Rows {
+	return sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(playUserID, superseded)
+}
+
 func TestVoidPlaySubscription(t *testing.T) {
-	const voidQ = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 `
 	tests := []struct {
-		name       string
-		rows       *sqlmock.Rows
-		updateRows int64
-		wantUpdate bool
-		wantUser   bool
-		wantErr    error
+		name            string
+		rows            *sqlmock.Rows
+		otherActive     int
+		userUpdateRows  int64
+		wantOtherCheck  bool
+		wantUserUpdate  bool
+		wantRowUpdate   bool
+		wantUser        bool
+		wantErr         error
+		wantRollbackErr bool
 	}{
 		{
-			name:       "cancels the owner",
-			rows:       sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(playUserID, false),
-			updateRows: 1, wantUpdate: true, wantUser: true,
+			name:           "cancels the owner",
+			rows:           voidRow(false),
+			userUpdateRows: 1, wantOtherCheck: true, wantUserUpdate: true, wantRowUpdate: true, wantUser: true,
 		},
 		{
-			name:    "unknown token",
-			rows:    sqlmock.NewRows([]string{"userId", "superseded"}),
-			wantErr: ErrPlaySubscriptionNotFound,
+			name:            "unknown token",
+			rows:            sqlmock.NewRows([]string{"userId", "superseded"}),
+			wantErr:         ErrPlaySubscriptionNotFound,
+			wantRollbackErr: true,
 		},
 		{
-			name:     "superseded token leaves the user alone",
-			rows:     sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(playUserID, true),
-			wantUser: true,
+			name:          "superseded token leaves the user alone",
+			rows:          voidRow(true),
+			wantRowUpdate: true, wantUser: true,
 		},
 		{
-			name:       "other provider owns a paid subscription",
-			rows:       sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(playUserID, false),
-			updateRows: 0, wantUpdate: true, wantErr: ErrBillingProviderMismatch,
+			name:        "other active subscription keeps the user paid",
+			rows:        voidRow(false),
+			otherActive: 1, wantOtherCheck: true, wantRowUpdate: true, wantUser: true,
+		},
+		{
+			name:           "other provider owns a paid subscription",
+			rows:           voidRow(false),
+			userUpdateRows: 0, wantOtherCheck: true, wantUserUpdate: true, wantRowUpdate: true, wantErr: ErrBillingProviderMismatch,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d, mock := newPlayTestDB(t)
-			mock.ExpectQuery(`SELECT "userId","superseded" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`).WithArgs(playToken, 1).WillReturnRows(tt.rows)
-			if tt.wantUpdate {
-				mock.ExpectBegin()
-				mock.ExpectExec(voidQ+ownedWhere).
+			mock.ExpectBegin()
+			mock.ExpectQuery(voidSelectQ+` .*FOR UPDATE`).WithArgs(playToken, 1).WillReturnRows(tt.rows)
+			if tt.wantRowUpdate {
+				mock.ExpectExec(voidRowQ).WithArgs(false, playStateVoid, sqlmock.AnyArg(), playToken).WillReturnResult(sqlmock.NewResult(0, 1))
+			}
+			if tt.wantOtherCheck {
+				mock.ExpectQuery(otherActiveQ).WithArgs(playUserID, playToken, playStateVoid, playStatePCanc).
+					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tt.otherActive))
+			}
+			if tt.wantUserUpdate {
+				mock.ExpectExec(voidUserQ+ownedWhere).
 					WithArgs(false, "canceled", sqlmock.AnyArg(), playUserID, "play",
 						"active", "trial", "trialing", "pro", "premium", float64(3600)).
-					WillReturnResult(sqlmock.NewResult(0, tt.updateRows))
+					WillReturnResult(sqlmock.NewResult(0, tt.userUpdateRows))
+			}
+			if tt.wantRollbackErr {
+				mock.ExpectRollback()
+			} else {
 				mock.ExpectCommit()
 			}
 			if tt.wantUser {
@@ -414,5 +447,31 @@ func TestVoidPlaySubscription(t *testing.T) {
 				t.Errorf("unfulfilled mock expectations: %v", err)
 			}
 		})
+	}
+}
+
+func TestVoidedPlaySubscriptionIsNoLongerActive(t *testing.T) {
+	d, mock := newPlayTestDB(t)
+	mock.ExpectBegin()
+	mock.ExpectQuery(voidSelectQ).WithArgs(playToken, 1).WillReturnRows(voidRow(true))
+	mock.ExpectExec(voidRowQ).WithArgs(false, playStateVoid, sqlmock.AnyArg(), playToken).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	mock.ExpectQuery(userSelectQ).WillReturnRows(playUserRow())
+	if _, err := d.VoidPlaySubscription(context.Background(), playToken, time.Hour); err != nil {
+		t.Fatalf("VoidPlaySubscription: %v", err)
+	}
+
+	mock.ExpectQuery(`SELECT \* FROM "PlaySubscription" WHERE "userId" = \$1 AND NOT "superseded" AND "state" NOT IN \(\$2,\$3\)`).
+		WithArgs(playUserID, playStateVoid, playStatePCanc).
+		WillReturnRows(sqlmock.NewRows([]string{"purchaseToken", "userId", "productId", "basePlanId", "state", "createdAt", "updatedAt"}))
+	got, err := d.ActivePlaySubscriptions(context.Background(), playUserID)
+	if err != nil {
+		t.Fatalf("ActivePlaySubscriptions: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("active subscriptions = %+v, want none after void", got)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
 	}
 }
