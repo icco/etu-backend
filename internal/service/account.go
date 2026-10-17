@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.icco.me/etu-backend/internal/auth"
+	"go.icco.me/etu-backend/internal/billing"
 	"go.icco.me/etu-backend/internal/db"
 	"go.icco.me/etu-backend/internal/storage"
 	pb "go.icco.me/etu-backend/proto"
@@ -45,6 +46,7 @@ type AccountService struct {
 	db      *db.DB
 	storage accountStorage
 	billing SubscriptionCanceler
+	play    billing.PlayAPI
 }
 
 // NewAccountService creates an AccountService. storageClient and billing may be nil when unconfigured.
@@ -54,6 +56,11 @@ func NewAccountService(database *db.DB, storageClient *storage.Client, billing S
 		s.storage = storageClient
 	}
 	return s
+}
+
+// SetPlay configures the Google Play client DeleteAccount uses to cancel Play subscriptions.
+func (s *AccountService) SetPlay(p billing.PlayAPI) {
+	s.play = p
 }
 
 // DeleteAccount freezes the account (disabled, API keys revoked), cancels billing,
@@ -95,8 +102,16 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 
 	l := logging.FromContext(ctx)
 
+	playSubs, err := s.db.ActivePlaySubscriptions(ctx, user.ID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list play subscriptions: %v", err)
+	}
+	if len(playSubs) > 0 && s.play == nil {
+		return nil, status.Error(codes.FailedPrecondition, "google play billing not configured; cannot cancel subscription")
+	}
+
 	customerID, subscriptionID := deref(user.StripeCustomerID), deref(user.StripeSubscriptionID)
-	if customerID == "" && subscriptionID == "" && paidStatuses[strings.ToLower(user.SubscriptionStatus)] {
+	if customerID == "" && subscriptionID == "" && len(playSubs) == 0 && paidStatuses[strings.ToLower(user.SubscriptionStatus)] {
 		return nil, status.Error(codes.FailedPrecondition, "subscription has no Stripe record to cancel; contact support to delete this account")
 	}
 	if (customerID != "" || subscriptionID != "") && s.billing == nil {
@@ -121,6 +136,17 @@ func (s *AccountService) DeleteAccount(ctx context.Context, req *pb.DeleteAccoun
 			l.Errorw("stripe cancellation failed; account frozen but not deleted", "user_id", user.ID, "error", err)
 			return nil, incompleteDeletion(codes.Unavailable, "cancel subscription", err)
 		}
+	}
+	playSubs, err = s.db.ActivePlaySubscriptions(ctx, user.ID)
+	if err != nil {
+		return nil, incompleteDeletion(codes.Internal, "list google play subscriptions", err)
+	}
+	if len(playSubs) > 0 && s.play == nil {
+		return nil, incompleteDeletion(codes.FailedPrecondition, "cancel google play subscription", errors.New("google play billing not configured"))
+	}
+	if err := cancelPlaySubscriptions(ctx, s.play, playSubs); err != nil {
+		l.Errorw("play cancellation failed; account frozen but not deleted", "user_id", user.ID, "error", err)
+		return nil, incompleteDeletion(codes.Unavailable, "cancel google play subscription", err)
 	}
 
 	objects, err := s.db.UserMediaObjects(ctx, user.ID)

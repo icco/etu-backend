@@ -27,6 +27,7 @@ import (
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.uber.org/zap"
+	"google.golang.org/api/idtoken"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -154,6 +155,7 @@ func run(log *zap.SugaredLogger) error {
 	if err != nil {
 		return fmt.Errorf("failed to configure paywall: %w", err)
 	}
+	database.SetPaywallGrace(paywall.Grace)
 	log.Infow("paywall configured", "grace_period", paywall.Grace.String())
 
 	server, err := newGRPCServer(registry, authenticator, m2mConfig, paywall, log)
@@ -176,6 +178,35 @@ func run(log *zap.SugaredLogger) error {
 	}
 	accountService := service.NewAccountService(database, storageClient, billingClient)
 
+	playCfg, err := playConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	var playSync *service.PlaySync
+	var playPackage string
+	if playCfg != nil {
+		play, err := billing.NewPlay(rootCtx, playCfg.packageName)
+		if err != nil {
+			return fmt.Errorf("failed to initialize google play billing: %w", err)
+		}
+		playSync = &service.PlaySync{DB: database, Play: play, Stripe: billingClient, AllowTest: playCfg.allowTest, Grace: paywall.Grace}
+		playPackage = playCfg.packageName
+		authService.SetPlay(play)
+		accountService.SetPlay(play)
+		log.Infow("google play billing configured", "package_name", playPackage, "allow_test_purchases", playCfg.allowTest)
+	} else {
+		log.Infow("google play billing disabled")
+	}
+	billingService := service.NewBillingService(playSync, playPackage)
+
+	var rtdnSync func(context.Context, string, bool) error
+	var rtdnAudience, rtdnServiceAccount string
+	if playSync != nil {
+		rtdnSync = playSync.HandleNotification
+		rtdnAudience, rtdnServiceAccount = playCfg.audience, playCfg.serviceAccount
+	}
+	rtdnHandler := billing.NewRTDNHandler(log, rtdnSync, idtoken.Validate, rtdnAudience, rtdnServiceAccount, playPackage)
+
 	pb.RegisterNotesServiceServer(server, notesService)
 	pb.RegisterTagsServiceServer(server, tagsService)
 	pb.RegisterAuthServiceServer(server, authService)
@@ -183,6 +214,7 @@ func run(log *zap.SugaredLogger) error {
 	pb.RegisterUserSettingsServiceServer(server, userSettingsService)
 	pb.RegisterStatsServiceServer(server, statsService)
 	pb.RegisterAccountServiceServer(server, accountService)
+	pb.RegisterBillingServiceServer(server, billingService)
 
 	reflection.Register(server)
 
@@ -199,7 +231,7 @@ func run(log *zap.SugaredLogger) error {
 	// ReadTimeout begins only after the first body byte arrives.
 	httpServer := &http.Server{
 		Addr:              ":" + httpPort,
-		Handler:           newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{})),
+		Handler:           newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}), rtdnHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       5 * time.Second,
 		WriteTimeout:      5 * time.Second,
@@ -241,11 +273,13 @@ func run(log *zap.SugaredLogger) error {
 
 // newHealthHandler creates an HTTP handler for health check and metrics
 // endpoints. metrics is the Prometheus exposition handler for the OTel
-// meter provider configured in main.
-func newHealthHandler(log *zap.SugaredLogger, metrics http.Handler) http.Handler {
+// meter provider configured in main. rtdn serves Google Play real-time
+// developer notifications.
+func newHealthHandler(log *zap.SugaredLogger, metrics, rtdn http.Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.Handle("/metrics", metrics)
+	mux.Handle("/billing/play/rtdn", rtdn)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {

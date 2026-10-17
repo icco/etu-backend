@@ -39,7 +39,7 @@ jobs:
         run: psql "postgres://postgres:postgres@localhost:5432/postgres" -c 'CREATE DATABASE stripe_test'
       - name: Apply migrations for Stripe integration tests
         run: $ATLAS_RUN migrate apply --dir file://migrations --url "postgres://postgres:postgres@localhost:5432/stripe_test?sslmode=disable"
-      - name: Test Stripe event transactions
+      - name: Test billing transactions against Postgres
         env:
           STRIPE_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/stripe_test?sslmode=disable
-        run: go test -race -v ./internal/service -run 'TestStripeEvent|TestBillingRPCsRequireM2M' -count=1
+        run: go test -race -v ./internal/service ./internal/db -run 'TestStripeEvent|TestBillingRPCsRequireM2M|TestPlayPostgres' -count=1

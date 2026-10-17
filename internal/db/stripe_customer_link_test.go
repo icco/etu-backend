@@ -20,7 +20,7 @@ func TestUpdateUserSubscription_ExpectedStripeCustomer_SQL(t *testing.T) {
 	userRow := func(stripe any) *sqlmock.Rows {
 		return sqlmock.NewRows(userRowColumns).AddRow(userID, "alice@example.com", nil, "hash", "active", nil, now, stripe, nil, nil, now)
 	}
-	conditional := `UPDATE "User" SET .* WHERE id = \$\d+ AND "stripeCustomerId" = \$\d+`
+	conditional := `UPDATE "User" SET .* WHERE id = \$\d+ AND \(\(.*\) AND "stripeCustomerId" = \$\d+`
 	insertEvent := `INSERT INTO "StripeEvent"`
 
 	tests := []struct {
@@ -35,7 +35,7 @@ func TestUpdateUserSubscription_ExpectedStripeCustomer_SQL(t *testing.T) {
 			in:   SubscriptionUpdate{SubscriptionStatus: "active", ExpectedStripeCustomerID: expected},
 			setup: func(m sqlmock.Sqlmock) {
 				m.ExpectBegin()
-				m.ExpectExec(conditional).WithArgs(false, "active", sqlmock.AnyArg(), userID, expected).WillReturnResult(sqlmock.NewResult(0, 1))
+				m.ExpectExec(conditional).WithArgs("stripe", false, "active", sqlmock.AnyArg(), userID, "stripe", "active", "trial", "trialing", "pro", "premium", (7 * 24 * time.Hour).Seconds(), expected).WillReturnResult(sqlmock.NewResult(0, 1))
 				m.ExpectCommit()
 				m.ExpectQuery(`SELECT (.+) FROM "User"`).WillReturnRows(userRow(expected))
 			},
@@ -114,7 +114,7 @@ func TestUpdateUserSubscription_ExpectedStripeCustomer_SQL(t *testing.T) {
 			in:   SubscriptionUpdate{SubscriptionStatus: "active"},
 			setup: func(m sqlmock.Sqlmock) {
 				m.ExpectBegin()
-				m.ExpectExec(`UPDATE "User" SET .* WHERE id = \$\d+$`).WithArgs(false, "active", sqlmock.AnyArg(), userID).WillReturnResult(sqlmock.NewResult(0, 1))
+				m.ExpectExec(`UPDATE "User" SET .* WHERE id = \$\d+ AND \(\(.*\)\)$`).WithArgs("stripe", false, "active", sqlmock.AnyArg(), userID, "stripe", "active", "trial", "trialing", "pro", "premium", (7 * 24 * time.Hour).Seconds()).WillReturnResult(sqlmock.NewResult(0, 1))
 				m.ExpectCommit()
 				m.ExpectQuery(`SELECT (.+) FROM "User"`).WillReturnRows(userRow(""))
 			},

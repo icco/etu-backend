@@ -39,10 +39,14 @@ func TestUpdateUserSubscriptionExpectedStripeCustomer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("db.NewFromConn: %v", err)
 			}
-			mock.ExpectBegin()
+			expectStripeLock(mock, tt.rows > 0, nil)
 			mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, tt.rows))
-			mock.ExpectCommit()
 			mock.ExpectQuery(`SELECT (.+) FROM "User"`).WillReturnRows(sqlmock.NewRows(columns).AddRow("alice", "alice@example.com", "active", now, now, tt.stored))
+			if tt.rows > 0 {
+				mock.ExpectCommit()
+			} else {
+				mock.ExpectRollback()
+			}
 			_, err = (&AuthService{db: database}).UpdateUserSubscription(stripeContext(t), &pb.UpdateUserSubscriptionRequest{
 				UserId:                   "alice",
 				SubscriptionStatus:       "active",
@@ -60,5 +64,36 @@ func TestUpdateUserSubscriptionExpectedStripeCustomer(t *testing.T) {
 				t.Errorf("unfulfilled mock expectations: %v", err)
 			}
 		})
+	}
+}
+
+func TestUpdateUserSubscriptionPlayOwned(t *testing.T) {
+	now := time.Now().UTC()
+	columns := []string{"id", "email", "subscriptionStatus", "createdAt", "updatedAt", "billingProvider"}
+	conn, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = conn.Close() }()
+	database, err := db.NewFromConn(conn)
+	if err != nil {
+		t.Fatalf("db.NewFromConn: %v", err)
+	}
+	expectStripeLock(mock, false, nil)
+	mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(`SELECT (.+) FROM "User"`).WillReturnRows(sqlmock.NewRows(columns).AddRow("alice", "alice@example.com", "active", now, now, "play"))
+	mock.ExpectRollback()
+	_, err = (&AuthService{db: database}).UpdateUserSubscription(stripeContext(t), &pb.UpdateUserSubscriptionRequest{
+		UserId:             "alice",
+		SubscriptionStatus: "active",
+	})
+	if diff := cmp.Diff(codes.FailedPrecondition, status.Code(err)); diff != "" {
+		t.Errorf("code mismatch (-want +got):\n%s (err=%v)", diff, err)
+	}
+	if diff := cmp.Diff("billing managed by google play", status.Convert(err).Message()); diff != "" {
+		t.Errorf("message mismatch (-want +got):\n%s", diff)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
 	}
 }
