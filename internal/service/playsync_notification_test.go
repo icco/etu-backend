@@ -170,6 +170,7 @@ func TestHandleNotificationVoided(t *testing.T) {
 			setup: func(m sqlmock.Sqlmock) {
 				expectVoidLookup(m, false)
 				expectVoidRow(m)
+				expectUserLock(m)
 				expectNoOtherActive(m, 0)
 				m.ExpectExec(voidUpdateQ).
 					WithArgs(false, "canceled", sqlmock.AnyArg(), acctUser, provPlay, "active", "trial", "trialing", "pro", "premium", sqlmock.AnyArg()).
@@ -184,6 +185,7 @@ func TestHandleNotificationVoided(t *testing.T) {
 			setup: func(m sqlmock.Sqlmock) {
 				expectVoidLookup(m, false)
 				expectVoidRow(m)
+				expectUserLock(m)
 				expectNoOtherActive(m, 1)
 				m.ExpectCommit()
 				expectBillingUser(m, "active", provPlay)
@@ -204,6 +206,7 @@ func TestHandleNotificationVoided(t *testing.T) {
 			setup: func(m sqlmock.Sqlmock) {
 				expectVoidLookup(m, false)
 				expectVoidRow(m)
+				expectUserLock(m)
 				expectNoOtherActive(m, 0)
 				m.ExpectExec(voidUpdateQ).WillReturnResult(sqlmock.NewResult(0, 0))
 				m.ExpectCommit()

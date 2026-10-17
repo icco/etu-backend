@@ -18,6 +18,7 @@ const (
 	supersedeQ  = `UPDATE "PlaySubscription" SET .* WHERE "purchaseToken" = \$\d+ AND "userId" = \$\d+`
 	ownedWhere  = `WHERE id = \$\d+ AND \(\("billingProvider" IS NULL OR "billingProvider" = \$\d+ OR NOT COALESCE\(`
 	userSelectQ = `SELECT (.+) FROM "User"`
+	userLockQ   = `SELECT "id" FROM "User" WHERE id = \$1 FOR UPDATE`
 )
 
 func newPlayTestDB(t *testing.T) (*DB, sqlmock.Sqlmock) {
@@ -85,6 +86,7 @@ func TestApplyPlaySubscriptionClaimsUnownedUser(t *testing.T) {
 	d, mock := newPlayTestDB(t)
 	mock.ExpectBegin()
 	mock.ExpectQuery(upsertPlay).WillReturnRows(supersededRow(false))
+	mock.ExpectQuery(userLockQ).WithArgs(playUserID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(playUserID))
 	mock.ExpectExec(`UPDATE "User" SET "billingProvider"=\$1,.* `+ownedWhere).
 		WithArgs("play", false, expiry, "active", sqlmock.AnyArg(), playUserID, "play",
 			"active", "trial", "trialing", "pro", "premium", float64(3600)).
@@ -109,6 +111,7 @@ func TestApplyPlaySubscriptionRejectedWhenStripeOwnsPaidUser(t *testing.T) {
 	d, mock := newPlayTestDB(t)
 	mock.ExpectBegin()
 	mock.ExpectQuery(upsertPlay).WillReturnRows(supersededRow(false))
+	mock.ExpectQuery(userLockQ).WithArgs(playUserID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(playUserID))
 	mock.ExpectExec(`UPDATE "User" SET .* ` + ownedWhere).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
@@ -134,6 +137,7 @@ func TestApplyPlaySubscriptionSupersedesLinkedToken(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(upsertPlay).WillReturnRows(supersededRow(false))
 	mock.ExpectExec(supersedeQ).WithArgs(true, sqlmock.AnyArg(), playOldTok, playUserID).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(userLockQ).WithArgs(playUserID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(playUserID))
 	mock.ExpectExec(`UPDATE "User" SET .* ` + ownedWhere).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	mock.ExpectQuery(userSelectQ).WillReturnRows(playUserRow())
@@ -460,6 +464,7 @@ func TestApplyPlaySubscriptionUnpaidStatus(t *testing.T) {
 			d, mock := newPlayTestDB(t)
 			mock.ExpectBegin()
 			mock.ExpectQuery(upsertPlay).WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, playUserID))
+			mock.ExpectQuery(userLockQ).WithArgs(playUserID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(playUserID))
 			mock.ExpectQuery(otherActiveQ).WithArgs(playUserID, playOldTok, playStateActive, playStateCanc, playStateGrace).
 				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tt.otherActive))
 			if tt.otherActive == 0 {
@@ -548,6 +553,7 @@ func TestVoidPlaySubscription(t *testing.T) {
 				mock.ExpectExec(voidRowQ).WithArgs(false, playStateVoid, sqlmock.AnyArg(), playToken).WillReturnResult(sqlmock.NewResult(0, 1))
 			}
 			if tt.wantOtherCheck {
+				mock.ExpectQuery(userLockQ).WithArgs(playUserID).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(playUserID))
 				mock.ExpectQuery(otherActiveQ).WithArgs(playUserID, playToken, playStateActive, playStateCanc, playStateGrace).
 					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tt.otherActive))
 			}

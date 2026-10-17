@@ -38,6 +38,7 @@ const (
 	stripeUpdate         = `UPDATE "User" SET "billingProvider"=\$1`
 	stripeUnpaidUpdate   = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1`
 	stateGrace           = "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"
+	userLockQ            = `SELECT "id" FROM "User" WHERE id = \$1 FOR UPDATE`
 )
 
 var (
@@ -123,6 +124,9 @@ func expectBillingUser(mock sqlmock.Sqlmock, subStatus string, provider any) {
 func expectPlayApply(mock sqlmock.Sqlmock, subStatus string, rows int64) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(upsertPlayQ).WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, acctUser))
+	if subStatus != "" {
+		expectUserLock(mock)
+	}
 	switch {
 	case subStatus == "":
 	case db.IsPaidStatus(subStatus):
@@ -145,6 +149,10 @@ func expectPlayApply(mock sqlmock.Sqlmock, subStatus string, rows int64) {
 		}
 		expectBillingUser(mock, subStatus, provider)
 	}
+}
+
+func expectUserLock(mock sqlmock.Sqlmock) {
+	mock.ExpectQuery(userLockQ).WithArgs(acctUser).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(acctUser))
 }
 
 // expectPlayRecord mocks ApplyPlaySubscription storing the purchase row without a user write.
@@ -437,6 +445,7 @@ func TestVerifyPlayPurchaseNoAccessChange(t *testing.T) {
 				expectBillingUser(m, "active", provStripe)
 				m.ExpectBegin()
 				m.ExpectQuery(upsertPlayQ).WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, acctUser))
+				expectUserLock(m)
 				m.ExpectExec(`UPDATE "User" SET`).WillReturnResult(sqlmock.NewResult(0, 0))
 				m.ExpectCommit()
 				expectBillingUser(m, "active", provStripe)

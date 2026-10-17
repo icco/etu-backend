@@ -839,13 +839,16 @@ func (db *DB) updateUserSubscription(ctx context.Context, userID string, in Subs
 		if err != nil || user == nil {
 			return nil, err
 		}
+		if in.ExpectedStripeCustomerID != "" && (user.StripeCustomerID == nil || *user.StripeCustomerID != in.ExpectedStripeCustomerID) {
+			return nil, ErrStripeCustomerMismatch
+		}
 		if user.BillingProvider != nil && *user.BillingProvider == BillingProviderPlay {
 			return nil, ErrBillingProviderMismatch
 		}
-		if in.ExpectedStripeCustomerID == "" {
-			return nil, nil
+		if in.ExpectedStripeCustomerID != "" {
+			return nil, ErrStripeCustomerMismatch
 		}
-		return nil, ErrStripeCustomerMismatch
+		return nil, nil
 	}
 
 	return db.GetUser(ctx, userID)

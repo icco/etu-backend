@@ -84,6 +84,16 @@ func IsPaidStatus(status string) bool {
 
 var playAccessStates = []string{"SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_CANCELED", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"}
 
+// lockUserRow serializes Play writes for a user, so concurrent notifications
+// for different tokens each see the other's committed state.
+func lockUserRow(tx *gorm.DB, userID string) error {
+	var ids []string
+	if err := tx.Model(&User{}).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", userID).Pluck("id", &ids).Error; err != nil {
+		return fmt.Errorf("failed to lock user: %w", err)
+	}
+	return nil
+}
+
 // otherPlayAccess reports whether the user has another non-superseded Play
 // purchase that still grants access, so a lapsed or voided token must not
 // overwrite their status.
@@ -165,6 +175,9 @@ func (db *DB) ApplyPlaySubscription(ctx context.Context, in PlaySubscriptionUpda
 			return nil
 		}
 
+		if err := lockUserRow(tx, in.UserID); err != nil {
+			return err
+		}
 		paid := IsPaidStatus(in.Status)
 		if !paid {
 			others, err := otherPlayAccess(tx, in.UserID, in.PurchaseToken)
@@ -299,6 +312,9 @@ func (db *DB) VoidPlaySubscription(ctx context.Context, purchaseToken string, gr
 			return nil
 		}
 
+		if err := lockUserRow(tx, row.UserID); err != nil {
+			return err
+		}
 		others, err := otherPlayAccess(tx, row.UserID, purchaseToken)
 		if err != nil {
 			return err
