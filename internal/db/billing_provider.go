@@ -27,6 +27,10 @@ const (
 // because the other billing provider owns a paid subscription for the user.
 var ErrBillingProviderMismatch = errors.New("billing managed by google play")
 
+// ErrPlayTokenUserMismatch is returned when a Play purchase token is already
+// recorded for a different user.
+var ErrPlayTokenUserMismatch = errors.New("play purchase token belongs to another user")
+
 // PlaySubscription is an alias for models.PlaySubscription.
 type PlaySubscription = models.PlaySubscription
 
@@ -99,10 +103,13 @@ func (db *DB) ApplyPlaySubscription(ctx context.Context, in PlaySubscriptionUpda
 					"acknowledged", "linkedPurchaseToken", colUpdatedAt,
 				}),
 			},
-			clause.Returning{Columns: []clause.Column{{Name: "superseded"}}},
+			clause.Returning{Columns: []clause.Column{{Name: "superseded"}, {Name: "userId"}}},
 		).Create(&row)
 		if upsert.Error != nil {
 			return fmt.Errorf("failed to upsert play subscription: %w", upsert.Error)
+		}
+		if row.UserID != in.UserID {
+			return ErrPlayTokenUserMismatch
 		}
 
 		if in.LinkedPurchaseToken != nil {
@@ -171,4 +178,47 @@ func (db *DB) ActivePlaySubscriptions(ctx context.Context, userID string) ([]Pla
 		return nil, fmt.Errorf("failed to list active play subscriptions: %w", err)
 	}
 	return subs, nil
+}
+
+// ReleaseStripeOwnership marks a Stripe-owned user's subscription canceled,
+// bypassing the ownership rule, after their Stripe subscription was canceled
+// so another provider can take over.
+func (db *DB) ReleaseStripeOwnership(ctx context.Context, userID string) error {
+	err := db.conn.WithContext(ctx).Model(&User{}).
+		Where(`id = ? AND "billingProvider" = ?`, userID, BillingProviderStripe).
+		Updates(map[string]any{
+			colSubscriptionStatus: "canceled",
+			colCancelAtPeriodEnd:  false,
+			colPastDueSince:       gorm.Expr("NULL"),
+		}).Error
+	if err != nil {
+		return fmt.Errorf("failed to release stripe ownership: %w", err)
+	}
+	return nil
+}
+
+// MarkPlayAcknowledged records that the Play purchase was acknowledged.
+func (db *DB) MarkPlayAcknowledged(ctx context.Context, purchaseToken string) error {
+	err := db.conn.WithContext(ctx).Model(&models.PlaySubscription{}).
+		Where(`"purchaseToken" = ?`, purchaseToken).
+		Updates(map[string]any{"acknowledged": true, colUpdatedAt: time.Now().UTC()}).Error
+	if err != nil {
+		return fmt.Errorf("failed to mark play subscription acknowledged: %w", err)
+	}
+	return nil
+}
+
+// LapsedPlayOwner reports whether Play owns the user but their subscription
+// is not paid, so a Stripe write may take the user over.
+func (db *DB) LapsedPlayOwner(ctx context.Context, userID string) (bool, error) {
+	sql, args := ownershipClause(BillingProviderStripe, db.paywallGrace)
+	var n int64
+	err := db.conn.WithContext(ctx).Model(&User{}).
+		Where(`id = ? AND "billingProvider" = ?`, userID, BillingProviderPlay).
+		Where("("+sql+")", args...).
+		Count(&n).Error
+	if err != nil {
+		return false, fmt.Errorf("failed to check play ownership: %w", err)
+	}
+	return n > 0, nil
 }

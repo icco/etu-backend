@@ -272,3 +272,86 @@ func TestActivePlaySubscriptions(t *testing.T) {
 		t.Errorf("unfulfilled mock expectations: %v", err)
 	}
 }
+
+func TestApplyPlaySubscriptionRejectsTokenOfOtherUser(t *testing.T) {
+	in := PlaySubscriptionUpdate{PurchaseToken: playToken, UserID: playUserID, State: "SUBSCRIPTION_STATE_ACTIVE", Status: "active"}
+	d, mock := newPlayTestDB(t)
+	mock.ExpectBegin()
+	mock.ExpectQuery(upsertPlay + `,"userId"`).
+		WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, "user-bob"))
+	mock.ExpectRollback()
+
+	user, err := d.ApplyPlaySubscription(context.Background(), in, time.Hour)
+	if !errors.Is(err, ErrPlayTokenUserMismatch) {
+		t.Fatalf("err = %v, want %v", err, ErrPlayTokenUserMismatch)
+	}
+	if user != nil {
+		t.Errorf("user = %+v, want nil", user)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestReleaseStripeOwnership(t *testing.T) {
+	d, mock := newPlayTestDB(t)
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 WHERE id = \$4 AND "billingProvider" = \$5`).
+		WithArgs(false, "canceled", sqlmock.AnyArg(), playUserID, "stripe").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := d.ReleaseStripeOwnership(context.Background(), playUserID); err != nil {
+		t.Fatalf("ReleaseStripeOwnership: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestMarkPlayAcknowledged(t *testing.T) {
+	d, mock := newPlayTestDB(t)
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "PlaySubscription" SET "acknowledged"=\$1,"updatedAt"=\$2 WHERE "purchaseToken" = \$3`).
+		WithArgs(true, sqlmock.AnyArg(), playToken).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+
+	if err := d.MarkPlayAcknowledged(context.Background(), playToken); err != nil {
+		t.Fatalf("MarkPlayAcknowledged: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestLapsedPlayOwner(t *testing.T) {
+	tests := []struct {
+		name  string
+		count int
+		want  bool
+	}{
+		{name: "play owns unpaid user", count: 1, want: true},
+		{name: "play owns paid user or not play", count: 0, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, mock := newPlayTestDB(t)
+			d.SetPaywallGrace(time.Hour)
+			mock.ExpectQuery(`SELECT count\(\*\) FROM "User" WHERE \(id = \$1 AND "billingProvider" = \$2\) AND \(\("billingProvider" IS NULL OR "billingProvider" = \$3 OR NOT COALESCE\(`).
+				WithArgs(playUserID, "play", "stripe", "active", "trial", "trialing", "pro", "premium", float64(3600)).
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tt.count))
+
+			got, err := d.LapsedPlayOwner(context.Background(), playUserID)
+			if err != nil {
+				t.Fatalf("LapsedPlayOwner: %v", err)
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("lapsed mismatch (-want +got):\n%s", diff)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled mock expectations: %v", err)
+			}
+		})
+	}
+}

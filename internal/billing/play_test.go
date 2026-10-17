@@ -227,3 +227,27 @@ func TestPlayAcknowledgeAndCancelRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestPlayStateCancelable(t *testing.T) {
+	tests := []struct {
+		state string
+		want  bool
+	}{
+		{"SUBSCRIPTION_STATE_ACTIVE", true},
+		{"SUBSCRIPTION_STATE_IN_GRACE_PERIOD", true},
+		{"SUBSCRIPTION_STATE_ON_HOLD", true},
+		{"SUBSCRIPTION_STATE_PAUSED", true},
+		{"SUBSCRIPTION_STATE_CANCELED", false},
+		{"SUBSCRIPTION_STATE_EXPIRED", false},
+		{"SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED", false},
+		{"SUBSCRIPTION_STATE_PENDING", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.state, func(t *testing.T) {
+			if diff := cmp.Diff(tt.want, PlayStateCancelable(tt.state)); diff != "" {
+				t.Errorf("PlayStateCancelable mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}

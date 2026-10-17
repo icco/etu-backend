@@ -176,3 +176,14 @@ func MapPlayStatus(p *PlayPurchase) (status string, cancelAtPeriodEnd bool) {
 		return "", false
 	}
 }
+
+// PlayStateCancelable reports whether a subscription in the given Play state
+// can still charge the user and so must be canceled before a store switch.
+func PlayStateCancelable(state string) bool {
+	switch state {
+	case playStateActive, playStateInGracePeriod, playStateOnHold, playStatePaused:
+		return true
+	default:
+		return false
+	}
+}
