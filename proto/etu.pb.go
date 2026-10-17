@@ -2135,8 +2135,13 @@ type UpdateUserSubscriptionRequest struct {
 	CurrentPeriodStart *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=current_period_start,json=currentPeriodStart,proto3,oneof" json:"current_period_start,omitempty"`
 	// Non-empty IDs are deduplicated globally across both Stripe update RPCs.
 	StripeEventId *string `protobuf:"bytes,9,opt,name=stripe_event_id,json=stripeEventId,proto3,oneof" json:"stripe_event_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// When non-empty, the update applies only if the user's stored Stripe
+	// customer id still equals this value, checked atomically with the write.
+	// On mismatch nothing is written, stripe_event_id is not recorded, and the
+	// RPC returns FAILED_PRECONDITION.
+	ExpectedStripeCustomerId *string `protobuf:"bytes,10,opt,name=expected_stripe_customer_id,json=expectedStripeCustomerId,proto3,oneof" json:"expected_stripe_customer_id,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *UpdateUserSubscriptionRequest) Reset() {
@@ -2228,6 +2233,13 @@ func (x *UpdateUserSubscriptionRequest) GetCurrentPeriodStart() *timestamppb.Tim
 func (x *UpdateUserSubscriptionRequest) GetStripeEventId() string {
 	if x != nil && x.StripeEventId != nil {
 		return *x.StripeEventId
+	}
+	return ""
+}
+
+func (x *UpdateUserSubscriptionRequest) GetExpectedStripeCustomerId() string {
+	if x != nil && x.ExpectedStripeCustomerId != nil {
+		return *x.ExpectedStripeCustomerId
 	}
 	return ""
 }
@@ -3740,7 +3752,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x12stripe_customer_id\x18\x01 \x01(\tR\x10stripeCustomerId\"P\n" +
 	"!GetUserByStripeCustomerIdResponse\x12\"\n" +
 	"\x04user\x18\x01 \x01(\v2\t.etu.UserH\x00R\x04user\x88\x01\x01B\a\n" +
-	"\x05_user\"\x89\x05\n" +
+	"\x05_user\"\xed\x05\n" +
 	"\x1dUpdateUserSubscriptionRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12/\n" +
 	"\x13subscription_status\x18\x02 \x01(\tR\x12subscriptionStatus\x121\n" +
@@ -3750,13 +3762,16 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x0fstripe_price_id\x18\x06 \x01(\tH\x03R\rstripePriceId\x88\x01\x01\x12/\n" +
 	"\x14cancel_at_period_end\x18\a \x01(\bR\x11cancelAtPeriodEnd\x12Q\n" +
 	"\x14current_period_start\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x04R\x12currentPeriodStart\x88\x01\x01\x12+\n" +
-	"\x0fstripe_event_id\x18\t \x01(\tH\x05R\rstripeEventId\x88\x01\x01B\x15\n" +
+	"\x0fstripe_event_id\x18\t \x01(\tH\x05R\rstripeEventId\x88\x01\x01\x12B\n" +
+	"\x1bexpected_stripe_customer_id\x18\n" +
+	" \x01(\tH\x06R\x18expectedStripeCustomerId\x88\x01\x01B\x15\n" +
 	"\x13_stripe_customer_idB\x13\n" +
 	"\x11_subscription_endB\x19\n" +
 	"\x17_stripe_subscription_idB\x12\n" +
 	"\x10_stripe_price_idB\x17\n" +
 	"\x15_current_period_startB\x12\n" +
-	"\x10_stripe_event_id\"?\n" +
+	"\x10_stripe_event_idB\x1e\n" +
+	"\x1c_expected_stripe_customer_id\"?\n" +
 	"\x1eUpdateUserSubscriptionResponse\x12\x1d\n" +
 	"\x04user\x18\x01 \x01(\v2\t.etu.UserR\x04user\"\x99\x04\n" +
 	"\x1fUpdateUserStripeCustomerRequest\x12\x17\n" +

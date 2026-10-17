@@ -12,6 +12,8 @@ import (
 	"go.icco.me/etu-backend/internal/db"
 	"go.icco.me/etu-backend/internal/models"
 	pb "go.icco.me/etu-backend/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -221,5 +223,88 @@ func TestStripeEventMissingUserPostgres(t *testing.T) {
 				t.Fatalf("missing user consumed event: %v, %v", user, err)
 			}
 		})
+	}
+}
+
+func TestStripeEventCustomerLinkPostgres(t *testing.T) {
+	s, conn := stripeTestService(t)
+	ctx := stripeContext(t)
+	id := stripeTestUser(ctx, t, s)
+	customer := "cus_" + id
+	if _, err := s.UpdateUserSubscription(ctx, &pb.UpdateUserSubscriptionRequest{UserId: id, SubscriptionStatus: "canceled", StripeCustomerId: proto.String("")}); err != nil {
+		t.Fatal(err)
+	}
+	event := "evt_" + id
+	_, err := s.UpdateUserSubscription(ctx, &pb.UpdateUserSubscriptionRequest{UserId: id, SubscriptionStatus: "active", StripeEventId: &event, ExpectedStripeCustomerId: &customer})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("cleared link did not fail precondition: %v", err)
+	}
+	user, err := s.db.GetUser(ctx, id)
+	if err != nil || user.SubscriptionStatus != "canceled" {
+		t.Fatalf("mismatch applied update: %v, %v", user, err)
+	}
+	var count int
+	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM "StripeEvent" WHERE id = $1`, event).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("mismatched event was recorded: count %d, error %v", count, err)
+	}
+}
+
+func TestStripeEventCustomerLinkConcurrentPostgres(t *testing.T) {
+	first, conn := stripeTestService(t)
+	second, _ := stripeTestService(t)
+	ctx := stripeContext(t)
+	id := stripeTestUser(ctx, t, first)
+	customer := "cus_" + id
+	if _, err := first.UpdateUserSubscription(ctx, &pb.UpdateUserSubscriptionRequest{UserId: id, SubscriptionStatus: "trialing", StripeCustomerId: &customer}); err != nil {
+		t.Fatal(err)
+	}
+	const deliveries = 16
+	errs := make([]error, deliveries)
+	events := make([]string, deliveries)
+	var deleteErr error
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range deliveries {
+		events[i] = fmt.Sprintf("evt_%s_%d", id, i)
+		wg.Go(func() {
+			<-start
+			s := first
+			if i%2 == 0 {
+				s = second
+			}
+			_, errs[i] = s.UpdateUserSubscription(ctx, &pb.UpdateUserSubscriptionRequest{UserId: id, SubscriptionStatus: "active", StripeEventId: &events[i], ExpectedStripeCustomerId: &customer})
+		})
+	}
+	wg.Go(func() {
+		<-start
+		deleted := "evt_deleted_" + id
+		_, deleteErr = second.UpdateUserSubscription(ctx, &pb.UpdateUserSubscriptionRequest{UserId: id, SubscriptionStatus: "canceled", StripeCustomerId: proto.String(""), StripeEventId: &deleted})
+	})
+	close(start)
+	wg.Wait()
+	if deleteErr != nil {
+		t.Fatal(deleteErr)
+	}
+	user, err := first.db.GetUser(ctx, id)
+	if err != nil || user.SubscriptionStatus != "canceled" || (user.StripeCustomerID != nil && *user.StripeCustomerID != "") {
+		t.Fatalf("stale update survived customer deletion: %v, %v", user, err)
+	}
+	for i, err := range errs {
+		var count int
+		if qerr := conn.QueryRowContext(ctx, `SELECT count(*) FROM "StripeEvent" WHERE id = $1`, events[i]).Scan(&count); qerr != nil {
+			t.Fatal(qerr)
+		}
+		switch status.Code(err) {
+		case codes.OK:
+			if count != 1 {
+				t.Errorf("delivery %d applied without recording its event", i)
+			}
+		case codes.FailedPrecondition:
+			if count != 0 {
+				t.Errorf("delivery %d failed but recorded its event", i)
+			}
+		default:
+			t.Errorf("delivery %d: unexpected error %v", i, err)
+		}
 	}
 }
