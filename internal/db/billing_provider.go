@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"go.icco.me/etu-backend/internal/models"
@@ -40,25 +41,62 @@ func (db *DB) SetPaywallGrace(d time.Duration) {
 	db.paywallGrace = d
 }
 
-// ownershipClause returns the WHERE fragment, with its arguments, that lets
-// provider write a user's billing fields: nobody owns the user, provider
-// already does, or the user's current subscription is not paid.
-func ownershipClause(provider string, grace time.Duration) (string, []any) {
+// paidClause returns the WHERE fragment, with its arguments, that is true when
+// the user's current subscription is paid.
+func paidClause(grace time.Duration) (string, []any) {
 	paid := make([]string, 0, len(AIEligibleSubscriptionStatuses))
 	for _, s := range AIEligibleSubscriptionStatuses {
 		if s != SubscriptionStatusPastDue {
 			paid = append(paid, s)
 		}
 	}
-	sql := `"billingProvider" IS NULL OR "billingProvider" = ? OR NOT COALESCE(` +
+	sql := `COALESCE(` +
 		`("subscriptionStatus" IN ? AND "subscriptionStatus" <> 'past_due') OR ` +
 		`("subscriptionStatus" = 'past_due' AND "pastDueSince" > now() - make_interval(secs => ?)), false)`
-	return sql, []any{provider, paid, grace.Seconds()}
+	return sql, []any{paid, grace.Seconds()}
+}
+
+// ownershipClause returns the WHERE fragment, with its arguments, that lets
+// provider write a user's billing fields: nobody owns the user, provider
+// already does, or the user's current subscription is not paid.
+func ownershipClause(provider string, grace time.Duration) (string, []any) {
+	paid, paidArgs := paidClause(grace)
+	return `"billingProvider" IS NULL OR "billingProvider" = ? OR NOT ` + paid, append([]any{provider}, paidArgs...)
 }
 
 func ownedBy(q *gorm.DB, provider string, grace time.Duration) *gorm.DB {
 	sql, args := ownershipClause(provider, grace)
 	return q.Where("("+sql+")", args...)
+}
+
+// managedBy limits q to users provider already owns, or unowned users who are
+// not paid, for writes that must not take ownership.
+func managedBy(q *gorm.DB, provider string, grace time.Duration) *gorm.DB {
+	paid, paidArgs := paidClause(grace)
+	return q.Where(`("billingProvider" = ? OR ("billingProvider" IS NULL AND NOT `+paid+`))`, append([]any{provider}, paidArgs...)...)
+}
+
+// IsPaidStatus reports whether a subscription status written by a billing
+// provider can still charge the user, so the write takes ownership of them.
+func IsPaidStatus(status string) bool {
+	return slices.Contains(AIEligibleSubscriptionStatuses, status)
+}
+
+var playAccessStates = []string{"SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_CANCELED", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"}
+
+// otherPlayAccess reports whether the user has another non-superseded Play
+// purchase that still grants access, so a lapsed or voided token must not
+// overwrite their status.
+func otherPlayAccess(tx *gorm.DB, userID, purchaseToken string) (bool, error) {
+	var n int64
+	err := tx.Model(&models.PlaySubscription{}).
+		Where(`"userId" = ? AND "purchaseToken" <> ? AND NOT "superseded" AND "state" IN ? AND ("expiryTime" IS NULL OR "expiryTime" > now())`,
+			userID, purchaseToken, playAccessStates).
+		Count(&n).Error
+	if err != nil {
+		return false, fmt.Errorf("failed to count other active play subscriptions: %w", err)
+	}
+	return n > 0, nil
 }
 
 // PlaySubscriptionUpdate carries one Google Play subscription state written by ApplyPlaySubscription.
@@ -77,10 +115,12 @@ type PlaySubscriptionUpdate struct {
 	CancelAtPeriodEnd   bool
 }
 
-// ApplyPlaySubscription records a Play purchase and, when allowed by the
-// provider ownership rule, applies its status to the user. It returns
-// ErrBillingProviderMismatch when another provider owns a paid subscription;
-// the purchase row is still recorded in that case.
+// ApplyPlaySubscription records a Play purchase and applies its status to the
+// user. A paid status takes ownership under the provider ownership rule. Any
+// other status applies only to a user Play already owns, or an unowned unpaid
+// user, and only when no other Play purchase still grants access. It returns
+// ErrBillingProviderMismatch when the user write is refused; the purchase row
+// is still recorded in that case.
 func (db *DB) ApplyPlaySubscription(ctx context.Context, in PlaySubscriptionUpdate, grace time.Duration) (*User, error) {
 	var blocked bool
 	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -125,10 +165,20 @@ func (db *DB) ApplyPlaySubscription(ctx context.Context, in PlaySubscriptionUpda
 			return nil
 		}
 
+		paid := IsPaidStatus(in.Status)
+		if !paid {
+			others, err := otherPlayAccess(tx, in.UserID, in.PurchaseToken)
+			if err != nil {
+				return err
+			}
+			if others {
+				return nil
+			}
+		}
+
 		updates := map[string]any{
 			colSubscriptionStatus: in.Status,
 			colCancelAtPeriodEnd:  in.CancelAtPeriodEnd,
-			colBillingProvider:    BillingProviderPlay,
 		}
 		if in.Status == SubscriptionStatusPastDue {
 			updates[colPastDueSince] = gorm.Expr(`COALESCE("pastDueSince", now())`)
@@ -138,7 +188,14 @@ func (db *DB) ApplyPlaySubscription(ctx context.Context, in PlaySubscriptionUpda
 		if in.ExpiryTime != nil {
 			updates[colSubscriptionEnd] = *in.ExpiryTime
 		}
-		result := ownedBy(tx.Model(&User{}).Where("id = ?", in.UserID), BillingProviderPlay, grace).Updates(updates)
+		query := tx.Model(&User{}).Where("id = ?", in.UserID)
+		if paid {
+			updates[colBillingProvider] = BillingProviderPlay
+			query = ownedBy(query, BillingProviderPlay, grace)
+		} else {
+			query = managedBy(query, BillingProviderPlay, grace)
+		}
+		result := query.Updates(updates)
 		if result.Error != nil {
 			return fmt.Errorf("failed to update user play subscription: %w", result.Error)
 		}
@@ -208,21 +265,6 @@ func (db *DB) MarkPlayAcknowledged(ctx context.Context, purchaseToken string) er
 	return nil
 }
 
-// LapsedPlayOwner reports whether Play owns the user but their subscription
-// is not paid, so a Stripe write may take the user over.
-func (db *DB) LapsedPlayOwner(ctx context.Context, userID string) (bool, error) {
-	sql, args := ownershipClause(BillingProviderStripe, db.paywallGrace)
-	var n int64
-	err := db.conn.WithContext(ctx).Model(&User{}).
-		Where(`id = ? AND "billingProvider" = ?`, userID, BillingProviderPlay).
-		Where("("+sql+")", args...).
-		Count(&n).Error
-	if err != nil {
-		return false, fmt.Errorf("failed to check play ownership: %w", err)
-	}
-	return n > 0, nil
-}
-
 // ErrPlaySubscriptionNotFound is returned when no Play purchase is recorded for a token.
 var ErrPlaySubscriptionNotFound = errors.New("play subscription not found")
 
@@ -257,15 +299,11 @@ func (db *DB) VoidPlaySubscription(ctx context.Context, purchaseToken string, gr
 			return nil
 		}
 
-		var others int64
-		err = tx.Model(&models.PlaySubscription{}).
-			Where(`"userId" = ? AND "purchaseToken" <> ? AND NOT "superseded" AND "state" NOT IN ?`,
-				row.UserID, purchaseToken, []string{playStateExpired, playStatePendingPurchaseCancel}).
-			Count(&others).Error
+		others, err := otherPlayAccess(tx, row.UserID, purchaseToken)
 		if err != nil {
-			return fmt.Errorf("failed to count other active play subscriptions: %w", err)
+			return err
 		}
-		if others > 0 {
+		if others {
 			return nil
 		}
 

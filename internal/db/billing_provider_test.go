@@ -325,29 +325,156 @@ func TestMarkPlayAcknowledged(t *testing.T) {
 	}
 }
 
-func TestLapsedPlayOwner(t *testing.T) {
+const (
+	stripeLockQ    = `SELECT "id" FROM "User" WHERE id = \$1 AND \(\("billingProvider" IS NULL OR "billingProvider" = \$2 OR NOT COALESCE\(.*LIMIT \$\d+ FOR UPDATE`
+	activePlaySubs = `SELECT \* FROM "PlaySubscription" WHERE "userId" = \$1 AND NOT "superseded"`
+	stripeEventQ   = `INSERT INTO "StripeEvent"`
+)
+
+func TestUpdateUserSubscriptionCancelingPlay(t *testing.T) {
+	now := time.Now().UTC()
+	playCols := []string{"purchaseToken", "userId", "productId", "basePlanId", "state", "createdAt", "updatedAt"}
+	cancelErr := errors.New("play down")
 	tests := []struct {
-		name  string
-		count int
-		want  bool
+		name       string
+		eventID    string
+		duplicate  bool
+		writable   bool
+		playRows   int
+		cancelErr  error
+		wantCancel []string
+		wantErr    error
+		wantUser   bool
 	}{
-		{name: "play owns unpaid user", count: 1, want: true},
-		{name: "play owns paid user or not play", count: 0, want: false},
+		{name: "writable user with play is canceled first", writable: true, playRows: 1, wantCancel: []string{playToken}, wantUser: true},
+		{name: "writable user without play skips cancel", writable: true, wantUser: true},
+		{name: "blocked write does not cancel play", wantErr: ErrBillingProviderMismatch},
+		{name: "cancel failure aborts the write", writable: true, playRows: 1, cancelErr: cancelErr, wantCancel: []string{playToken}, wantErr: cancelErr},
+		{name: "duplicate event does not cancel play", eventID: "evt_ada", duplicate: true, wantUser: true},
+		{name: "new event cancels play", eventID: "evt_ada", writable: true, playRows: 1, wantCancel: []string{playToken}, wantUser: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d, mock := newPlayTestDB(t)
-			d.SetPaywallGrace(time.Hour)
-			mock.ExpectQuery(`SELECT count\(\*\) FROM "User" WHERE \(id = \$1 AND "billingProvider" = \$2\) AND \(\("billingProvider" IS NULL OR "billingProvider" = \$3 OR NOT COALESCE\(`).
-				WithArgs(playUserID, "play", "stripe", "active", "trial", "trialing", "pro", "premium", float64(3600)).
-				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tt.count))
-
-			got, err := d.LapsedPlayOwner(context.Background(), playUserID)
-			if err != nil {
-				t.Fatalf("LapsedPlayOwner: %v", err)
+			mock.ExpectBegin()
+			if tt.eventID != "" {
+				var rows int64 = 1
+				if tt.duplicate {
+					rows = 0
+				}
+				mock.ExpectExec(stripeEventQ).WithArgs(tt.eventID, sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, rows))
 			}
-			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("lapsed mismatch (-want +got):\n%s", diff)
+			if tt.duplicate {
+				mock.ExpectQuery(userSelectQ).WillReturnRows(playUserRow())
+				mock.ExpectCommit()
+			} else {
+				lock := sqlmock.NewRows([]string{"id"})
+				if tt.writable {
+					lock.AddRow(playUserID)
+				}
+				mock.ExpectQuery(stripeLockQ).WillReturnRows(lock)
+				if tt.writable {
+					rows := sqlmock.NewRows(playCols)
+					for range tt.playRows {
+						rows.AddRow(playToken, playUserID, "etu", "monthly", "SUBSCRIPTION_STATE_ON_HOLD", now, now)
+					}
+					mock.ExpectQuery(activePlaySubs).WillReturnRows(rows)
+				}
+				if tt.cancelErr != nil {
+					mock.ExpectRollback()
+				} else {
+					var affected int64
+					if tt.writable {
+						affected = 1
+					}
+					mock.ExpectExec(`UPDATE "User" SET "billingProvider"=\$1,.* ` + ownedWhere).WillReturnResult(sqlmock.NewResult(0, affected))
+					if tt.writable {
+						mock.ExpectQuery(userSelectQ).WillReturnRows(playUserRow())
+						mock.ExpectCommit()
+					} else {
+						mock.ExpectQuery(userSelectQ).WillReturnRows(
+							sqlmock.NewRows(append(append([]string{}, userRowColumns...), colBillingProvider)).
+								AddRow(playUserID, "ada@example.com", nil, "hash", "active", nil, now, nil, nil, nil, now, "play"))
+						mock.ExpectRollback()
+					}
+				}
+			}
+
+			var cancels []string
+			cancel := func(_ context.Context, subs []PlaySubscription) error {
+				for _, s := range subs {
+					cancels = append(cancels, s.PurchaseToken)
+				}
+				return tt.cancelErr
+			}
+			user, err := d.UpdateUserSubscriptionCancelingPlay(context.Background(), playUserID, SubscriptionUpdate{SubscriptionStatus: "active", StripeEventID: tt.eventID}, cancel)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+			if (user != nil) != tt.wantUser {
+				t.Errorf("user = %+v, want user: %v", user, tt.wantUser)
+			}
+			if diff := cmp.Diff(tt.wantCancel, cancels); diff != "" {
+				t.Errorf("cancels mismatch (-want +got):\n%s", diff)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled mock expectations: %v", err)
+			}
+		})
+	}
+}
+
+func TestUpdateUserSubscriptionUnpaidKeepsProvider(t *testing.T) {
+	d, mock := newPlayTestDB(t)
+	mock.ExpectBegin()
+	mock.ExpectExec(`UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"stripeCustomerId"=\$2,"subscriptionStatus"=\$3,"updatedAt"=\$4 `+ownedWhere).
+		WithArgs(false, "cus_ada", "unpaid", sqlmock.AnyArg(), playUserID, "stripe",
+			"active", "trial", "trialing", "pro", "premium", float64((7 * 24 * time.Hour).Seconds())).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	mock.ExpectQuery(userSelectQ).WillReturnRows(playUserRow())
+
+	customer := "cus_ada"
+	if _, err := d.UpdateUserSubscription(context.Background(), playUserID, SubscriptionUpdate{SubscriptionStatus: "unpaid", StripeCustomerID: &customer}); err != nil {
+		t.Fatalf("UpdateUserSubscription: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestApplyPlaySubscriptionUnpaidStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		otherActive int
+		userRows    int64
+		wantErr     error
+	}{
+		{name: "applies to a play-managed user", userRows: 1},
+		{name: "another active purchase keeps the user paid", otherActive: 1},
+		{name: "stripe-owned or paid unowned user is untouched", userRows: 0, wantErr: ErrBillingProviderMismatch},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := PlaySubscriptionUpdate{PurchaseToken: playOldTok, UserID: playUserID, State: "SUBSCRIPTION_STATE_EXPIRED", Status: "canceled"}
+			d, mock := newPlayTestDB(t)
+			mock.ExpectBegin()
+			mock.ExpectQuery(upsertPlay).WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, playUserID))
+			mock.ExpectQuery(otherActiveQ).WithArgs(playUserID, playOldTok, playStateActive, playStateCanc, playStateGrace).
+				WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tt.otherActive))
+			if tt.otherActive == 0 {
+				mock.ExpectExec(`UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 WHERE id = \$4 AND \(\("billingProvider" = \$5 OR \("billingProvider" IS NULL AND NOT COALESCE\(`).
+					WithArgs(false, "canceled", sqlmock.AnyArg(), playUserID, "play", "active", "trial", "trialing", "pro", "premium", float64(3600)).
+					WillReturnResult(sqlmock.NewResult(0, tt.userRows))
+			}
+			mock.ExpectCommit()
+			if tt.wantErr == nil {
+				mock.ExpectQuery(userSelectQ).WillReturnRows(playUserRow())
+			}
+
+			_, err := d.ApplyPlaySubscription(context.Background(), in, time.Hour)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
 				t.Errorf("unfulfilled mock expectations: %v", err)
@@ -357,12 +484,15 @@ func TestLapsedPlayOwner(t *testing.T) {
 }
 
 const (
-	voidSelectQ    = `SELECT "userId","superseded" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`
-	voidRowQ       = `UPDATE "PlaySubscription" SET "autoRenewing"=\$1,"state"=\$2,"updatedAt"=\$3 WHERE "purchaseToken" = \$4`
-	otherActiveQ   = `SELECT count\(\*\) FROM "PlaySubscription" WHERE .*"userId" = \$1 AND "purchaseToken" <> \$2 AND NOT "superseded" AND "state" NOT IN \(\$3,\$4\)`
-	voidUserQ      = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 `
-	playStateVoid  = "SUBSCRIPTION_STATE_EXPIRED"
-	playStatePCanc = "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED"
+	voidSelectQ     = `SELECT "userId","superseded" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`
+	voidRowQ        = `UPDATE "PlaySubscription" SET "autoRenewing"=\$1,"state"=\$2,"updatedAt"=\$3 WHERE "purchaseToken" = \$4`
+	otherActiveQ    = `SELECT count\(\*\) FROM "PlaySubscription" WHERE "userId" = \$1 AND "purchaseToken" <> \$2 AND NOT "superseded" AND "state" IN \(\$3,\$4,\$5\) AND \("expiryTime" IS NULL OR "expiryTime" > now\(\)\)`
+	voidUserQ       = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 `
+	playStateVoid   = "SUBSCRIPTION_STATE_EXPIRED"
+	playStatePCanc  = "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED"
+	playStateActive = "SUBSCRIPTION_STATE_ACTIVE"
+	playStateCanc   = "SUBSCRIPTION_STATE_CANCELED"
+	playStateGrace  = "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"
 )
 
 func voidRow(superseded bool) *sqlmock.Rows {
@@ -418,7 +548,7 @@ func TestVoidPlaySubscription(t *testing.T) {
 				mock.ExpectExec(voidRowQ).WithArgs(false, playStateVoid, sqlmock.AnyArg(), playToken).WillReturnResult(sqlmock.NewResult(0, 1))
 			}
 			if tt.wantOtherCheck {
-				mock.ExpectQuery(otherActiveQ).WithArgs(playUserID, playToken, playStateVoid, playStatePCanc).
+				mock.ExpectQuery(otherActiveQ).WithArgs(playUserID, playToken, playStateActive, playStateCanc, playStateGrace).
 					WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(tt.otherActive))
 			}
 			if tt.wantUserUpdate {

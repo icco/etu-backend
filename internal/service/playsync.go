@@ -38,7 +38,9 @@ type PlaySync struct {
 // otherwise the user is the one the token is stored for, or else the
 // purchase's obfuscated account ID. A paying purchase for a Stripe-owned user
 // cancels the Stripe subscription first and fails with ErrTakeoverFailed if
-// that cancel fails.
+// that cancel fails. Without expectedUserID, which only the user's own session
+// sets, such a purchase is recorded but neither applied nor acknowledged, since
+// anyone can tag a purchase with another user's ID.
 func (p *PlaySync) Sync(ctx context.Context, token, expectedUserID string) (*db.User, error) {
 	purchase, err := p.Play.GetSubscription(ctx, token)
 	if err != nil {
@@ -80,12 +82,7 @@ func (p *PlaySync) Sync(ctx context.Context, token, expectedUserID string) (*db.
 
 	subStatus, cancelAtPeriodEnd := billing.MapPlayStatus(purchase)
 	paying := !cancelAtPeriodEnd && (subStatus == "active" || subStatus == "trialing")
-	if paying && deref(owner.BillingProvider) == db.BillingProviderStripe {
-		if err := p.takeOverStripe(ctx, owner); err != nil {
-			return nil, err
-		}
-	}
-
+	verified := expectedUserID != ""
 	in := db.PlaySubscriptionUpdate{
 		PurchaseToken:       token,
 		UserID:              userID,
@@ -99,8 +96,22 @@ func (p *PlaySync) Sync(ctx context.Context, token, expectedUserID string) (*db.
 		Status:              subStatus,
 		CancelAtPeriodEnd:   cancelAtPeriodEnd,
 	}
+	if paying && deref(owner.BillingProvider) == db.BillingProviderStripe {
+		recorded, err := p.record(ctx, in)
+		if err != nil {
+			return nil, err
+		}
+		if !verified {
+			logging.FromContext(ctx).Warnw("unverified play purchase for a stripe subscriber recorded but not applied or acknowledged", "user_id", userID, "state", purchase.State)
+			return recorded, nil
+		}
+		if err := p.takeOverStripe(ctx, owner); err != nil {
+			return nil, err
+		}
+	}
+
 	user, err := p.DB.ApplyPlaySubscription(ctx, in, p.Grace)
-	if errors.Is(err, db.ErrBillingProviderMismatch) && paying {
+	if errors.Is(err, db.ErrBillingProviderMismatch) && paying && verified {
 		user, err = p.retryTakeover(ctx, in)
 	}
 	switch {
@@ -121,6 +132,23 @@ func (p *PlaySync) Sync(ctx context.Context, token, expectedUserID string) (*db.
 	}
 	if err := p.DB.MarkPlayAcknowledged(ctx, token); err != nil {
 		return nil, err
+	}
+	return user, nil
+}
+
+// record stores the purchase row without touching the user, failing when the
+// token belongs to another user.
+func (p *PlaySync) record(ctx context.Context, in db.PlaySubscriptionUpdate) (*db.User, error) {
+	in.Status = ""
+	user, err := p.DB.ApplyPlaySubscription(ctx, in, p.Grace)
+	if errors.Is(err, db.ErrPlayTokenUserMismatch) {
+		return nil, fmt.Errorf("%w: %w", ErrPlayAccountMismatch, err)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrPlayUnmatched
 	}
 	return user, nil
 }

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 
 	"go.icco.me/etu-backend/internal/billing"
@@ -244,13 +243,16 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 		update.CurrentPeriodStart = &t
 	}
 
-	if paidStatuses[strings.ToLower(req.SubscriptionStatus)] {
-		if err := s.cancelLapsedPlay(ctx, req.UserId); err != nil {
-			return nil, err
-		}
+	var user *db.User
+	var err error
+	if db.IsPaidStatus(req.SubscriptionStatus) {
+		user, err = s.db.UpdateUserSubscriptionCancelingPlay(ctx, req.UserId, update, s.cancelPlayForStripe)
+	} else {
+		user, err = s.db.UpdateUserSubscription(ctx, req.UserId, update)
 	}
-
-	user, err := s.db.UpdateUserSubscription(ctx, req.UserId, update)
+	if _, ok := status.FromError(err); ok && err != nil {
+		return nil, err
+	}
 	if errors.Is(err, db.ErrStripeCustomerMismatch) {
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
@@ -269,28 +271,14 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	}, nil
 }
 
-// cancelLapsedPlay cancels a Play-owned, unpaid user's Play subscriptions
-// before Stripe takes them over, so Play cannot recover and charge again.
-func (s *AuthService) cancelLapsedPlay(ctx context.Context, userID string) error {
-	lapsed, err := s.db.LapsedPlayOwner(ctx, userID)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to check billing provider: %v", err)
-	}
-	if !lapsed {
-		return nil
-	}
-	subs, err := s.db.ActivePlaySubscriptions(ctx, userID)
-	if err != nil {
-		return status.Errorf(codes.Internal, "failed to list play subscriptions: %v", err)
-	}
-	if len(subs) == 0 {
-		return nil
-	}
+// cancelPlayForStripe cancels a user's Play subscriptions before a paid Stripe
+// write applies, so Play cannot recover and charge them again.
+func (s *AuthService) cancelPlayForStripe(ctx context.Context, subs []db.PlaySubscription) error {
 	if s.play == nil {
 		return status.Error(codes.Unavailable, "google play billing not configured; cannot cancel play subscription")
 	}
 	if err := cancelPlaySubscriptions(ctx, s.play, subs); err != nil {
-		logging.FromContext(ctx).Errorw("play cancellation before stripe takeover failed", "user_id", userID, "error", err)
+		logging.FromContext(ctx).Errorw("play cancellation before stripe takeover failed", "user_id", subs[0].UserID, "error", err)
 		return status.Errorf(codes.Unavailable, "failed to cancel play subscription: %v", err)
 	}
 	return nil

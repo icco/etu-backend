@@ -31,10 +31,13 @@ const (
 	purchaseOwnerQ       = `SELECT "userId" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`
 	releaseQ             = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 WHERE id = \$4 AND "billingProvider" = \$5`
 	markAckQ             = `UPDATE "PlaySubscription" SET "acknowledged"=\$1`
-	lapsedPlayQ          = `SELECT count\(\*\) FROM "User" WHERE \(id = \$1 AND "billingProvider" = \$2\)`
+	stripeLockQ          = `SELECT "id" FROM "User" WHERE id = \$1 AND .* FOR UPDATE`
 	activePlayQ          = `SELECT \* FROM "PlaySubscription" WHERE "userId" = \$1 AND NOT "superseded"`
 	playUpdateQ          = `UPDATE "User" SET "billingProvider"=\$1,"cancelAtPeriodEnd"=\$2,"pastDueSince"=NULL,"subscriptionEnd"=\$3,"subscriptionStatus"=\$4`
+	playUnpaidUpdateQ    = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionEnd"=\$2,"subscriptionStatus"=\$3`
 	stripeUpdate         = `UPDATE "User" SET "billingProvider"=\$1`
+	stripeUnpaidUpdate   = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1`
+	stateGrace           = "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"
 )
 
 var (
@@ -120,9 +123,17 @@ func expectBillingUser(mock sqlmock.Sqlmock, subStatus string, provider any) {
 func expectPlayApply(mock sqlmock.Sqlmock, subStatus string, rows int64) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(upsertPlayQ).WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, acctUser))
-	if subStatus != "" {
+	switch {
+	case subStatus == "":
+	case db.IsPaidStatus(subStatus):
 		mock.ExpectExec(playUpdateQ).
 			WithArgs(provPlay, false, playExpiry, subStatus, sqlmock.AnyArg(), acctUser, provPlay,
+				"active", "trial", "trialing", "pro", "premium", sqlmock.AnyArg()).
+			WillReturnResult(sqlmock.NewResult(0, rows))
+	default:
+		expectNoOtherActive(mock, 0)
+		mock.ExpectExec(playUnpaidUpdateQ).
+			WithArgs(false, playExpiry, subStatus, sqlmock.AnyArg(), acctUser, provPlay,
 				"active", "trial", "trialing", "pro", "premium", sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(0, rows))
 	}
@@ -136,9 +147,29 @@ func expectPlayApply(mock sqlmock.Sqlmock, subStatus string, rows int64) {
 	}
 }
 
-func expectNotLapsedPlay(mock sqlmock.Sqlmock) {
-	mock.ExpectQuery(lapsedPlayQ).WithArgs(acctUser, provPlay, provStripe, "active", "trial", "trialing", "pro", "premium", sqlmock.AnyArg()).
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+// expectPlayRecord mocks ApplyPlaySubscription storing the purchase row without a user write.
+func expectPlayRecord(mock sqlmock.Sqlmock, userStatus string, provider any) {
+	mock.ExpectBegin()
+	mock.ExpectQuery(upsertPlayQ).WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, acctUser))
+	mock.ExpectCommit()
+	expectBillingUser(mock, userStatus, provider)
+}
+
+// expectStripeLock mocks the start of a paid Stripe write: the transaction,
+// the user row lock, and, when the write will apply, the user's Play purchases.
+func expectStripeLock(mock sqlmock.Sqlmock, writable bool, playRows *sqlmock.Rows) {
+	mock.ExpectBegin()
+	lock := sqlmock.NewRows([]string{"id"})
+	if writable {
+		lock.AddRow(acctUser)
+	}
+	mock.ExpectQuery(stripeLockQ).WillReturnRows(lock)
+	if writable {
+		if playRows == nil {
+			playRows = sqlmock.NewRows([]string{"purchaseToken"})
+		}
+		mock.ExpectQuery(activePlayQ).WithArgs(acctUser, stateExpired, statePendingCanceled).WillReturnRows(playRows)
+	}
 }
 
 func expectMarkAck(mock sqlmock.Sqlmock) {
@@ -273,6 +304,7 @@ func TestVerifyPlayPurchaseTakesOverLapsedStripe(t *testing.T) {
 			setup: func(m sqlmock.Sqlmock) {
 				expectTokenOwner(m, "")
 				expectBillingUser(m, "past_due", provStripe)
+				expectPlayRecord(m, "past_due", provStripe)
 				expectRelease(m)
 				expectPlayApply(m, "trialing", 1)
 			},
@@ -331,6 +363,7 @@ func TestVerifyPlayPurchaseTakeoverCancelFails(t *testing.T) {
 			play := &fakePlay{purchases: map[string]*billing.PlayPurchase{playTok: alicePurchase(stateActive)}}
 			expectTokenOwner(mock, "")
 			expectBillingUser(mock, "active", provStripe)
+			expectPlayRecord(mock, "active", provStripe)
 
 			_, err := newTestBillingService(database, play, tt.stripe, false).VerifyPlayPurchase(aliceCtx(), verifyReq())
 			if diff := cmp.Diff(codes.Unavailable, status.Code(err)); diff != "" {
@@ -346,6 +379,28 @@ func TestVerifyPlayPurchaseTakeoverCancelFails(t *testing.T) {
 				t.Errorf("unfulfilled mock expectations: %v", err)
 			}
 		})
+	}
+}
+
+func TestVerifyPlayPurchaseTokenRaceKeepsStripe(t *testing.T) {
+	database, mock := newBillingMock(t)
+	play := &fakePlay{purchases: map[string]*billing.PlayPurchase{playTok: alicePurchase(stateActive)}}
+	stripe := &fakeCanceler{}
+	expectTokenOwner(mock, "")
+	expectBillingUser(mock, "active", provStripe)
+	mock.ExpectBegin()
+	mock.ExpectQuery(upsertPlayQ).WillReturnRows(sqlmock.NewRows([]string{"superseded", "userId"}).AddRow(false, acctOther))
+	mock.ExpectRollback()
+
+	_, err := newTestBillingService(database, play, stripe, false).VerifyPlayPurchase(aliceCtx(), verifyReq())
+	if diff := cmp.Diff(codes.PermissionDenied, status.Code(err)); diff != "" {
+		t.Errorf("code mismatch (-want +got):\n%s (err=%v)", diff, err)
+	}
+	if len(stripe.calls) != 0 || len(play.acks) != 0 {
+		t.Errorf("stripe calls = %v, acks = %v, want none", stripe.calls, play.acks)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
 	}
 }
 
@@ -534,7 +589,7 @@ func TestVerifyPlayPurchaseNotConfigured(t *testing.T) {
 func TestStripeTakeoverCancelsPlay(t *testing.T) {
 	tests := []struct {
 		name        string
-		lapsed      bool
+		writable    bool
 		playState   string
 		noPlay      bool
 		cancelErr   error
@@ -542,10 +597,10 @@ func TestStripeTakeoverCancelsPlay(t *testing.T) {
 		wantCode    codes.Code
 		wantWrite   bool
 	}{
-		{name: "lapsed play owner is canceled first", lapsed: true, playState: "SUBSCRIPTION_STATE_ON_HOLD", wantCancels: []string{playTok}, wantWrite: true},
-		{name: "already canceled play is not canceled again", lapsed: true, playState: stateCancel, wantWrite: true},
-		{name: "play cancel failure retries webhook", lapsed: true, playState: stateActive, cancelErr: errors.New("play down"), wantCancels: []string{playTok}, wantCode: codes.Unavailable},
-		{name: "play not configured retries webhook", lapsed: true, playState: stateActive, noPlay: true, wantCode: codes.Unavailable},
+		{name: "lapsed play owner is canceled first", writable: true, playState: "SUBSCRIPTION_STATE_ON_HOLD", wantCancels: []string{playTok}, wantWrite: true},
+		{name: "already canceled play is not canceled again", writable: true, playState: stateCancel, wantWrite: true},
+		{name: "play cancel failure retries webhook", writable: true, playState: stateActive, cancelErr: errors.New("play down"), wantCancels: []string{playTok}, wantCode: codes.Unavailable},
+		{name: "play not configured retries webhook", writable: true, playState: stateActive, noPlay: true, wantCode: codes.Unavailable},
 		{name: "paid play owner is not canceled", wantCode: codes.FailedPrecondition},
 	}
 	for _, tt := range tests {
@@ -556,28 +611,20 @@ func TestStripeTakeoverCancelsPlay(t *testing.T) {
 			if !tt.noPlay {
 				svc.SetPlay(play)
 			}
-			count := 0
-			if tt.lapsed {
-				count = 1
-			}
-			mock.ExpectQuery(lapsedPlayQ).WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(count))
-			if tt.lapsed {
-				now := time.Now().UTC()
-				mock.ExpectQuery(activePlayQ).WithArgs(acctUser, stateExpired, statePendingCanceled).
-					WillReturnRows(sqlmock.NewRows([]string{"purchaseToken", "userId", "productId", "basePlanId", "state", colCreatedAt, colUpdatedAt}).
-						AddRow(playTok, acctUser, playProduct, "yearly", stateActive, now, now))
-			}
-			if tt.wantWrite {
-				mock.ExpectBegin()
+			now := time.Now().UTC()
+			expectStripeLock(mock, tt.writable, sqlmock.NewRows([]string{"purchaseToken", "userId", "productId", "basePlanId", "state", colCreatedAt, colUpdatedAt}).
+				AddRow(playTok, acctUser, playProduct, "yearly", stateActive, now, now))
+			switch {
+			case tt.wantWrite:
 				mock.ExpectExec(stripeUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
-				mock.ExpectCommit()
 				expectBillingUser(mock, "active", provStripe)
-			}
-			if tt.wantCode == codes.FailedPrecondition {
-				mock.ExpectBegin()
-				mock.ExpectExec(stripeUpdate).WillReturnResult(sqlmock.NewResult(0, 0))
 				mock.ExpectCommit()
+			case tt.wantCode == codes.FailedPrecondition:
+				mock.ExpectExec(stripeUpdate).WillReturnResult(sqlmock.NewResult(0, 0))
 				expectBillingUser(mock, "active", provPlay)
+				mock.ExpectRollback()
+			default:
+				mock.ExpectRollback()
 			}
 
 			m2m := auth.SetAuthContext(context.Background(), "m2m", "m2m")
@@ -601,7 +648,7 @@ func TestStripeNonPayingStatusSkipsPlayCheck(t *testing.T) {
 	svc := NewAuthService(database)
 	svc.SetPlay(play)
 	mock.ExpectBegin()
-	mock.ExpectExec(stripeUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(stripeUnpaidUpdate).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	expectBillingUser(mock, "canceled", provStripe)
 

@@ -27,7 +27,7 @@ func expectVoidRow(m sqlmock.Sqlmock) {
 }
 
 func expectNoOtherActive(m sqlmock.Sqlmock, n int) {
-	m.ExpectQuery(otherActivePlayQ).WithArgs(acctUser, playTok, stateExpired, statePendingCanceled).
+	m.ExpectQuery(otherActivePlayQ).WithArgs(acctUser, playTok, stateActive, stateCancel, stateGrace).
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(n))
 }
 
@@ -123,20 +123,39 @@ func TestHandleNotificationTransientErrors(t *testing.T) {
 			t.Errorf("unfulfilled mock expectations: %v", err)
 		}
 	})
-	t.Run("stripe takeover failure", func(t *testing.T) {
-		database, mock := newBillingMock(t)
-		play := &fakePlay{purchases: map[string]*billing.PlayPurchase{playTok: alicePurchase(stateActive)}}
-		expectTokenOwner(mock, acctUser)
-		expectBillingUser(mock, "active", provStripe)
-		sync := &PlaySync{DB: database, Play: play, Stripe: &fakeCanceler{err: boom}, Grace: time.Hour}
-		err := sync.HandleNotification(context.Background(), playTok, false)
-		if !errors.Is(err, ErrTakeoverFailed) || errors.Is(err, billing.ErrRTDNPermanent) {
-			t.Errorf("err = %v, want transient %v", err, ErrTakeoverFailed)
-		}
-		if err := mock.ExpectationsWereMet(); err != nil {
-			t.Errorf("unfulfilled mock expectations: %v", err)
-		}
-	})
+}
+
+func TestHandleNotificationLeavesStripeSubscriber(t *testing.T) {
+	tests := []struct {
+		name        string
+		storedOwner string
+		userStatus  string
+	}{
+		{name: "unseen token tagged with a paid stripe subscriber", userStatus: "active"},
+		{name: "unseen token tagged with a lapsed stripe subscriber", userStatus: "canceled"},
+		{name: "stored token of a stripe subscriber", storedOwner: acctUser, userStatus: "active"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			database, mock := newBillingMock(t)
+			play := &fakePlay{purchases: map[string]*billing.PlayPurchase{playTok: alicePurchase(stateActive)}}
+			stripe := &fakeCanceler{}
+			expectTokenOwner(mock, tt.storedOwner)
+			expectBillingUser(mock, tt.userStatus, provStripe)
+			expectPlayRecord(mock, tt.userStatus, provStripe)
+			sync := &PlaySync{DB: database, Play: play, Stripe: stripe, Grace: time.Hour}
+
+			if err := sync.HandleNotification(context.Background(), playTok, false); err != nil {
+				t.Fatalf("HandleNotification: %v", err)
+			}
+			if len(stripe.calls) != 0 || len(play.acks) != 0 {
+				t.Errorf("stripe calls = %v, acks = %v, want none", stripe.calls, play.acks)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled mock expectations: %v", err)
+			}
+		})
+	}
 }
 
 func TestHandleNotificationVoided(t *testing.T) {

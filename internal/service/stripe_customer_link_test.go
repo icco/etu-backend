@@ -39,11 +39,14 @@ func TestUpdateUserSubscriptionExpectedStripeCustomer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("db.NewFromConn: %v", err)
 			}
-			expectNotLapsedPlay(mock)
-			mock.ExpectBegin()
+			expectStripeLock(mock, tt.rows > 0, nil)
 			mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, tt.rows))
-			mock.ExpectCommit()
 			mock.ExpectQuery(`SELECT (.+) FROM "User"`).WillReturnRows(sqlmock.NewRows(columns).AddRow("alice", "alice@example.com", "active", now, now, tt.stored))
+			if tt.rows > 0 {
+				mock.ExpectCommit()
+			} else {
+				mock.ExpectRollback()
+			}
 			_, err = (&AuthService{db: database}).UpdateUserSubscription(stripeContext(t), &pb.UpdateUserSubscriptionRequest{
 				UserId:                   "alice",
 				SubscriptionStatus:       "active",
@@ -76,11 +79,10 @@ func TestUpdateUserSubscriptionPlayOwned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("db.NewFromConn: %v", err)
 	}
-	expectNotLapsedPlay(mock)
-	mock.ExpectBegin()
+	expectStripeLock(mock, false, nil)
 	mock.ExpectExec(`UPDATE "User"`).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectCommit()
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).WillReturnRows(sqlmock.NewRows(columns).AddRow("alice", "alice@example.com", "active", now, now, "play"))
+	mock.ExpectRollback()
 	_, err = (&AuthService{db: database}).UpdateUserSubscription(stripeContext(t), &pb.UpdateUserSubscriptionRequest{
 		UserId:             "alice",
 		SubscriptionStatus: "active",

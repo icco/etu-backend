@@ -801,7 +801,9 @@ func (db *DB) updateUserSubscription(ctx context.Context, userID string, in Subs
 	updates := map[string]interface{}{
 		colSubscriptionStatus: in.SubscriptionStatus,
 		colCancelAtPeriodEnd:  in.CancelAtPeriodEnd,
-		colBillingProvider:    BillingProviderStripe,
+	}
+	if IsPaidStatus(in.SubscriptionStatus) {
+		updates[colBillingProvider] = BillingProviderStripe
 	}
 	if in.SubscriptionStatus == SubscriptionStatusPastDue {
 		updates[colPastDueSince] = gorm.Expr(`COALESCE("pastDueSince", now())`)
