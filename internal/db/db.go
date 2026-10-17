@@ -761,6 +761,10 @@ func (db *DB) GetUserByStripeCustomerID(ctx context.Context, stripeCustomerID st
 	return &user, nil
 }
 
+// ErrStripeCustomerMismatch is returned when a conditional subscription update
+// finds a different Stripe customer id than expected.
+var ErrStripeCustomerMismatch = errors.New("stripe customer link changed")
+
 // SubscriptionStatusPastDue is the Stripe status that starts the past-due grace period.
 const SubscriptionStatusPastDue = "past_due"
 
@@ -769,14 +773,17 @@ const SubscriptionStatusPastDue = "past_due"
 // Pointer-typed fields are only persisted when non-nil; pass an empty string
 // pointer to explicitly clear the column. CancelAtPeriodEnd is always written.
 type SubscriptionUpdate struct {
-	StripeEventID        string
-	SubscriptionStatus   string
-	StripeCustomerID     *string
-	SubscriptionEnd      *time.Time
-	StripeSubscriptionID *string
-	StripePriceID        *string
-	CancelAtPeriodEnd    bool
-	CurrentPeriodStart   *time.Time
+	StripeEventID string
+	// ExpectedStripeCustomerID, when non-empty, makes the update conditional on
+	// the stored Stripe customer id still matching it.
+	ExpectedStripeCustomerID string
+	SubscriptionStatus       string
+	StripeCustomerID         *string
+	SubscriptionEnd          *time.Time
+	StripeSubscriptionID     *string
+	StripePriceID            *string
+	CancelAtPeriodEnd        bool
+	CurrentPeriodStart       *time.Time
 }
 
 // UpdateUserSubscription updates a user's subscription information.
@@ -812,12 +819,23 @@ func (db *DB) updateUserSubscription(ctx context.Context, userID string, in Subs
 		updates[colCurrentPeriodStart] = *in.CurrentPeriodStart
 	}
 
-	result := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID).Updates(updates)
+	query := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID)
+	if in.ExpectedStripeCustomerID != "" {
+		query = query.Where(`"stripeCustomerId" = ?`, in.ExpectedStripeCustomerID)
+	}
+	result := query.Updates(updates)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to update user subscription: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return nil, nil
+		if in.ExpectedStripeCustomerID == "" {
+			return nil, nil
+		}
+		user, err := db.GetUser(ctx, userID)
+		if err != nil || user == nil {
+			return nil, err
+		}
+		return nil, ErrStripeCustomerMismatch
 	}
 
 	return db.GetUser(ctx, userID)

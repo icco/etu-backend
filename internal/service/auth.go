@@ -217,12 +217,13 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	}
 
 	update := db.SubscriptionUpdate{
-		StripeEventID:        req.GetStripeEventId(),
-		SubscriptionStatus:   req.SubscriptionStatus,
-		StripeCustomerID:     req.StripeCustomerId,
-		StripeSubscriptionID: req.StripeSubscriptionId,
-		StripePriceID:        req.StripePriceId,
-		CancelAtPeriodEnd:    req.CancelAtPeriodEnd,
+		StripeEventID:            req.GetStripeEventId(),
+		ExpectedStripeCustomerID: req.GetExpectedStripeCustomerId(),
+		SubscriptionStatus:       req.SubscriptionStatus,
+		StripeCustomerID:         req.StripeCustomerId,
+		StripeSubscriptionID:     req.StripeSubscriptionId,
+		StripePriceID:            req.StripePriceId,
+		CancelAtPeriodEnd:        req.CancelAtPeriodEnd,
 	}
 	if req.SubscriptionEnd != nil {
 		t := req.SubscriptionEnd.AsTime()
@@ -234,6 +235,9 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	}
 
 	user, err := s.db.UpdateUserSubscription(ctx, req.UserId, update)
+	if errors.Is(err, db.ErrStripeCustomerMismatch) {
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user subscription: %v", err)
 	}

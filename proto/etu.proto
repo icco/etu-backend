@@ -371,6 +371,11 @@ message UpdateUserSubscriptionRequest {
   optional google.protobuf.Timestamp current_period_start = 8;
   // Non-empty IDs are deduplicated globally across both Stripe update RPCs.
   optional string stripe_event_id = 9;
+  // When non-empty, the update applies only if the user's stored Stripe
+  // customer id still equals this value, checked atomically with the write.
+  // On mismatch nothing is written, stripe_event_id is not recorded, and the
+  // RPC returns FAILED_PRECONDITION.
+  optional string expected_stripe_customer_id = 10;
 }
 
 // UpdateUserSubscriptionResponse returns the updated user record.
