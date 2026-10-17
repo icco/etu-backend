@@ -148,7 +148,7 @@ func TestAttachmentPartialFailure(t *testing.T) {
 						count = 2
 						store.deleteErr = errors.New("cleanup failed")
 					}
-					for i := 0; i < count; i++ {
+					for i := range count {
 						mock.ExpectBegin()
 						mock.ExpectQuery(`SELECT "User".id FROM "User" JOIN "Note"`).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("alice"))
 						table := "NoteImage"

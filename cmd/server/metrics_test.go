@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -105,14 +106,14 @@ func TestGRPCMetrics(t *testing.T) {
 				t.Fatalf("stream result: %v", err)
 			}
 			if err == nil {
-				if _, err := stream.Recv(); err != io.EOF {
+				if _, err := stream.Recv(); !errors.Is(err, io.EOF) {
 					t.Fatalf("stream end: %v", err)
 				}
 			}
 		})
 	}
 	w := httptest.NewRecorder()
-	newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{})).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{})).ServeHTTP(w, httptest.NewRequestWithContext(ctx, http.MethodGet, "/metrics", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("scrape status %d", w.Code)
 	}
