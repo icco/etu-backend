@@ -18,6 +18,8 @@ var (
 	ErrTakeoverFailed = errors.New("could not cancel the existing subscription")
 	// ErrPlayTestPurchase is returned for a Play test purchase when test purchases are not allowed.
 	ErrPlayTestPurchase = errors.New("play test purchases are not accepted")
+	// ErrPlayWrongProduct is returned when a Play purchase is not for the etu subscription product.
+	ErrPlayWrongProduct = errors.New("play purchase is for another product")
 	// ErrPlayUnmatched is returned when a Play purchase cannot be tied to an existing user.
 	ErrPlayUnmatched = errors.New("play purchase has no matching user")
 )
@@ -44,6 +46,9 @@ func (p *PlaySync) Sync(ctx context.Context, token, expectedUserID string) (*db.
 	}
 	if purchase.Test && !p.AllowTest {
 		return nil, ErrPlayTestPurchase
+	}
+	if purchase.ProductID != playProductID {
+		return nil, ErrPlayWrongProduct
 	}
 	if expectedUserID != "" && purchase.ObfuscatedAccountID != expectedUserID {
 		return nil, ErrPlayAccountMismatch

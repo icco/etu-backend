@@ -475,6 +475,55 @@ func TestVerifyPlayPurchaseRequestErrors(t *testing.T) {
 	}
 }
 
+func TestVerifyPlayPurchaseRejectsOtherProduct(t *testing.T) {
+	database, mock := newBillingMock(t)
+	p := alicePurchase(stateActive)
+	p.ProductID = "etu_lifetime"
+	play := &fakePlay{purchases: map[string]*billing.PlayPurchase{playTok: p}}
+	stripe := &fakeCanceler{}
+
+	_, err := newTestBillingService(database, play, stripe, false).VerifyPlayPurchase(aliceCtx(), verifyReq())
+	if diff := cmp.Diff(codes.InvalidArgument, status.Code(err)); diff != "" {
+		t.Errorf("code mismatch (-want +got):\n%s (err=%v)", diff, err)
+	}
+	if len(play.acks) != 0 || len(stripe.calls) != 0 {
+		t.Errorf("acks = %v, stripe calls = %v, want none", play.acks, stripe.calls)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unfulfilled mock expectations: %v", err)
+	}
+}
+
+func TestPlaySyncRejectsOtherProduct(t *testing.T) {
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{name: "rpc path", expected: acctUser},
+		{name: "rtdn path", expected: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			database, mock := newBillingMock(t)
+			p := alicePurchase(stateActive)
+			p.ProductID = "etu_lifetime"
+			stripe := &fakeCanceler{}
+			sync := &PlaySync{DB: database, Play: &fakePlay{purchases: map[string]*billing.PlayPurchase{playTok: p}}, Stripe: stripe, Grace: time.Hour}
+
+			_, err := sync.Sync(context.Background(), playTok, tt.expected)
+			if !errors.Is(err, ErrPlayWrongProduct) {
+				t.Errorf("err = %v, want %v", err, ErrPlayWrongProduct)
+			}
+			if len(stripe.calls) != 0 {
+				t.Errorf("stripe calls = %v, want none", stripe.calls)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled mock expectations: %v", err)
+			}
+		})
+	}
+}
+
 func TestVerifyPlayPurchaseNotConfigured(t *testing.T) {
 	_, err := NewBillingService(nil, "").VerifyPlayPurchase(aliceCtx(), verifyReq())
 	if diff := cmp.Diff(codes.FailedPrecondition, status.Code(err)); diff != "" {

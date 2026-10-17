@@ -59,6 +59,8 @@ func (s *BillingService) VerifyPlayPurchase(ctx context.Context, req *pb.VerifyP
 			return nil, status.Error(codes.Unavailable, "could not cancel the existing subscription; retry later")
 		case errors.Is(err, ErrPlayTestPurchase):
 			return nil, status.Error(codes.FailedPrecondition, "test purchases are not accepted")
+		case errors.Is(err, ErrPlayWrongProduct):
+			return nil, status.Error(codes.InvalidArgument, "purchase is not for a supported product")
 		case errors.Is(err, ErrPlayUnmatched):
 			return nil, status.Error(codes.NotFound, "user not found")
 		default:
