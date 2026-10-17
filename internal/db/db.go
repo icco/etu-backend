@@ -24,7 +24,8 @@ import (
 // DB wraps the GORM database connection.
 // Loggers are sourced from per-call ctx via gutil/logging.
 type DB struct {
-	conn *gorm.DB
+	conn         *gorm.DB
+	paywallGrace time.Duration
 }
 
 // Re-exported model types for backwards compatibility.
@@ -92,7 +93,8 @@ func New() (*DB, error) {
 	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
 	return &DB{
-		conn: conn,
+		conn:         conn,
+		paywallGrace: defaultPaywallGrace,
 	}, nil
 }
 
@@ -106,7 +108,8 @@ func NewFromConn(sqlDB *sql.DB) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 	return &DB{
-		conn: conn,
+		conn:         conn,
+		paywallGrace: defaultPaywallGrace,
 	}, nil
 }
 
@@ -133,6 +136,7 @@ func (db *DB) AutoMigrate() error {
 		&models.AccountDeletionCleanup{},
 		&models.AIUsage{},
 		&models.StripeEvent{},
+		&models.PlaySubscription{},
 	); err != nil {
 		return err
 	}
@@ -798,6 +802,9 @@ func (db *DB) updateUserSubscription(ctx context.Context, userID string, in Subs
 		colSubscriptionStatus: in.SubscriptionStatus,
 		colCancelAtPeriodEnd:  in.CancelAtPeriodEnd,
 	}
+	if IsPaidStatus(in.SubscriptionStatus) {
+		updates[colBillingProvider] = BillingProviderStripe
+	}
 	if in.SubscriptionStatus == SubscriptionStatusPastDue {
 		updates[colPastDueSince] = gorm.Expr(`COALESCE("pastDueSince", now())`)
 	} else {
@@ -819,7 +826,7 @@ func (db *DB) updateUserSubscription(ctx context.Context, userID string, in Subs
 		updates[colCurrentPeriodStart] = *in.CurrentPeriodStart
 	}
 
-	query := db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID)
+	query := ownedBy(db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", userID), BillingProviderStripe, db.paywallGrace)
 	if in.ExpectedStripeCustomerID != "" {
 		query = query.Where(`"stripeCustomerId" = ?`, in.ExpectedStripeCustomerID)
 	}
@@ -828,14 +835,20 @@ func (db *DB) updateUserSubscription(ctx context.Context, userID string, in Subs
 		return nil, fmt.Errorf("failed to update user subscription: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		if in.ExpectedStripeCustomerID == "" {
-			return nil, nil
-		}
 		user, err := db.GetUser(ctx, userID)
 		if err != nil || user == nil {
 			return nil, err
 		}
-		return nil, ErrStripeCustomerMismatch
+		if in.ExpectedStripeCustomerID != "" && (user.StripeCustomerID == nil || *user.StripeCustomerID != in.ExpectedStripeCustomerID) {
+			return nil, ErrStripeCustomerMismatch
+		}
+		if user.BillingProvider != nil && *user.BillingProvider == BillingProviderPlay {
+			return nil, ErrBillingProviderMismatch
+		}
+		if in.ExpectedStripeCustomerID != "" {
+			return nil, ErrStripeCustomerMismatch
+		}
+		return nil, nil
 	}
 
 	return db.GetUser(ctx, userID)

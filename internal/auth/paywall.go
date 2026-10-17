@@ -25,6 +25,7 @@ var paywallExemptMethods = map[string]bool{
 	"/etu.ApiKeysService/DeleteApiKey":            true,
 	"/etu.AccountService/DeleteAccount":           true,
 	"/etu.AccountService/ExportData":              true,
+	"/etu.BillingService/VerifyPlayPurchase":      true,
 }
 
 // AccountState is the subset of a user record that drives access decisions.

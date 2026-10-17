@@ -1,0 +1,345 @@
+package db
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+	"time"
+
+	"go.icco.me/etu-backend/internal/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+const (
+	// BillingProviderStripe marks a user whose subscription is managed by Stripe.
+	BillingProviderStripe = "stripe"
+	// BillingProviderPlay marks a user whose subscription is managed by Google Play.
+	BillingProviderPlay = "play"
+
+	playStateExpired               = "SUBSCRIPTION_STATE_EXPIRED"
+	playStatePendingPurchaseCancel = "SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED"
+
+	defaultPaywallGrace = 7 * 24 * time.Hour
+)
+
+// ErrBillingProviderMismatch is returned when a billing write is refused
+// because the other billing provider owns a paid subscription for the user.
+var ErrBillingProviderMismatch = errors.New("billing managed by google play")
+
+// ErrPlayTokenUserMismatch is returned when a Play purchase token is already
+// recorded for a different user.
+var ErrPlayTokenUserMismatch = errors.New("play purchase token belongs to another user")
+
+// PlaySubscription is an alias for models.PlaySubscription.
+type PlaySubscription = models.PlaySubscription
+
+// SetPaywallGrace sets how long a past_due subscription counts as paid when
+// deciding which billing provider owns a user.
+func (db *DB) SetPaywallGrace(d time.Duration) {
+	db.paywallGrace = d
+}
+
+// paidClause returns the WHERE fragment, with its arguments, that is true when
+// the user's current subscription is paid.
+func paidClause(grace time.Duration) (string, []any) {
+	paid := make([]string, 0, len(AIEligibleSubscriptionStatuses))
+	for _, s := range AIEligibleSubscriptionStatuses {
+		if s != SubscriptionStatusPastDue {
+			paid = append(paid, s)
+		}
+	}
+	sql := `COALESCE(` +
+		`("subscriptionStatus" IN ? AND "subscriptionStatus" <> 'past_due') OR ` +
+		`("subscriptionStatus" = 'past_due' AND "pastDueSince" > now() - make_interval(secs => ?)), false)`
+	return sql, []any{paid, grace.Seconds()}
+}
+
+// ownershipClause returns the WHERE fragment, with its arguments, that lets
+// provider write a user's billing fields: nobody owns the user, provider
+// already does, or the user's current subscription is not paid.
+func ownershipClause(provider string, grace time.Duration) (string, []any) {
+	paid, paidArgs := paidClause(grace)
+	return `"billingProvider" IS NULL OR "billingProvider" = ? OR NOT ` + paid, append([]any{provider}, paidArgs...)
+}
+
+func ownedBy(q *gorm.DB, provider string, grace time.Duration) *gorm.DB {
+	sql, args := ownershipClause(provider, grace)
+	return q.Where("("+sql+")", args...)
+}
+
+// managedBy limits q to users provider already owns, or unowned users who are
+// not paid, for writes that must not take ownership.
+func managedBy(q *gorm.DB, provider string, grace time.Duration) *gorm.DB {
+	paid, paidArgs := paidClause(grace)
+	return q.Where(`("billingProvider" = ? OR ("billingProvider" IS NULL AND NOT `+paid+`))`, append([]any{provider}, paidArgs...)...)
+}
+
+// IsPaidStatus reports whether a subscription status written by a billing
+// provider can still charge the user, so the write takes ownership of them.
+func IsPaidStatus(status string) bool {
+	return slices.Contains(AIEligibleSubscriptionStatuses, status)
+}
+
+var playAccessStates = []string{"SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_CANCELED", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"}
+
+// lockUserRow serializes Play writes for a user, so concurrent notifications
+// for different tokens each see the other's committed state.
+func lockUserRow(tx *gorm.DB, userID string) error {
+	var ids []string
+	if err := tx.Model(&User{}).Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", userID).Pluck("id", &ids).Error; err != nil {
+		return fmt.Errorf("failed to lock user: %w", err)
+	}
+	return nil
+}
+
+// otherPlayAccess reports whether the user has another non-superseded Play
+// purchase that still grants access, so a lapsed or voided token must not
+// overwrite their status.
+func otherPlayAccess(tx *gorm.DB, userID, purchaseToken string) (bool, error) {
+	var n int64
+	err := tx.Model(&models.PlaySubscription{}).
+		Where(`"userId" = ? AND "purchaseToken" <> ? AND NOT "superseded" AND "state" IN ? AND ("expiryTime" IS NULL OR "expiryTime" > now())`,
+			userID, purchaseToken, playAccessStates).
+		Count(&n).Error
+	if err != nil {
+		return false, fmt.Errorf("failed to count other active play subscriptions: %w", err)
+	}
+	return n > 0, nil
+}
+
+// PlaySubscriptionUpdate carries one Google Play subscription state written by ApplyPlaySubscription.
+// An empty Status leaves the user's subscription fields untouched.
+type PlaySubscriptionUpdate struct {
+	PurchaseToken       string
+	UserID              string
+	ProductID           string
+	BasePlanID          string
+	State               string
+	ExpiryTime          *time.Time
+	AutoRenewing        bool
+	Acknowledged        bool
+	LinkedPurchaseToken *string
+	Status              string
+	CancelAtPeriodEnd   bool
+}
+
+// ApplyPlaySubscription records a Play purchase and applies its status to the
+// user. A paid status takes ownership under the provider ownership rule. Any
+// other status applies only to a user Play already owns, or an unowned unpaid
+// user, and only when no other Play purchase still grants access. It returns
+// ErrBillingProviderMismatch when the user write is refused; the purchase row
+// is still recorded in that case.
+func (db *DB) ApplyPlaySubscription(ctx context.Context, in PlaySubscriptionUpdate, grace time.Duration) (*User, error) {
+	var blocked bool
+	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		row := models.PlaySubscription{
+			PurchaseToken:       in.PurchaseToken,
+			UserID:              in.UserID,
+			ProductID:           in.ProductID,
+			BasePlanID:          in.BasePlanID,
+			State:               in.State,
+			ExpiryTime:          in.ExpiryTime,
+			AutoRenewing:        in.AutoRenewing,
+			Acknowledged:        in.Acknowledged,
+			LinkedPurchaseToken: in.LinkedPurchaseToken,
+		}
+		upsert := tx.Omit(clause.Associations).Clauses(
+			clause.OnConflict{
+				Columns: []clause.Column{{Name: "purchaseToken"}},
+				DoUpdates: clause.AssignmentColumns([]string{
+					"productId", "basePlanId", "state", "expiryTime", "autoRenewing",
+					"acknowledged", "linkedPurchaseToken", colUpdatedAt,
+				}),
+			},
+			clause.Returning{Columns: []clause.Column{{Name: "superseded"}, {Name: "userId"}}},
+		).Create(&row)
+		if upsert.Error != nil {
+			return fmt.Errorf("failed to upsert play subscription: %w", upsert.Error)
+		}
+		if row.UserID != in.UserID {
+			return ErrPlayTokenUserMismatch
+		}
+
+		if in.LinkedPurchaseToken != nil {
+			result := tx.Model(&models.PlaySubscription{}).
+				Where(`"purchaseToken" = ? AND "userId" = ?`, *in.LinkedPurchaseToken, in.UserID).
+				Updates(map[string]any{"superseded": true, colUpdatedAt: time.Now().UTC()})
+			if result.Error != nil {
+				return fmt.Errorf("failed to supersede linked play subscription: %w", result.Error)
+			}
+		}
+
+		if row.Superseded || in.Status == "" {
+			return nil
+		}
+
+		if err := lockUserRow(tx, in.UserID); err != nil {
+			return err
+		}
+		paid := IsPaidStatus(in.Status)
+		if !paid {
+			others, err := otherPlayAccess(tx, in.UserID, in.PurchaseToken)
+			if err != nil {
+				return err
+			}
+			if others {
+				return nil
+			}
+		}
+
+		updates := map[string]any{
+			colSubscriptionStatus: in.Status,
+			colCancelAtPeriodEnd:  in.CancelAtPeriodEnd,
+		}
+		if in.Status == SubscriptionStatusPastDue {
+			updates[colPastDueSince] = gorm.Expr(`COALESCE("pastDueSince", now())`)
+		} else {
+			updates[colPastDueSince] = gorm.Expr("NULL")
+		}
+		if in.ExpiryTime != nil {
+			updates[colSubscriptionEnd] = *in.ExpiryTime
+		}
+		query := tx.Model(&User{}).Where("id = ?", in.UserID)
+		if paid {
+			updates[colBillingProvider] = BillingProviderPlay
+			query = ownedBy(query, BillingProviderPlay, grace)
+		} else {
+			query = managedBy(query, BillingProviderPlay, grace)
+		}
+		result := query.Updates(updates)
+		if result.Error != nil {
+			return fmt.Errorf("failed to update user play subscription: %w", result.Error)
+		}
+		blocked = result.RowsAffected == 0
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, ErrBillingProviderMismatch
+	}
+	return db.GetUser(ctx, in.UserID)
+}
+
+// PlaySubscriptionUser returns the user a purchase token belongs to, or an empty string when the token is unknown.
+func (db *DB) PlaySubscriptionUser(ctx context.Context, purchaseToken string) (string, error) {
+	var ids []string
+	err := db.conn.WithContext(ctx).Model(&models.PlaySubscription{}).
+		Where(`"purchaseToken" = ?`, purchaseToken).Limit(1).Pluck(`"userId"`, &ids).Error
+	if err != nil {
+		return "", fmt.Errorf("failed to look up play subscription user: %w", err)
+	}
+	if len(ids) == 0 {
+		return "", nil
+	}
+	return ids[0], nil
+}
+
+// ActivePlaySubscriptions returns the user's Play purchases that are neither superseded nor expired or canceled before purchase.
+func (db *DB) ActivePlaySubscriptions(ctx context.Context, userID string) ([]PlaySubscription, error) {
+	var subs []PlaySubscription
+	err := db.conn.WithContext(ctx).
+		Where(`"userId" = ? AND NOT "superseded" AND "state" NOT IN ?`, userID, []string{playStateExpired, playStatePendingPurchaseCancel}).
+		Find(&subs).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to list active play subscriptions: %w", err)
+	}
+	return subs, nil
+}
+
+// ReleaseStripeOwnership marks a Stripe-owned user's subscription canceled,
+// bypassing the ownership rule, after their Stripe subscription was canceled
+// so another provider can take over.
+func (db *DB) ReleaseStripeOwnership(ctx context.Context, userID string) error {
+	err := db.conn.WithContext(ctx).Model(&User{}).
+		Where(`id = ? AND "billingProvider" = ?`, userID, BillingProviderStripe).
+		Updates(map[string]any{
+			colSubscriptionStatus: "canceled",
+			colCancelAtPeriodEnd:  false,
+			colPastDueSince:       gorm.Expr("NULL"),
+		}).Error
+	if err != nil {
+		return fmt.Errorf("failed to release stripe ownership: %w", err)
+	}
+	return nil
+}
+
+// MarkPlayAcknowledged records that the Play purchase was acknowledged.
+func (db *DB) MarkPlayAcknowledged(ctx context.Context, purchaseToken string) error {
+	err := db.conn.WithContext(ctx).Model(&models.PlaySubscription{}).
+		Where(`"purchaseToken" = ?`, purchaseToken).
+		Updates(map[string]any{"acknowledged": true, colUpdatedAt: time.Now().UTC()}).Error
+	if err != nil {
+		return fmt.Errorf("failed to mark play subscription acknowledged: %w", err)
+	}
+	return nil
+}
+
+// ErrPlaySubscriptionNotFound is returned when no Play purchase is recorded for a token.
+var ErrPlaySubscriptionNotFound = errors.New("play subscription not found")
+
+// VoidPlaySubscription records a voided Play purchase as expired, so it is no
+// longer active, and marks the user's subscription canceled under the provider
+// ownership rule. The user is left untouched when the purchase was superseded
+// or the user has another active Play purchase. It returns
+// ErrPlaySubscriptionNotFound for an unknown token and
+// ErrBillingProviderMismatch when another provider owns a paid subscription.
+func (db *DB) VoidPlaySubscription(ctx context.Context, purchaseToken string, grace time.Duration) (*User, error) {
+	var userID string
+	var blocked bool
+	err := db.conn.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var rows []PlaySubscription
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select(`"userId"`, `"superseded"`).
+			Where(`"purchaseToken" = ?`, purchaseToken).Limit(1).Find(&rows).Error
+		if err != nil {
+			return fmt.Errorf("failed to look up play subscription: %w", err)
+		}
+		if len(rows) == 0 {
+			return ErrPlaySubscriptionNotFound
+		}
+		row := rows[0]
+		userID = row.UserID
+
+		err = tx.Model(&models.PlaySubscription{}).Where(`"purchaseToken" = ?`, purchaseToken).
+			Updates(map[string]any{"state": playStateExpired, "autoRenewing": false, colUpdatedAt: time.Now().UTC()}).Error
+		if err != nil {
+			return fmt.Errorf("failed to record voided play subscription: %w", err)
+		}
+		if row.Superseded {
+			return nil
+		}
+
+		if err := lockUserRow(tx, row.UserID); err != nil {
+			return err
+		}
+		others, err := otherPlayAccess(tx, row.UserID, purchaseToken)
+		if err != nil {
+			return err
+		}
+		if others {
+			return nil
+		}
+
+		result := ownedBy(tx.Model(&User{}).Where("id = ?", row.UserID), BillingProviderPlay, grace).
+			Updates(map[string]any{
+				colSubscriptionStatus: "canceled",
+				colCancelAtPeriodEnd:  false,
+				colPastDueSince:       gorm.Expr("NULL"),
+			})
+		if result.Error != nil {
+			return fmt.Errorf("failed to cancel voided play subscription: %w", result.Error)
+		}
+		blocked = result.RowsAffected == 0
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if blocked {
+		return nil, ErrBillingProviderMismatch
+	}
+	return db.GetUser(ctx, userID)
+}

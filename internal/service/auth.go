@@ -5,8 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"go.icco.me/etu-backend/internal/billing"
 	"go.icco.me/etu-backend/internal/db"
 	pb "go.icco.me/etu-backend/proto"
+	"go.icco.me/gutil/logging"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,11 +21,18 @@ type AuthService struct {
 	db            *db.DB
 	loginLimits   *loginLimits
 	attemptLimits *attemptLimits
+	play          billing.PlayAPI
 }
 
 // NewAuthService creates a new AuthService
 func NewAuthService(database *db.DB) *AuthService {
 	return &AuthService{db: database, loginLimits: newLoginLimits(), attemptLimits: newAttemptLimits()}
+}
+
+// SetPlay configures the Google Play client used to cancel a lapsed Play
+// subscription when Stripe takes a user over.
+func (s *AuthService) SetPlay(p billing.PlayAPI) {
+	s.play = p
 }
 
 // Register creates a new user account
@@ -234,9 +243,21 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 		update.CurrentPeriodStart = &t
 	}
 
-	user, err := s.db.UpdateUserSubscription(ctx, req.UserId, update)
+	var user *db.User
+	var err error
+	if db.IsPaidStatus(req.SubscriptionStatus) {
+		user, err = s.db.UpdateUserSubscriptionCancelingPlay(ctx, req.UserId, update, s.cancelPlayForStripe)
+	} else {
+		user, err = s.db.UpdateUserSubscription(ctx, req.UserId, update)
+	}
+	if _, ok := status.FromError(err); ok && err != nil {
+		return nil, err
+	}
 	if errors.Is(err, db.ErrStripeCustomerMismatch) {
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	}
+	if errors.Is(err, db.ErrBillingProviderMismatch) {
+		return nil, status.Error(codes.FailedPrecondition, db.ErrBillingProviderMismatch.Error())
 	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user subscription: %v", err)
@@ -248,6 +269,19 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	return &pb.UpdateUserSubscriptionResponse{
 		User: userToProto(user),
 	}, nil
+}
+
+// cancelPlayForStripe cancels a user's Play subscriptions before a paid Stripe
+// write applies, so Play cannot recover and charge them again.
+func (s *AuthService) cancelPlayForStripe(ctx context.Context, subs []db.PlaySubscription) error {
+	if s.play == nil {
+		return status.Error(codes.Unavailable, "google play billing not configured; cannot cancel play subscription")
+	}
+	if err := cancelPlaySubscriptions(ctx, s.play, subs); err != nil {
+		logging.FromContext(ctx).Errorw("play cancellation before stripe takeover failed", "user_id", subs[0].UserID, "error", err)
+		return status.Errorf(codes.Unavailable, "failed to cancel play subscription: %v", err)
+	}
+	return nil
 }
 
 // UpdateUserStripeCustomer syncs Stripe customer profile fields
@@ -311,6 +345,9 @@ func userToProto(u *db.User) *pb.User {
 	}
 	if u.StripeSubscriptionID != nil {
 		pbUser.StripeSubscriptionId = u.StripeSubscriptionID
+	}
+	if u.BillingProvider != nil {
+		pbUser.BillingProvider = u.BillingProvider
 	}
 	if u.StripePriceID != nil {
 		pbUser.StripePriceId = u.StripePriceID
