@@ -117,7 +117,7 @@ func TestPlayGetSubscriptionParses(t *testing.T) {
 }
 
 func TestPlayGetSubscriptionMinimal(t *testing.T) {
-	p := newTestPlay(t, func(w http.ResponseWriter, r *http.Request) {
+	p := newTestPlay(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"subscriptionState":"SUBSCRIPTION_STATE_PENDING","acknowledgementState":"ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED"}`)
 	})
@@ -133,7 +133,7 @@ func TestPlayGetSubscriptionMinimal(t *testing.T) {
 }
 
 func TestPlayGetSubscriptionBadExpiry(t *testing.T) {
-	p := newTestPlay(t, func(w http.ResponseWriter, r *http.Request) {
+	p := newTestPlay(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"lineItems":[{"productId":"etu","expiryTime":"yesterday"}]}`)
 	})
@@ -152,7 +152,7 @@ func TestPlayNotFound(t *testing.T) {
 	for name, call := range calls {
 		for _, status := range []int{http.StatusNotFound, http.StatusGone} {
 			t.Run(name+"/"+http.StatusText(status), func(t *testing.T) {
-				p := newTestPlay(t, func(w http.ResponseWriter, r *http.Request) {
+				p := newTestPlay(t, func(w http.ResponseWriter, _ *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(status)
 					_, _ = io.WriteString(w, `{"error":{"code":`+strconv.Itoa(status)+`,"message":"gone"}}`)
@@ -166,7 +166,7 @@ func TestPlayNotFound(t *testing.T) {
 }
 
 func TestPlayGetSubscriptionServerError(t *testing.T) {
-	p := newTestPlay(t, func(w http.ResponseWriter, r *http.Request) {
+	p := newTestPlay(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	})
 
