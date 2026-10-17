@@ -113,7 +113,7 @@ func TestGRPCMetrics(t *testing.T) {
 		})
 	}
 	w := httptest.NewRecorder()
-	newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{})).ServeHTTP(w, httptest.NewRequestWithContext(ctx, http.MethodGet, "/metrics", nil))
+	newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}), http.NotFoundHandler()).ServeHTTP(w, httptest.NewRequestWithContext(ctx, http.MethodGet, "/metrics", nil))
 	if w.Code != http.StatusOK {
 		t.Fatalf("scrape status %d", w.Code)
 	}

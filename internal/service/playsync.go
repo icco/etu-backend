@@ -185,3 +185,31 @@ func cancelPlaySubscriptions(ctx context.Context, play billing.PlayAPI, subs []d
 	}
 	return nil
 }
+
+// HandleNotification applies a Google Play real-time notification for token.
+// A voided purchase forces its user to canceled without consulting Play. Errors
+// that retrying cannot fix wrap billing.ErrRTDNPermanent.
+func (p *PlaySync) HandleNotification(ctx context.Context, token string, voided bool) error {
+	if voided {
+		return p.voidPurchase(ctx, token)
+	}
+	_, err := p.Sync(ctx, token, "")
+	for _, permanent := range []error{billing.ErrPlayPurchaseNotFound, ErrPlayUnmatched, ErrPlayAccountMismatch, ErrPlayWrongProduct, ErrPlayTestPurchase} {
+		if errors.Is(err, permanent) {
+			return fmt.Errorf("%w: %w", billing.ErrRTDNPermanent, err)
+		}
+	}
+	return err
+}
+
+func (p *PlaySync) voidPurchase(ctx context.Context, token string) error {
+	_, err := p.DB.VoidPlaySubscription(ctx, token, p.Grace)
+	switch {
+	case errors.Is(err, db.ErrPlaySubscriptionNotFound):
+		return fmt.Errorf("%w: %w", billing.ErrRTDNPermanent, err)
+	case errors.Is(err, db.ErrBillingProviderMismatch):
+		logging.FromContext(ctx).Infow("voided play purchase left the user untouched; stripe owns the subscription")
+		return nil
+	}
+	return err
+}

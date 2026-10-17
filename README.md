@@ -39,6 +39,10 @@ A gRPC-based notes and tags management API written in Go. This service provides 
 - `AI_DAILY_LIMIT` - Max AI operations per user per UTC day in `taggen` (default: `200`). AI only runs for users with `ai_enabled` and a subscription status of `active`, `trial`, `trialing`, `pro`, `premium`, or `past_due`
 - `GCS_BUCKET` - Google Cloud Storage bucket name (for image and audio file access)
 - `STRIPE_SECRET_KEY` - Stripe secret key; account deletion cancels Stripe subscriptions and refuses Stripe-linked users when unset
+- `PLAY_PACKAGE_NAME` - Android package name for Google Play billing (`com.timeclimbers.etu`); Play billing and the `/billing/play/rtdn` endpoint are disabled when unset. Auth is Application Default Credentials
+- `PLAY_RTDN_AUDIENCE` - Audience of the Pub/Sub push token sent to `/billing/play/rtdn` (required with `PLAY_PACKAGE_NAME`)
+- `PLAY_RTDN_SERVICE_ACCOUNT` - Service account email the Pub/Sub push subscription authenticates as (required with `PLAY_PACKAGE_NAME`)
+- `PLAY_ALLOW_TEST_PURCHASES` - Accept Google Play license-tester purchases (default: `false`)
 - `GCP_SECRET_NAME` - GCP Secret Manager secret name for encryption key (required for encryption, format: `projects/PROJECT_ID/secrets/SECRET_NAME/versions/VERSION`)
 
 **Run locally:**

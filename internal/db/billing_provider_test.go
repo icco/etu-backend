@@ -355,3 +355,64 @@ func TestLapsedPlayOwner(t *testing.T) {
 		})
 	}
 }
+
+func TestVoidPlaySubscription(t *testing.T) {
+	const voidQ = `UPDATE "User" SET "cancelAtPeriodEnd"=\$1,"pastDueSince"=NULL,"subscriptionStatus"=\$2,"updatedAt"=\$3 `
+	tests := []struct {
+		name       string
+		rows       *sqlmock.Rows
+		updateRows int64
+		wantUpdate bool
+		wantUser   bool
+		wantErr    error
+	}{
+		{
+			name:       "cancels the owner",
+			rows:       sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(playUserID, false),
+			updateRows: 1, wantUpdate: true, wantUser: true,
+		},
+		{
+			name:    "unknown token",
+			rows:    sqlmock.NewRows([]string{"userId", "superseded"}),
+			wantErr: ErrPlaySubscriptionNotFound,
+		},
+		{
+			name:     "superseded token leaves the user alone",
+			rows:     sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(playUserID, true),
+			wantUser: true,
+		},
+		{
+			name:       "other provider owns a paid subscription",
+			rows:       sqlmock.NewRows([]string{"userId", "superseded"}).AddRow(playUserID, false),
+			updateRows: 0, wantUpdate: true, wantErr: ErrBillingProviderMismatch,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, mock := newPlayTestDB(t)
+			mock.ExpectQuery(`SELECT "userId","superseded" FROM "PlaySubscription" WHERE "purchaseToken" = \$1`).WithArgs(playToken, 1).WillReturnRows(tt.rows)
+			if tt.wantUpdate {
+				mock.ExpectBegin()
+				mock.ExpectExec(voidQ+ownedWhere).
+					WithArgs(false, "canceled", sqlmock.AnyArg(), playUserID, "play",
+						"active", "trial", "trialing", "pro", "premium", float64(3600)).
+					WillReturnResult(sqlmock.NewResult(0, tt.updateRows))
+				mock.ExpectCommit()
+			}
+			if tt.wantUser {
+				mock.ExpectQuery(userSelectQ).WillReturnRows(playUserRow())
+			}
+
+			user, err := d.VoidPlaySubscription(context.Background(), playToken, time.Hour)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("err = %v, want %v", err, tt.wantErr)
+			}
+			if (user != nil) != tt.wantUser {
+				t.Errorf("user = %+v, want user: %v", user, tt.wantUser)
+			}
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("unfulfilled mock expectations: %v", err)
+			}
+		})
+	}
+}

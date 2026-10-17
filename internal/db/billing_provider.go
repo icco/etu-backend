@@ -222,3 +222,39 @@ func (db *DB) LapsedPlayOwner(ctx context.Context, userID string) (bool, error) 
 	}
 	return n > 0, nil
 }
+
+// ErrPlaySubscriptionNotFound is returned when no Play purchase is recorded for a token.
+var ErrPlaySubscriptionNotFound = errors.New("play subscription not found")
+
+// VoidPlaySubscription marks the user who owns a voided Play purchase's
+// subscription canceled, under the provider ownership rule. A purchase
+// superseded by a newer one leaves the user untouched. It returns
+// ErrPlaySubscriptionNotFound for an unknown token and
+// ErrBillingProviderMismatch when another provider owns a paid subscription.
+func (db *DB) VoidPlaySubscription(ctx context.Context, purchaseToken string, grace time.Duration) (*User, error) {
+	var rows []PlaySubscription
+	err := db.conn.WithContext(ctx).Select(`"userId"`, `"superseded"`).
+		Where(`"purchaseToken" = ?`, purchaseToken).Limit(1).Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up play subscription: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, ErrPlaySubscriptionNotFound
+	}
+	row := rows[0]
+	if !row.Superseded {
+		result := ownedBy(db.conn.WithContext(ctx).Model(&User{}).Where("id = ?", row.UserID), BillingProviderPlay, grace).
+			Updates(map[string]any{
+				colSubscriptionStatus: "canceled",
+				colCancelAtPeriodEnd:  false,
+				colPastDueSince:       gorm.Expr("NULL"),
+			})
+		if result.Error != nil {
+			return nil, fmt.Errorf("failed to cancel voided play subscription: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return nil, ErrBillingProviderMismatch
+		}
+	}
+	return db.GetUser(ctx, row.UserID)
+}
