@@ -69,9 +69,6 @@ func run(log *zap.SugaredLogger) error {
 
 	log.Infow("starting etu-backend server", "commit", CommitSHA, "grpc_port", grpcPort, "http_port", httpPort)
 
-	// OpenTelemetry meter provider exporting to Prometheus. Only HTTP is
-	// instrumented today; the /metrics endpoint is mounted on the health
-	// HTTP server below.
 	registry := prometheus.NewRegistry()
 	exporter, err := otelprom.New(otelprom.WithRegisterer(registry))
 	if err != nil {
@@ -159,13 +156,10 @@ func run(log *zap.SugaredLogger) error {
 	}
 	log.Infow("paywall configured", "grace_period", paywall.Grace.String())
 
-	unaryAuth := authInterceptor(authenticator, m2mConfig, log)
-	recoverUnary, recoverStream := recoveryInterceptors(log)
-	server := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(recoverUnary, unaryAuth, paywallInterceptor(authenticator, paywall)),
-		grpc.ChainStreamInterceptor(recoverStream, streamAuthInterceptor(unaryAuth), paywallStreamInterceptor(authenticator, paywall)),
-		grpc.MaxRecvMsgSize(maxRecvMsgSize),
-	)
+	server, err := newGRPCServer(registry, authenticator, m2mConfig, paywall, log)
+	if err != nil {
+		return err
+	}
 
 	notesService := service.NewNotesService(database, storageClient, aiClient, imgixDomain)
 	tagsService := service.NewTagsService(database)

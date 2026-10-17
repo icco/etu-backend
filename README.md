@@ -69,6 +69,10 @@ Search is performed via `ListNotes` with the `search` field (case-insensitive su
 
 See [`proto/etu.proto`](proto/etu.proto) for full definitions.
 
+Invalid attachments are rejected with `InvalidArgument` before anything is saved. If an upload fails after the note is saved, `CreateNote` and `UpdateNote` return `Internal` with a `google.rpc.ErrorInfo` detail (reason `ATTACHMENT_UPLOAD_FAILED`, metadata `note_id`, `attachment_type`, `attachment_index`). The note and earlier attachments are kept, so clients should retry by updating that note instead of creating it again.
+
+**Metrics:** `GET :8080/metrics` serves Prometheus metrics, including `grpc_server_handled_total` and `grpc_server_handling_seconds` from [go-grpc-middleware](https://github.com/grpc-ecosystem/go-grpc-middleware/tree/main/providers/prometheus).
+
 ## Machine-to-Machine (M2M) Authentication
 
 For server-to-server authentication (e.g., between `etu-web` and `etu-backend`), use M2M tokens passed via the `authorization` metadata header.
