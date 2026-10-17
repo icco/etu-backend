@@ -34,19 +34,22 @@ const (
 type NotesService struct {
 	pb.UnimplementedNotesServiceServer
 	db          *db.DB
-	storage     *storage.Client
+	storage     noteStorage
 	aiClient    *ai.Client
 	imgixDomain string
 }
 
 // NewNotesService creates a new NotesService
 func NewNotesService(database *db.DB, storageClient *storage.Client, aiClient *ai.Client, imgixDomain string) *NotesService {
-	return &NotesService{
+	svc := &NotesService{
 		db:          database,
-		storage:     storageClient,
 		aiClient:    aiClient,
 		imgixDomain: imgixDomain,
 	}
+	if storageClient != nil {
+		svc.storage = storageClient
+	}
+	return svc
 }
 
 // ListNotes retrieves notes for a user with optional filtering
@@ -119,14 +122,11 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 	if req.UserId == "" {
 		return nil, status.Error(codes.InvalidArgument, "user_id is required")
 	}
-	if err := checkAttachmentCounts(len(req.Images), len(req.Audios)); err != nil {
-		return nil, err
-	}
 	if req.Content == "" && len(req.Images) == 0 && len(req.Audios) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "at least one of content, images, or audio files is required")
 	}
-	if req.Content == "" && (len(req.Images) > 0 || len(req.Audios) > 0) && s.storage == nil {
-		return nil, status.Error(codes.FailedPrecondition, "storage is not configured")
+	if err := s.validateAttachments(req.Images, req.Audios); err != nil {
+		return nil, err
 	}
 
 	// Verify authorization
@@ -142,50 +142,8 @@ func (s *NotesService) CreateNote(ctx context.Context, req *pb.CreateNoteRequest
 		return nil, status.Errorf(codes.Internal, "failed to create note: %v", err)
 	}
 
-	l := logging.FromContext(ctx)
-
-	if len(req.Images) > 0 && s.storage != nil {
-		for i, img := range req.Images {
-			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
-			if err != nil {
-				l.Errorw("failed to process image", "note_id", note.ID, "image_index", i, zap.Error(err))
-				continue
-			}
-
-			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
-				l.Errorw("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, zap.Error(err))
-				if s.storage != nil {
-					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
-						l.Errorw("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, zap.Error(deleteErr))
-					}
-				}
-				continue
-			}
-
-			note.Images = append(note.Images, *noteImage)
-		}
-	}
-
-	if len(req.Audios) > 0 && s.storage != nil {
-		for i, aud := range req.Audios {
-			noteAudio, err := s.processAndUploadAudio(ctx, note.ID, aud.Data, aud.MimeType)
-			if err != nil {
-				l.Errorw("failed to process audio", "note_id", note.ID, "audio_index", i, zap.Error(err))
-				continue
-			}
-
-			if err := s.db.AddAudioToNote(ctx, note.ID, noteAudio); err != nil {
-				l.Errorw("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, zap.Error(err))
-				if s.storage != nil {
-					if deleteErr := s.storage.DeleteImage(ctx, noteAudio.GCSObjectName); deleteErr != nil {
-						l.Errorw("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, zap.Error(deleteErr))
-					}
-				}
-				continue
-			}
-
-			note.Audios = append(note.Audios, *noteAudio)
-		}
+	if err := s.saveAttachments(ctx, note, req.Images, req.Audios); err != nil {
+		return nil, err
 	}
 
 	return &pb.CreateNoteResponse{
@@ -322,7 +280,7 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "id is required")
 	}
-	if err := checkAttachmentCounts(len(req.AddImages), len(req.AddAudios)); err != nil {
+	if err := s.validateAttachments(req.AddImages, req.AddAudios); err != nil {
 		return nil, err
 	}
 
@@ -347,46 +305,8 @@ func (s *NotesService) UpdateNote(ctx context.Context, req *pb.UpdateNoteRequest
 		return nil, status.Error(codes.NotFound, "note not found")
 	}
 
-	l := logging.FromContext(ctx)
-
-	if len(req.AddImages) > 0 && s.storage != nil {
-		for i, img := range req.AddImages {
-			noteImage, err := s.processAndUploadImage(ctx, note.ID, img.Data, img.MimeType)
-			if err != nil {
-				l.Errorw("failed to process image", "note_id", note.ID, "image_index", i, zap.Error(err))
-				continue
-			}
-
-			if err := s.db.AddImageToNote(ctx, note.ID, noteImage); err != nil {
-				l.Errorw("failed to save image to database", "note_id", note.ID, "image_id", noteImage.ID, zap.Error(err))
-				if s.storage != nil {
-					if deleteErr := s.storage.DeleteImage(ctx, noteImage.GCSObjectName); deleteErr != nil {
-						l.Errorw("failed to clean up image from GCS after DB error", "object_name", noteImage.GCSObjectName, zap.Error(deleteErr))
-					}
-				}
-				continue
-			}
-		}
-	}
-
-	if len(req.AddAudios) > 0 && s.storage != nil {
-		for i, aud := range req.AddAudios {
-			noteAudio, err := s.processAndUploadAudio(ctx, note.ID, aud.Data, aud.MimeType)
-			if err != nil {
-				l.Errorw("failed to process audio", "note_id", note.ID, "audio_index", i, zap.Error(err))
-				continue
-			}
-
-			if err := s.db.AddAudioToNote(ctx, note.ID, noteAudio); err != nil {
-				l.Errorw("failed to save audio to database", "note_id", note.ID, "audio_id", noteAudio.ID, zap.Error(err))
-				if s.storage != nil {
-					if deleteErr := s.storage.DeleteImage(ctx, noteAudio.GCSObjectName); deleteErr != nil {
-						l.Errorw("failed to clean up audio from GCS after DB error", "object_name", noteAudio.GCSObjectName, zap.Error(deleteErr))
-					}
-				}
-				continue
-			}
-		}
+	if err := s.saveAttachments(ctx, note, req.AddImages, req.AddAudios); err != nil {
+		return nil, err
 	}
 
 	// Reload note to get updated images and audios
