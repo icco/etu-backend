@@ -15,7 +15,7 @@ CREATE TABLE "PlaySubscription" (
   "createdAt" timestamptz NOT NULL,
   "updatedAt" timestamptz NOT NULL,
   PRIMARY KEY ("purchaseToken"),
-  CONSTRAINT "fk_PlaySubscription_User" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
+  CONSTRAINT "fk_PlaySubscription_user" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON UPDATE NO ACTION ON DELETE CASCADE
 );
 -- Create index "idx_PlaySubscription_user_id" to table: "PlaySubscription"
 CREATE INDEX "idx_PlaySubscription_user_id" ON "PlaySubscription" ("userId");
