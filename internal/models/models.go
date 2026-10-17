@@ -117,6 +117,8 @@ type User struct {
 
 	AIEnabled    bool       `gorm:"column:aiEnabled;not null;default:false"`
 	PastDueSince *time.Time `gorm:"column:pastDueSince"`
+
+	BillingProvider *string `gorm:"column:billingProvider"`
 }
 
 // TableName specifies the table name for User
@@ -248,4 +250,26 @@ type AIUsage struct {
 // TableName specifies the table name for AIUsage
 func (AIUsage) TableName() string {
 	return "AIUsage"
+}
+
+// PlaySubscription records one Google Play subscription purchase token for a user.
+type PlaySubscription struct {
+	PurchaseToken       string     `gorm:"column:purchaseToken;primaryKey"`
+	UserID              string     `gorm:"column:userId;not null;index"`
+	User                *User      `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+	ProductID           string     `gorm:"column:productId;not null"`
+	BasePlanID          string     `gorm:"column:basePlanId;not null"`
+	State               string     `gorm:"column:state;not null"`
+	ExpiryTime          *time.Time `gorm:"column:expiryTime"`
+	AutoRenewing        bool       `gorm:"column:autoRenewing;not null;default:false"`
+	Acknowledged        bool       `gorm:"column:acknowledged;not null;default:false"`
+	Superseded          bool       `gorm:"column:superseded;not null;default:false"`
+	LinkedPurchaseToken *string    `gorm:"column:linkedPurchaseToken"`
+	CreatedAt           time.Time  `gorm:"column:createdAt;not null"`
+	UpdatedAt           time.Time  `gorm:"column:updatedAt;not null"`
+}
+
+// TableName specifies the table name for PlaySubscription
+func (PlaySubscription) TableName() string {
+	return "PlaySubscription"
 }

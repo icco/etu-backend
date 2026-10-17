@@ -133,6 +133,7 @@ func (db *DB) AutoMigrate() error {
 		&models.AccountDeletionCleanup{},
 		&models.AIUsage{},
 		&models.StripeEvent{},
+		&models.PlaySubscription{},
 	); err != nil {
 		return err
 	}

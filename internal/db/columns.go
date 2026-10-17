@@ -36,6 +36,7 @@ const (
 	colPastDueSince         = "pastDueSince"
 	colNoteID               = "noteId"
 	colURL                  = "url"
+	colBillingProvider      = "billingProvider"
 
 	tagWork  = "work"
 	tagValid = "valid"

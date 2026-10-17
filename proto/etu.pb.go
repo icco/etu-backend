@@ -593,9 +593,12 @@ type User struct {
 	HasNotionKey bool `protobuf:"varint,25,opt,name=has_notion_key,json=hasNotionKey,proto3" json:"has_notion_key,omitempty"`
 	// ai_enabled reports whether the user opted in to AI processing such as
 	// tag generation, OCR, and audio transcription. Defaults to false.
-	AiEnabled     bool `protobuf:"varint,26,opt,name=ai_enabled,json=aiEnabled,proto3" json:"ai_enabled,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	AiEnabled bool `protobuf:"varint,26,opt,name=ai_enabled,json=aiEnabled,proto3" json:"ai_enabled,omitempty"`
+	// billing_provider names the billing system that owns the user's subscription,
+	// such as "stripe" or "play". It is unset for users that have never subscribed.
+	BillingProvider *string `protobuf:"bytes,27,opt,name=billing_provider,json=billingProvider,proto3,oneof" json:"billing_provider,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -801,6 +804,13 @@ func (x *User) GetAiEnabled() bool {
 		return x.AiEnabled
 	}
 	return false
+}
+
+func (x *User) GetBillingProvider() string {
+	if x != nil && x.BillingProvider != nil {
+		return *x.BillingProvider
+	}
+	return ""
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -3577,6 +3587,108 @@ func (*ExportDataResponse_Note) isExportDataResponse_Item() {}
 
 func (*ExportDataResponse_ProfileImageUrl) isExportDataResponse_Item() {}
 
+// VerifyPlayPurchaseRequest submits a Google Play subscription purchase for
+// verification.
+type VerifyPlayPurchaseRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// purchase_token is the token returned by Google Play Billing for the purchase.
+	PurchaseToken string `protobuf:"bytes,1,opt,name=purchase_token,json=purchaseToken,proto3" json:"purchase_token,omitempty"`
+	// product_id is the Google Play subscription product id that was purchased.
+	ProductId     string `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyPlayPurchaseRequest) Reset() {
+	*x = VerifyPlayPurchaseRequest{}
+	mi := &file_proto_etu_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyPlayPurchaseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyPlayPurchaseRequest) ProtoMessage() {}
+
+func (x *VerifyPlayPurchaseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyPlayPurchaseRequest.ProtoReflect.Descriptor instead.
+func (*VerifyPlayPurchaseRequest) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *VerifyPlayPurchaseRequest) GetPurchaseToken() string {
+	if x != nil {
+		return x.PurchaseToken
+	}
+	return ""
+}
+
+func (x *VerifyPlayPurchaseRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+// VerifyPlayPurchaseResponse returns the user after the purchase is applied.
+type VerifyPlayPurchaseResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// user is the caller's account with its updated subscription state.
+	User          *User `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyPlayPurchaseResponse) Reset() {
+	*x = VerifyPlayPurchaseResponse{}
+	mi := &file_proto_etu_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyPlayPurchaseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyPlayPurchaseResponse) ProtoMessage() {}
+
+func (x *VerifyPlayPurchaseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_etu_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyPlayPurchaseResponse.ProtoReflect.Descriptor instead.
+func (*VerifyPlayPurchaseResponse) Descriptor() ([]byte, []int) {
+	return file_proto_etu_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *VerifyPlayPurchaseResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
 var File_proto_etu_proto protoreflect.FileDescriptor
 
 const file_proto_etu_proto_rawDesc = "" +
@@ -3617,7 +3729,7 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x03 \x01(\x05R\x05count\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xb6\v\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xfb\v\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12\x17\n" +
@@ -3648,7 +3760,8 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x0fbilling_country\x18\x18 \x01(\tH\x0fR\x0ebillingCountry\x88\x01\x01\x12$\n" +
 	"\x0ehas_notion_key\x18\x19 \x01(\bR\fhasNotionKey\x12\x1d\n" +
 	"\n" +
-	"ai_enabled\x18\x1a \x01(\bR\taiEnabledB\a\n" +
+	"ai_enabled\x18\x1a \x01(\bR\taiEnabled\x12.\n" +
+	"\x10billing_provider\x18\x1b \x01(\tH\x10R\x0fbillingProvider\x88\x01\x01B\a\n" +
 	"\x05_nameB\b\n" +
 	"\x06_imageB\x13\n" +
 	"\x11_subscription_endB\x15\n" +
@@ -3664,7 +3777,8 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\r_billing_cityB\x10\n" +
 	"\x0e_billing_stateB\x16\n" +
 	"\x14_billing_postal_codeB\x12\n" +
-	"\x10_billing_countryJ\x04\b\n" +
+	"\x10_billing_countryB\x13\n" +
+	"\x11_billing_providerJ\x04\b\n" +
 	"\x10\v\"\xd2\x01\n" +
 	"\x06ApiKey\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -3868,7 +3982,13 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x03tag\x18\x02 \x01(\v2\b.etu.TagH\x00R\x03tag\x12\x1f\n" +
 	"\x04note\x18\x03 \x01(\v2\t.etu.NoteH\x00R\x04note\x12,\n" +
 	"\x11profile_image_url\x18\x04 \x01(\tH\x00R\x0fprofileImageUrlB\x06\n" +
-	"\x04item*|\n" +
+	"\x04item\"a\n" +
+	"\x19VerifyPlayPurchaseRequest\x12%\n" +
+	"\x0epurchase_token\x18\x01 \x01(\tR\rpurchaseToken\x12\x1d\n" +
+	"\n" +
+	"product_id\x18\x02 \x01(\tR\tproductId\";\n" +
+	"\x1aVerifyPlayPurchaseResponse\x12\x1d\n" +
+	"\x04user\x18\x01 \x01(\v2\t.etu.UserR\x04user*|\n" +
 	"\x0eDisabledReason\x12\x0f\n" +
 	"\vUNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fTERMS_VIOLATION\x10\x01\x12\x14\n" +
@@ -3910,7 +4030,9 @@ const file_proto_etu_proto_rawDesc = "" +
 	"\x0eAccountService\x12F\n" +
 	"\rDeleteAccount\x12\x19.etu.DeleteAccountRequest\x1a\x1a.etu.DeleteAccountResponse\x12?\n" +
 	"\n" +
-	"ExportData\x12\x16.etu.ExportDataRequest\x1a\x17.etu.ExportDataResponse0\x01B\x1eZ\x1cgo.icco.me/etu-backend/protob\x06proto3"
+	"ExportData\x12\x16.etu.ExportDataRequest\x1a\x17.etu.ExportDataResponse0\x012g\n" +
+	"\x0eBillingService\x12U\n" +
+	"\x12VerifyPlayPurchase\x12\x1e.etu.VerifyPlayPurchaseRequest\x1a\x1f.etu.VerifyPlayPurchaseResponseB\x1eZ\x1cgo.icco.me/etu-backend/protob\x06proto3"
 
 var (
 	file_proto_etu_proto_rawDescOnce sync.Once
@@ -3925,7 +4047,7 @@ func file_proto_etu_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_etu_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 54)
+var file_proto_etu_proto_msgTypes = make([]protoimpl.MessageInfo, 56)
 var file_proto_etu_proto_goTypes = []any{
 	(DisabledReason)(0),                       // 0: etu.DisabledReason
 	(*ImageUpload)(nil),                       // 1: etu.ImageUpload
@@ -3982,23 +4104,25 @@ var file_proto_etu_proto_goTypes = []any{
 	(*DeleteAccountResponse)(nil),             // 52: etu.DeleteAccountResponse
 	(*ExportDataRequest)(nil),                 // 53: etu.ExportDataRequest
 	(*ExportDataResponse)(nil),                // 54: etu.ExportDataResponse
-	(*timestamppb.Timestamp)(nil),             // 55: google.protobuf.Timestamp
+	(*VerifyPlayPurchaseRequest)(nil),         // 55: etu.VerifyPlayPurchaseRequest
+	(*VerifyPlayPurchaseResponse)(nil),        // 56: etu.VerifyPlayPurchaseResponse
+	(*timestamppb.Timestamp)(nil),             // 57: google.protobuf.Timestamp
 }
 var file_proto_etu_proto_depIdxs = []int32{
-	55, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
-	55, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
-	55, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
-	55, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
+	57, // 0: etu.NoteImage.created_at:type_name -> google.protobuf.Timestamp
+	57, // 1: etu.NoteAudio.created_at:type_name -> google.protobuf.Timestamp
+	57, // 2: etu.Note.created_at:type_name -> google.protobuf.Timestamp
+	57, // 3: etu.Note.updated_at:type_name -> google.protobuf.Timestamp
 	3,  // 4: etu.Note.images:type_name -> etu.NoteImage
 	4,  // 5: etu.Note.audios:type_name -> etu.NoteAudio
-	55, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
-	55, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
-	55, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
-	55, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
+	57, // 6: etu.Tag.created_at:type_name -> google.protobuf.Timestamp
+	57, // 7: etu.User.subscription_end:type_name -> google.protobuf.Timestamp
+	57, // 8: etu.User.created_at:type_name -> google.protobuf.Timestamp
+	57, // 9: etu.User.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 10: etu.User.disabled_reason:type_name -> etu.DisabledReason
-	55, // 11: etu.User.current_period_start:type_name -> google.protobuf.Timestamp
-	55, // 12: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
-	55, // 13: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
+	57, // 11: etu.User.current_period_start:type_name -> google.protobuf.Timestamp
+	57, // 12: etu.ApiKey.created_at:type_name -> google.protobuf.Timestamp
+	57, // 13: etu.ApiKey.last_used:type_name -> google.protobuf.Timestamp
 	5,  // 14: etu.ListNotesResponse.notes:type_name -> etu.Note
 	1,  // 15: etu.CreateNoteRequest.images:type_name -> etu.ImageUpload
 	2,  // 16: etu.CreateNoteRequest.audios:type_name -> etu.AudioUpload
@@ -4013,8 +4137,8 @@ var file_proto_etu_proto_depIdxs = []int32{
 	7,  // 25: etu.AuthenticateResponse.user:type_name -> etu.User
 	7,  // 26: etu.GetUserResponse.user:type_name -> etu.User
 	7,  // 27: etu.GetUserByStripeCustomerIdResponse.user:type_name -> etu.User
-	55, // 28: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
-	55, // 29: etu.UpdateUserSubscriptionRequest.current_period_start:type_name -> google.protobuf.Timestamp
+	57, // 28: etu.UpdateUserSubscriptionRequest.subscription_end:type_name -> google.protobuf.Timestamp
+	57, // 29: etu.UpdateUserSubscriptionRequest.current_period_start:type_name -> google.protobuf.Timestamp
 	7,  // 30: etu.UpdateUserSubscriptionResponse.user:type_name -> etu.User
 	7,  // 31: etu.UpdateUserStripeCustomerResponse.user:type_name -> etu.User
 	8,  // 32: etu.CreateApiKeyResponse.api_key:type_name -> etu.ApiKey
@@ -4025,59 +4149,62 @@ var file_proto_etu_proto_depIdxs = []int32{
 	7,  // 37: etu.ExportDataResponse.user:type_name -> etu.User
 	6,  // 38: etu.ExportDataResponse.tag:type_name -> etu.Tag
 	5,  // 39: etu.ExportDataResponse.note:type_name -> etu.Note
-	9,  // 40: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
-	11, // 41: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
-	13, // 42: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
-	15, // 43: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
-	17, // 44: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
-	19, // 45: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
-	21, // 46: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
-	23, // 47: etu.AuthService.Register:input_type -> etu.RegisterRequest
-	25, // 48: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
-	25, // 49: etu.AuthService.Login:input_type -> etu.AuthenticateRequest
-	27, // 50: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
-	29, // 51: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
-	31, // 52: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
-	33, // 53: etu.AuthService.UpdateUserStripeCustomer:input_type -> etu.UpdateUserStripeCustomerRequest
-	35, // 54: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
-	37, // 55: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
-	39, // 56: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
-	41, // 57: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
-	43, // 58: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
-	45, // 59: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
-	49, // 60: etu.UserSettingsService.GetProfileImageURL:input_type -> etu.GetProfileImageURLRequest
-	47, // 61: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
-	51, // 62: etu.AccountService.DeleteAccount:input_type -> etu.DeleteAccountRequest
-	53, // 63: etu.AccountService.ExportData:input_type -> etu.ExportDataRequest
-	10, // 64: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
-	12, // 65: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
-	14, // 66: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
-	16, // 67: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
-	18, // 68: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
-	20, // 69: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
-	22, // 70: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
-	24, // 71: etu.AuthService.Register:output_type -> etu.RegisterResponse
-	26, // 72: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
-	36, // 73: etu.AuthService.Login:output_type -> etu.CreateApiKeyResponse
-	28, // 74: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
-	30, // 75: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
-	32, // 76: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
-	34, // 77: etu.AuthService.UpdateUserStripeCustomer:output_type -> etu.UpdateUserStripeCustomerResponse
-	36, // 78: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
-	38, // 79: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
-	40, // 80: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
-	42, // 81: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
-	44, // 82: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
-	46, // 83: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
-	50, // 84: etu.UserSettingsService.GetProfileImageURL:output_type -> etu.GetProfileImageURLResponse
-	48, // 85: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
-	52, // 86: etu.AccountService.DeleteAccount:output_type -> etu.DeleteAccountResponse
-	54, // 87: etu.AccountService.ExportData:output_type -> etu.ExportDataResponse
-	64, // [64:88] is the sub-list for method output_type
-	40, // [40:64] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	7,  // 40: etu.VerifyPlayPurchaseResponse.user:type_name -> etu.User
+	9,  // 41: etu.NotesService.ListNotes:input_type -> etu.ListNotesRequest
+	11, // 42: etu.NotesService.CreateNote:input_type -> etu.CreateNoteRequest
+	13, // 43: etu.NotesService.GetNote:input_type -> etu.GetNoteRequest
+	15, // 44: etu.NotesService.UpdateNote:input_type -> etu.UpdateNoteRequest
+	17, // 45: etu.NotesService.DeleteNote:input_type -> etu.DeleteNoteRequest
+	19, // 46: etu.NotesService.GetRandomNotes:input_type -> etu.GetRandomNotesRequest
+	21, // 47: etu.TagsService.ListTags:input_type -> etu.ListTagsRequest
+	23, // 48: etu.AuthService.Register:input_type -> etu.RegisterRequest
+	25, // 49: etu.AuthService.Authenticate:input_type -> etu.AuthenticateRequest
+	25, // 50: etu.AuthService.Login:input_type -> etu.AuthenticateRequest
+	27, // 51: etu.AuthService.GetUser:input_type -> etu.GetUserRequest
+	29, // 52: etu.AuthService.GetUserByStripeCustomerId:input_type -> etu.GetUserByStripeCustomerIdRequest
+	31, // 53: etu.AuthService.UpdateUserSubscription:input_type -> etu.UpdateUserSubscriptionRequest
+	33, // 54: etu.AuthService.UpdateUserStripeCustomer:input_type -> etu.UpdateUserStripeCustomerRequest
+	35, // 55: etu.ApiKeysService.CreateApiKey:input_type -> etu.CreateApiKeyRequest
+	37, // 56: etu.ApiKeysService.ListApiKeys:input_type -> etu.ListApiKeysRequest
+	39, // 57: etu.ApiKeysService.DeleteApiKey:input_type -> etu.DeleteApiKeyRequest
+	41, // 58: etu.ApiKeysService.VerifyApiKey:input_type -> etu.VerifyApiKeyRequest
+	43, // 59: etu.UserSettingsService.GetUserSettings:input_type -> etu.GetUserSettingsRequest
+	45, // 60: etu.UserSettingsService.UpdateUserSettings:input_type -> etu.UpdateUserSettingsRequest
+	49, // 61: etu.UserSettingsService.GetProfileImageURL:input_type -> etu.GetProfileImageURLRequest
+	47, // 62: etu.StatsService.GetStats:input_type -> etu.GetStatsRequest
+	51, // 63: etu.AccountService.DeleteAccount:input_type -> etu.DeleteAccountRequest
+	53, // 64: etu.AccountService.ExportData:input_type -> etu.ExportDataRequest
+	55, // 65: etu.BillingService.VerifyPlayPurchase:input_type -> etu.VerifyPlayPurchaseRequest
+	10, // 66: etu.NotesService.ListNotes:output_type -> etu.ListNotesResponse
+	12, // 67: etu.NotesService.CreateNote:output_type -> etu.CreateNoteResponse
+	14, // 68: etu.NotesService.GetNote:output_type -> etu.GetNoteResponse
+	16, // 69: etu.NotesService.UpdateNote:output_type -> etu.UpdateNoteResponse
+	18, // 70: etu.NotesService.DeleteNote:output_type -> etu.DeleteNoteResponse
+	20, // 71: etu.NotesService.GetRandomNotes:output_type -> etu.GetRandomNotesResponse
+	22, // 72: etu.TagsService.ListTags:output_type -> etu.ListTagsResponse
+	24, // 73: etu.AuthService.Register:output_type -> etu.RegisterResponse
+	26, // 74: etu.AuthService.Authenticate:output_type -> etu.AuthenticateResponse
+	36, // 75: etu.AuthService.Login:output_type -> etu.CreateApiKeyResponse
+	28, // 76: etu.AuthService.GetUser:output_type -> etu.GetUserResponse
+	30, // 77: etu.AuthService.GetUserByStripeCustomerId:output_type -> etu.GetUserByStripeCustomerIdResponse
+	32, // 78: etu.AuthService.UpdateUserSubscription:output_type -> etu.UpdateUserSubscriptionResponse
+	34, // 79: etu.AuthService.UpdateUserStripeCustomer:output_type -> etu.UpdateUserStripeCustomerResponse
+	36, // 80: etu.ApiKeysService.CreateApiKey:output_type -> etu.CreateApiKeyResponse
+	38, // 81: etu.ApiKeysService.ListApiKeys:output_type -> etu.ListApiKeysResponse
+	40, // 82: etu.ApiKeysService.DeleteApiKey:output_type -> etu.DeleteApiKeyResponse
+	42, // 83: etu.ApiKeysService.VerifyApiKey:output_type -> etu.VerifyApiKeyResponse
+	44, // 84: etu.UserSettingsService.GetUserSettings:output_type -> etu.GetUserSettingsResponse
+	46, // 85: etu.UserSettingsService.UpdateUserSettings:output_type -> etu.UpdateUserSettingsResponse
+	50, // 86: etu.UserSettingsService.GetProfileImageURL:output_type -> etu.GetProfileImageURLResponse
+	48, // 87: etu.StatsService.GetStats:output_type -> etu.GetStatsResponse
+	52, // 88: etu.AccountService.DeleteAccount:output_type -> etu.DeleteAccountResponse
+	54, // 89: etu.AccountService.ExportData:output_type -> etu.ExportDataResponse
+	56, // 90: etu.BillingService.VerifyPlayPurchase:output_type -> etu.VerifyPlayPurchaseResponse
+	66, // [66:91] is the sub-list for method output_type
+	41, // [41:66] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_proto_etu_proto_init() }
@@ -4106,9 +4233,9 @@ func file_proto_etu_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_etu_proto_rawDesc), len(file_proto_etu_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   54,
+			NumMessages:   56,
 			NumExtensions: 0,
-			NumServices:   7,
+			NumServices:   8,
 		},
 		GoTypes:           file_proto_etu_proto_goTypes,
 		DependencyIndexes: file_proto_etu_proto_depIdxs,

@@ -312,6 +312,9 @@ func userToProto(u *db.User) *pb.User {
 	if u.StripeSubscriptionID != nil {
 		pbUser.StripeSubscriptionId = u.StripeSubscriptionID
 	}
+	if u.BillingProvider != nil {
+		pbUser.BillingProvider = u.BillingProvider
+	}
 	if u.StripePriceID != nil {
 		pbUser.StripePriceId = u.StripePriceID
 	}

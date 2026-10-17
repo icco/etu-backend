@@ -161,6 +161,9 @@ message User {
   // ai_enabled reports whether the user opted in to AI processing such as
   // tag generation, OCR, and audio transcription. Defaults to false.
   bool ai_enabled = 26;
+  // billing_provider names the billing system that owns the user's subscription,
+  // such as "stripe" or "play". It is unset for users that have never subscribed.
+  optional string billing_provider = 27;
 }
 
 // ApiKey represents API key metadata returned to clients.
@@ -641,4 +644,26 @@ service AccountService {
   rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
   // ExportData streams all of the caller's data.
   rpc ExportData(ExportDataRequest) returns (stream ExportDataResponse);
+}
+
+// VerifyPlayPurchaseRequest submits a Google Play subscription purchase for
+// verification.
+message VerifyPlayPurchaseRequest {
+  // purchase_token is the token returned by Google Play Billing for the purchase.
+  string purchase_token = 1;
+  // product_id is the Google Play subscription product id that was purchased.
+  string product_id = 2;
+}
+
+// VerifyPlayPurchaseResponse returns the user after the purchase is applied.
+message VerifyPlayPurchaseResponse {
+  // user is the caller's account with its updated subscription state.
+  User user = 1;
+}
+
+// BillingService handles subscriptions purchased outside Stripe.
+service BillingService {
+  // VerifyPlayPurchase verifies a Google Play subscription purchase with Google
+  // and applies it to the authenticated user's account.
+  rpc VerifyPlayPurchase(VerifyPlayPurchaseRequest) returns (VerifyPlayPurchaseResponse);
 }
