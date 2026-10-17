@@ -20,7 +20,7 @@ func (db *DB) withStripeEvent(ctx context.Context, userID, eventID string, updat
 		if result.Error != nil {
 			return fmt.Errorf("record stripe event: %w", result.Error)
 		}
-		txDB := &DB{conn: tx}
+		txDB := &DB{conn: tx, paywallGrace: db.paywallGrace}
 		var err error
 		if result.RowsAffected == 0 {
 			user, err = txDB.GetUser(ctx, userID)

@@ -238,6 +238,9 @@ func (s *AuthService) UpdateUserSubscription(ctx context.Context, req *pb.Update
 	if errors.Is(err, db.ErrStripeCustomerMismatch) {
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
+	if errors.Is(err, db.ErrBillingProviderMismatch) {
+		return nil, status.Error(codes.FailedPrecondition, db.ErrBillingProviderMismatch.Error())
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update user subscription: %v", err)
 	}

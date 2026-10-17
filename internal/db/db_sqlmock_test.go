@@ -917,9 +917,9 @@ func TestUpdateUserSubscription_SQL(t *testing.T) {
 	now := time.Now().UTC()
 
 	mock.ExpectBegin()
-	// UPDATE "User" SET cancelAtPeriodEnd=$1, stripeCustomerId=$2, subscriptionStatus=$3, updatedAt=$4 WHERE id=$5
+	// UPDATE "User" SET billingProvider=$1, cancelAtPeriodEnd=$2, stripeCustomerId=$3, subscriptionStatus=$4, updatedAt=$5 WHERE id=$6 AND ownership clause
 	mock.ExpectExec(`UPDATE "User"`).
-		WithArgs(false, stripeID, "premium", sqlmock.AnyArg(), userID).
+		WithArgs("stripe", false, stripeID, "premium", sqlmock.AnyArg(), userID, "stripe", "active", "trial", "trialing", "pro", "premium", (7 * 24 * time.Hour).Seconds()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	mock.ExpectQuery(`SELECT (.+) FROM "User"`).

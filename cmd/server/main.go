@@ -154,6 +154,7 @@ func run(log *zap.SugaredLogger) error {
 	if err != nil {
 		return fmt.Errorf("failed to configure paywall: %w", err)
 	}
+	database.SetPaywallGrace(paywall.Grace)
 	log.Infow("paywall configured", "grace_period", paywall.Grace.String())
 
 	server, err := newGRPCServer(registry, authenticator, m2mConfig, paywall, log)
