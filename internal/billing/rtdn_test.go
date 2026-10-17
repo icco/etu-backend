@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 	"google.golang.org/api/idtoken"
 )
 
@@ -260,14 +261,48 @@ func TestRTDNNotConfigured(t *testing.T) {
 	}
 }
 
-func TestRTDNWrongPackage(t *testing.T) {
-	f := &fakeSync{}
-	rec := doRTDN(t, newRTDN(f, okValidator()), http.MethodPost, "Bearer good-jwt", subscriptionBody(t, "com.example.other"))
-	if diff := cmp.Diff(http.StatusBadRequest, rec.Code); diff != "" {
-		t.Errorf("status mismatch (-want +got):\n%s", diff)
+func TestRTDNDropsUnusableNotifications(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    func(*testing.T) string
+		wantLog string
+	}{
+		{
+			name:    "wrong package",
+			body:    func(t *testing.T) string { return subscriptionBody(t, "com.example.other") },
+			wantLog: "rtdn for another package dropped",
+		},
+		{
+			name: "subscription without token",
+			body: func(t *testing.T) string {
+				return pushBody(t, map[string]any{"packageName": rtdnPackage, "subscriptionNotification": map[string]any{"notificationType": 4}})
+			},
+			wantLog: "rtdn notification without purchase token dropped",
+		},
+		{
+			name: "voided purchase without token",
+			body: func(t *testing.T) string {
+				return pushBody(t, map[string]any{"packageName": rtdnPackage, "voidedPurchaseNotification": map[string]any{"orderId": "GPA.1"}})
+			},
+			wantLog: "rtdn notification without purchase token dropped",
+		},
 	}
-	if len(f.calls) != 0 {
-		t.Errorf("sync calls = %v, want none", f.calls)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &fakeSync{}
+			core, logs := observer.New(zap.WarnLevel)
+			h := NewRTDNHandler(zap.New(core).Sugar(), f.sync, okValidator(), rtdnAudience, rtdnServiceAccount, rtdnPackage)
+			rec := doRTDN(t, h, http.MethodPost, "Bearer good-jwt", tt.body(t))
+			if diff := cmp.Diff(http.StatusNoContent, rec.Code); diff != "" {
+				t.Errorf("status mismatch (-want +got):\n%s", diff)
+			}
+			if len(f.calls) != 0 {
+				t.Errorf("sync calls = %v, want none", f.calls)
+			}
+			if got := logs.FilterMessage(tt.wantLog).Len(); got != 1 {
+				t.Errorf("log %q count = %d, want 1 (logs %v)", tt.wantLog, got, logs.All())
+			}
+		})
 	}
 }
 

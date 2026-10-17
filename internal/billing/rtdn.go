@@ -74,8 +74,8 @@ func NewRTDNHandler(log *zap.SugaredLogger, sync func(ctx context.Context, token
 			return
 		}
 		if note.PackageName != packageName {
-			log.Warnw("rtdn for another package", "package_name", note.PackageName)
-			http.Error(w, "unknown package", http.StatusBadRequest)
+			log.Warnw("rtdn for another package dropped", "package_name", note.PackageName)
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
@@ -97,8 +97,8 @@ func NewRTDNHandler(log *zap.SugaredLogger, sync func(ctx context.Context, token
 			return
 		}
 		if token == "" {
-			log.Warnw("rtdn notification without purchase token")
-			http.Error(w, "missing purchase token", http.StatusBadRequest)
+			log.Warnw("rtdn notification without purchase token dropped", "voided", voided)
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 
