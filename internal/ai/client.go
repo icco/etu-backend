@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"go.icco.me/gutil/vertex"
 )
@@ -38,11 +39,15 @@ func NewClient(project, location string) (*Client, error) {
 // consider caching the client in the Client struct. However, the genai library
 // manages connection pooling internally, so this approach is acceptable for now.
 func (c *Client) newVertexClient(ctx context.Context) (*vertex.Client, error) {
-	client, err := vertex.New(ctx, vertex.Config{
+	cfg := vertex.Config{
 		Project:  c.project,
 		Location: c.location,
 		Model:    model,
-	})
+	}
+	if key := os.Getenv("GEMINI_API_KEY"); key != "" {
+		cfg = vertex.Config{APIKey: key, Model: model}
+	}
+	client, err := vertex.New(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
