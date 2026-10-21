@@ -29,7 +29,7 @@ LABEL org.opencontainers.image.source=https://github.com/icco/etu-backend
 LABEL org.opencontainers.image.description="gRPC notes/tags API in Go backing etu-web and the etu CLI; Postgres storage, GCS attachments, Notion sync, and Gemini-powered tag generation, OCR, and audio transcription."
 LABEL org.opencontainers.image.licenses=CC-BY-NC-4.0
 
-RUN apt-get update && apt-get install -y ca-certificates && apt-get install -y --no-install-recommends --only-upgrade ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' ca-certificates)" ge 20250419~deb12u2 && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user.
 RUN groupadd -r app && useradd -r -u 1001 -g app app
