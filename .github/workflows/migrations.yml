@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18-alpine
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -15,11 +15,11 @@ jobs:
     env:
       ATLAS_MODELS_URL: postgres://postgres:postgres@localhost:5432/models?sslmode=disable&search_path=public
       ATLAS_DEV_URL: postgres://postgres:postgres@localhost:5432/dev?sslmode=disable&search_path=public
-      ATLAS_RUN: docker run --rm --network host -v ${{ github.workspace }}:/src -w /src -e ATLAS_MODELS_URL -e ATLAS_DEV_URL arigaio/atlas:latest-community@sha256:88cadf07b3896a995f455263bd9d54dddd9704e3e3b04b34194ba710d5672c49
+      ATLAS_RUN: docker run --rm --network host -v ${{ github.workspace }}:/src -w /src -e ATLAS_MODELS_URL -e ATLAS_DEV_URL arigaio/atlas:latest-community@sha256:1584507eedff048d68fc3cf98cd9cde996cecdb82d8ff6f6b367e2082e5aa00d
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: Create scratch databases
