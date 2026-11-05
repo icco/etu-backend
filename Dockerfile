@@ -1,6 +1,6 @@
-FROM arigaio/atlas:latest-community@sha256:88cadf07b3896a995f455263bd9d54dddd9704e3e3b04b34194ba710d5672c49 AS atlas
+FROM arigaio/atlas:latest-community@sha256:1584507eedff048d68fc3cf98cd9cde996cecdb82d8ff6f6b367e2082e5aa00d AS atlas
 
-FROM golang:1.27-bookworm AS builder
+FROM golang:1.27-trixie AS builder
 
 # Install task via go install to avoid supply-chain risk from curl|bash.
 # The Go module proxy verifies the checksum of the downloaded module.
@@ -23,7 +23,7 @@ COPY . .
 RUN task build
 
 # Final image
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 LABEL org.opencontainers.image.source=https://github.com/icco/etu-backend
 LABEL org.opencontainers.image.description="gRPC notes/tags API in Go backing etu-web and the etu CLI; Postgres storage, GCS attachments, Notion sync, and Gemini-powered tag generation, OCR, and audio transcription."
