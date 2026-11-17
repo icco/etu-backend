@@ -14,6 +14,7 @@ import (
 	"go.icco.me/etu-backend/internal/sync"
 	"go.icco.me/etu-backend/internal/syncdb"
 	"go.icco.me/gutil/logging"
+	"go.icco.me/gutil/tracing"
 	"go.uber.org/zap"
 )
 
@@ -25,6 +26,19 @@ const (
 
 func main() {
 	log := logger.New("etu-backend-sync")
+	shutdown, err := tracing.Init(context.Background(), "etu-backend-sync")
+	if err != nil {
+		log.Errorw("failed to init tracing", zap.Error(err))
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
+
 	if err := run(log); err != nil {
 		log.Errorw("sync exited with error", zap.Error(err))
 		os.Exit(1)

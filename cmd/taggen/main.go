@@ -16,12 +16,26 @@ import (
 	"go.icco.me/etu-backend/internal/storage"
 	"go.icco.me/etu-backend/internal/tagging"
 	"go.icco.me/gutil/logging"
+	"go.icco.me/gutil/tracing"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
 
 func main() {
 	log := logger.New("etu-backend-taggen")
+	shutdown, err := tracing.Init(context.Background(), "etu-backend-taggen")
+	if err != nil {
+		log.Errorw("failed to init tracing", zap.Error(err))
+		os.Exit(1)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
+
 	if err := run(log); err != nil {
 		log.Errorw("taggen exited with error", zap.Error(err))
 		os.Exit(1)

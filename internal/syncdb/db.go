@@ -14,6 +14,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+	gormtracing "gorm.io/plugin/opentelemetry/tracing"
 )
 
 // ErrUserDisabled is returned when syncing into a missing or disabled account.
@@ -57,6 +58,10 @@ func New() (*DB, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
+
+	if err := conn.Use(gormtracing.NewPlugin(gormtracing.WithoutMetrics())); err != nil {
+		return nil, fmt.Errorf("failed to register tracing plugin: %w", err)
 	}
 
 	// Configure connection pool
