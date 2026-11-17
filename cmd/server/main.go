@@ -48,19 +48,6 @@ const maxRecvMsgSize = service.MaxImagesPerRequest*service.MaxImageSize + servic
 
 func main() {
 	log := logger.New("etu-backend-server")
-	shutdown, err := tracing.Init(context.Background(), "etu-backend-server")
-	if err != nil {
-		log.Errorw("failed to init tracing", zap.Error(err))
-		os.Exit(1)
-	}
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := shutdown(shutdownCtx); err != nil {
-			log.Warnw("tracing shutdown", zap.Error(err))
-		}
-	}()
-
 	if err := run(log); err != nil {
 		log.Errorw("server exited with error", zap.Error(err))
 		os.Exit(1)
@@ -72,6 +59,18 @@ func run(log *zap.SugaredLogger) error {
 	// context (HTTP handlers, gRPC interceptors, background goroutines) can
 	// retrieve a logger via logging.FromContext.
 	rootCtx := logging.NewContext(context.Background(), log)
+
+	shutdown, err := tracing.Init(rootCtx, "etu-backend-server")
+	if err != nil {
+		return fmt.Errorf("init tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
 
 	grpcPort := os.Getenv("GRPC_PORT")
 	if grpcPort == "" {

@@ -23,19 +23,6 @@ import (
 
 func main() {
 	log := logger.New("etu-backend-taggen")
-	shutdown, err := tracing.Init(context.Background(), "etu-backend-taggen")
-	if err != nil {
-		log.Errorw("failed to init tracing", zap.Error(err))
-		os.Exit(1)
-	}
-	defer func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := shutdown(shutdownCtx); err != nil {
-			log.Warnw("tracing shutdown", zap.Error(err))
-		}
-	}()
-
 	if err := run(log); err != nil {
 		log.Errorw("taggen exited with error", zap.Error(err))
 		os.Exit(1)
@@ -46,6 +33,18 @@ func run(log *zap.SugaredLogger) error {
 	// rootCtx carries the application logger so descendant contexts
 	// (signal-cancellable, per-task) can retrieve it via logging.FromContext.
 	rootCtx := logging.NewContext(context.Background(), log)
+
+	shutdown, err := tracing.Init(rootCtx, "etu-backend-taggen")
+	if err != nil {
+		return fmt.Errorf("init tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
 
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
 	dryRun := flag.Bool("dry-run", false, "Run without actually adding tags (for testing)")
