@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.icco.me/etu-backend/internal/auth"
 	"go.uber.org/zap"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -18,6 +19,7 @@ func newGRPCServer(registry *prometheus.Registry, authenticator *auth.Authentica
 	unaryAuth := authInterceptor(authenticator, m2m, log)
 	recoverUnary, recoverStream := recoveryInterceptors(log)
 	return grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.ChainUnaryInterceptor(metrics.UnaryServerInterceptor(), recoverUnary, unaryAuth, paywallInterceptor(authenticator, paywall)),
 		grpc.ChainStreamInterceptor(metrics.StreamServerInterceptor(), recoverStream, streamAuthInterceptor(unaryAuth), paywallStreamInterceptor(authenticator, paywall)),
 		grpc.MaxRecvMsgSize(maxRecvMsgSize),

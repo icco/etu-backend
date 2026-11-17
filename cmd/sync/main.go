@@ -14,6 +14,7 @@ import (
 	"go.icco.me/etu-backend/internal/sync"
 	"go.icco.me/etu-backend/internal/syncdb"
 	"go.icco.me/gutil/logging"
+	"go.icco.me/gutil/tracing"
 	"go.uber.org/zap"
 )
 
@@ -33,6 +34,18 @@ func main() {
 
 func run(log *zap.SugaredLogger) error {
 	rootCtx := logging.NewContext(context.Background(), log)
+
+	shutdown, err := tracing.Init(rootCtx, "etu-backend-sync")
+	if err != nil {
+		return fmt.Errorf("init tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
 
 	fullSync := flag.Bool("full", false, "Perform a full sync instead of incremental")
 	direction := flag.String("direction", "from-notion", "Sync direction: from-notion, to-notion, or bidirectional")

@@ -16,6 +16,7 @@ import (
 	"go.icco.me/etu-backend/internal/storage"
 	"go.icco.me/etu-backend/internal/tagging"
 	"go.icco.me/gutil/logging"
+	"go.icco.me/gutil/tracing"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
@@ -32,6 +33,18 @@ func run(log *zap.SugaredLogger) error {
 	// rootCtx carries the application logger so descendant contexts
 	// (signal-cancellable, per-task) can retrieve it via logging.FromContext.
 	rootCtx := logging.NewContext(context.Background(), log)
+
+	shutdown, err := tracing.Init(rootCtx, "etu-backend-taggen")
+	if err != nil {
+		return fmt.Errorf("init tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
 
 	interval := flag.Duration("interval", 0, "Run continuously with this interval (e.g., 1h). If not set, runs once and exits.")
 	dryRun := flag.Bool("dry-run", false, "Run without actually adding tags (for testing)")

@@ -23,6 +23,8 @@ import (
 	"go.icco.me/etu-backend/internal/storage"
 	pb "go.icco.me/etu-backend/proto"
 	"go.icco.me/gutil/logging"
+	"go.icco.me/gutil/tracing"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -57,6 +59,18 @@ func run(log *zap.SugaredLogger) error {
 	// context (HTTP handlers, gRPC interceptors, background goroutines) can
 	// retrieve a logger via logging.FromContext.
 	rootCtx := logging.NewContext(context.Background(), log)
+
+	shutdown, err := tracing.Init(rootCtx, "etu-backend-server")
+	if err != nil {
+		return fmt.Errorf("init tracing: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdown(shutdownCtx); err != nil {
+			log.Warnw("tracing shutdown", zap.Error(err))
+		}
+	}()
 
 	grpcPort := os.Getenv("GRPC_PORT")
 	if grpcPort == "" {
@@ -229,9 +243,19 @@ func run(log *zap.SugaredLogger) error {
 	// trickle HTTP request headers without ever completing them. Without it,
 	// ReadTimeout alone does not bound header-only connections because
 	// ReadTimeout begins only after the first body byte arrives.
+	healthHandler := newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}), rtdnHandler)
+	otelHealthHandler := otelhttp.NewHandler(healthHandler, "etu-backend-http", otelhttp.WithFilter(func(r *http.Request) bool {
+		switch r.URL.Path {
+		case "/", "/health", "/metrics", "/ready", "/robots.txt":
+			return false
+		default:
+			return true
+		}
+	}))
+
 	httpServer := &http.Server{
 		Addr:              ":" + httpPort,
-		Handler:           newHealthHandler(log, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}), rtdnHandler),
+		Handler:           otelHealthHandler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       5 * time.Second,
 		WriteTimeout:      5 * time.Second,
