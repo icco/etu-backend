@@ -83,7 +83,7 @@ func New() (*DB, error) {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	if err := conn.Use(gormtracing.NewPlugin(gormtracing.WithoutMetrics())); err != nil {
+	if err := conn.Use(gormtracing.NewPlugin(gormtracing.WithoutMetrics(), gormtracing.WithoutQueryVariables())); err != nil {
 		return nil, fmt.Errorf("failed to register tracing plugin: %w", err)
 	}
 
